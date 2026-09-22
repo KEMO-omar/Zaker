@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SHAPAP | شاحن الإنجاز اللانهائي ⚡</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;800;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050507;
+  --bg2:#0a0a10;
+  --panel:rgba(18,18,28,.55);
+  --violet:#a855f7;
+  --cyan:#22d3ee;
+  --green:#4ade80;
+  --amber:#fbbf24;
+  --rose:#fb7185;
+  --txt:#e8e8f0;
+  --dim:#8b8b9e;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--txt);
+  font-family:'Cairo',sans-serif;
+  overflow-x:hidden;
+  min-height:100vh;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 10%, rgba(168,85,247,.08), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 85% 80%, rgba(34,211,238,.06), transparent 60%);
+}
+.stars{position:fixed;inset:0;z-index:0;pointer-events:none}
+.screen{position:relative;z-index:2;display:none;min-height:100vh;flex-direction:column;align-items:center;padding:24px 16px 60px}
+.screen.active{display:flex;animation:fadeIn .6s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* ===== Dashboard ===== */
+.brand{font-size:13px;letter-spacing:6px;color:var(--dim);margin-top:8px;font-family:'Orbitron',monospace;text-transform:uppercase}
+.brand b{color:var(--cyan);text-shadow:0 0 14px var(--cyan)}
+.spiral-wrap{position:relative;width:min(78vw,380px);height:min(78vw,380px);margin:22px auto 6px}
+.spiral-wrap canvas{width:100%;height:100%}
+.total-clock{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;
+}
+.total-clock .num{
+  font-family:'Orbitron',monospace;font-weight:900;
+  font-size:clamp(26px,8vw,40px);
+  background:linear-gradient(120deg,var(--cyan),var(--violet),var(--green));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 18px rgba(168,85,247,.55));
+  direction:ltr;
+}
+.total-clock .lbl{font-size:12px;color:var(--dim);margin-top:4px}
+.ring-note{font-size:11px;color:var(--dim);text-align:center;margin-bottom:18px}
+.ring-note b{color:var(--green)}
+.subjects{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%;max-width:520px;margin-bottom:26px}
+.subj{
+  background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:14px 6px;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  transition:.3s;cursor:default;
+}
+.subj:hover{transform:translateY(-4px);border-color:var(--sc)}
+.subj .ico{font-size:22px}
+.subj .nm{font-size:12px;font-weight:600;color:var(--sc);text-shadow:0 0 10px var(--sc)}
+.subj .hr{font-family:'Orbitron',monospace;font-size:11px;color:var(--txt);direction:ltr}
+.launch{
+  position:relative;border:none;cursor:pointer;font-family:'Cairo',sans-serif;
+  padding:18px 54px;border-radius:60px;font-size:19px;font-weight:800;color:#04040a;
+  background:linear-gradient(120deg,var(--cyan),var(--violet) 55%,var(--green));
+  box-shadow:0 0 30px rgba(168,85,247,.45),0 0 70px rgba(34,211,238,.2);
+  animation:pulse 2.6s ease-in-out infinite;
+  transition:.25s;
+}
+.launch:hover{transform:scale(1.05)}
+.launch:active{transform:scale(.96)}
+@keyframes pulse{0%,100%{box-shadow:0 0 26px rgba(168,85,247,.4),0 0 60px rgba(34,211,238,.15)}50%{box-shadow:0 0 46px rgba(168,85,247,.7),0 0 100px rgba(74,222,128,.3)}}
+.dash-tabs{display:flex;gap:8px;margin-top:22px}
+.dash-tabs button{
+  background:var(--panel);border:1px solid rgba(255,255,255,.08);color:var(--dim);
+  border-radius:12px;padding:9px 18px;font-family:'Cairo';font-size:13px;cursor:pointer;transition:.25s;
+}
+.dash-tabs button.on{color:var(--cyan);border-color:rgba(34,211,238,.4);box-shadow:0 0 16px rgba(34,211,238,.15)}
+
+/* ===== Focus Mode ===== */
+#focusScreen{justify-content:space-between;padding-top:30px}
+.top-bar{width:100%;max-width:640px}
+.bar-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:6px}
+.neo-bar{
+  height:12px;border-radius:20px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);overflow:hidden;position:relative;
+}
+.neo-fill{
+  height:100%;width:0%;border-radius:20px;position:relative;
+  background:linear-gradient(90deg,var(--cyan),var(--violet));
+  box-shadow:0 0 16px rgba(34,211,238,.7);
+  transition:width 1s linear;
+}
+.neo-fill::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
+  animation:wave 2.2s linear infinite;
+}
+@keyframes wave{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
+.focus-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%}
+.session-timer{
+  font-family:'Orbitron',monospace;font-size:clamp(52px,15vw,96px);font-weight:700;
+  color:var(--txt);opacity:.85;direction:ltr;letter-spacing:4px;
+  text-shadow:0 0 30px rgba(168,85,247,.4);
+  animation:softGlow 60s ease-in-out infinite alternate;
+}
+@keyframes softGlow{from{text-shadow:0 0 20px rgba(168,85,247,.25)}to{text-shadow:0 0 50px rgba(74,222,128,.55)}}
+.session-sub{font-size:13px;color:var(--dim);margin-top:6px}
+.focus-btns{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap;justify-content:center}
+.fbtn{
+  border-radius:16px;padding:14px 26px;font-family:'Cairo';font-size:15px;font-weight:700;cursor:pointer;transition:.25s;border:1px solid rgba(255,255,255,.12);
+}
+.fbtn.break{background:rgba(251,191,36,.1);color:var(--amber);border-color:rgba(251,191,36,.35)}
+.fbtn.break:hover{box-shadow:0 0 20px rgba(251,191,36,.3)}
+.fbtn.end{background:rgba(251,113,133,.12);color:var(--rose);border-color:rgba(251,113,133,.4)}
+.fbtn.end:hover{box-shadow:0 0 22px rgba(251,113,133,.35)}
+.bottom-bar-wrap{width:100%;max-width:640px;margin-top:20px}
+.big-bar{height:20px}
+.big-fill{background:linear-gradient(90deg,var(--violet),var(--green));box-shadow:0 0 22px rgba(74,222,128,.6)}
+
+/* Break overlay */
+#breakOverlay{
+  position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;flex-direction:column;
+  background:#020204;animation:breath 6s ease-in-out infinite;
+}
+#breakOverlay.show{display:flex}
+@keyframes breath{
+  0%,100%{box-shadow:inset 0 0 120px rgba(251,191,36,.04)}
+  50%{box-shadow:inset 0 0 220px rgba(251,191,36,.14)}
+}
+#breakOverlay .q{font-size:clamp(18px,5vw,26px);color:var(--amber);text-align:center;padding:0 30px;line-height:2;text-shadow:0 0 20px rgba(251,191,36,.35)}
+#breakOverlay .bt{font-family:'Orbitron',monospace;color:var(--dim);margin-top:22px;font-size:14px;direction:ltr}
+#breakOverlay button{
+  margin-top:40px;background:transparent;border:1px solid rgba(251,191,36,.4);color:var(--amber);
+  border-radius:40px;padding:12px 34px;font-family:'Cairo';font-size:15px;cursor:pointer;transition:.25s;
+}
+#breakOverlay button:hover{box-shadow:0 0 24px rgba(251,191,36,.3)}
+
+/* ===== Mission Logger ===== */
+#loggerModal{
+  position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:20px;
+  background:rgba(3,3,6,.7);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+#loggerModal.show{display:flex;animation:fadeIn .35s ease}
+.logger{
+  width:100%;max-width:480px;background:rgba(16,16,26,.85);
+  border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:26px;
+  box-shadow:0 0 60px rgba(168,85,247,.15);max-height:85vh;overflow-y:auto;
+}
+.logger h3{font-size:19px;margin-bottom:4px;background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.logger .dur{font-size:12px;color:var(--dim);margin-bottom:18px}
+.mrow{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+.msubj{
+  flex:0 0 auto;border-radius:12px;padding:10px 14px;font-family:'Cairo';font-size:13px;font-weight:700;cursor:pointer;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--dim);transition:.2s;
+}
+.msubj.sel{color:#0a0a12;background:var(--mc);border-color:var(--mc);box-shadow:0 0 16px var(--mc)}
+.mtask{
+  flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;
+  padding:10px 14px;color:var(--txt);font-family:'Cairo';font-size:13px;outline:none;transition:.2s;min-width:0;
+}
+.mtask:focus{border-color:var(--violet);box-shadow:0 0 14px rgba(168,85,247,.25)}
+.add-subj{
+  width:100%;background:transparent;border:1px dashed rgba(255,255,255,.2);color:var(--dim);border-radius:12px;
+  padding:10px;font-family:'Cairo';font-size:13px;cursor:pointer;margin-bottom:16px;transition:.2s;
+}
+.add-subj:hover{color:var(--cyan);border-color:rgba(34,211,238,.4)}
+.save-btn{
+  width:100%;border:none;border-radius:14px;padding:15px;font-family:'Cairo';font-size:16px;font-weight:800;cursor:pointer;
+  background:linear-gradient(120deg,var(--violet),var(--green));color:#04040a;transition:.25s;
+  box-shadow:0 0 24px rgba(74,222,128,.25);
+}
+.save-btn:hover{transform:scale(1.02)}
+.save-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ===== Chrono Log ===== */
+.log-list{width:100%;max-width:560px;display:flex;flex-direction:column;gap:14px}
+.log-item{
+  background:var(--panel);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.07);
+  border-radius:18px;padding:16px 18px;position:relative;overflow:hidden;
+}
+.log-item::before{content:'';position:absolute;right:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--cyan),var(--violet))}
+.log-date{font-size:13px;font-weight:700;color:var(--cyan)}
+.log-meta{font-size:12px;color:var(--dim);margin:4px 0 10px}
+.task-line{font-size:13px;padding:5px 10px;border-radius:8px;margin-top:5px;display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.03)}
+.task-line .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.empty-log{text-align:center;color:var(--dim);font-size:14px;padding:40px 0}
+.toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);z-index:99;
+  background:rgba(20,20,32,.95);border:1px solid rgba(74,222,128,.4);color:var(--green);
+  padding:12px 26px;border-radius:40px;font-size:14px;transition:.4s;opacity:0;pointer-events:none;
+  box-shadow:0 0 24px rgba(74,222,128,.2);
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.sync-ind{position:fixed;top:14px;left:16px;z-index:40;font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
+.sync-ind .d{width:8px;height:8px;border-radius:50%;background:var(--rose)}
+.sync-ind.on .d{background:var(--green);box-shadow:0 0 10px var(--green)}
+h2.sec{font-size:22px;font-weight:800;margin:6px 0 20px}
+h2.sec span{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+</style>
+</head>
+<body>
+<canvas class="stars" id="stars"></canvas>
+<div class="sync-ind" id="syncInd"><span class="d"></span><span id="syncTxt">محلي</span></div>
+
+<!-- ============ DASHBOARD ============ -->
+<section class="screen active" id="dashScreen">
+  <div class="brand">SHAPAP <b>∞</b> INFINITE SPIRAL</div>
+  <div class="spiral-wrap">
+    <canvas id="spiralCanvas"></canvas>
+    <div class="total-clock">
+      <div class="num" id="totalHours">0h 00m</div>
+      <div class="lbl">إجمالي طاقة المذاكرة</div>
+    </div>
+  </div>
+  <div class="ring-note">كل <b>5 ساعات</b> = حلقة نيون جديدة تُثبَّت في الحلزون</div>
+  <div class="subjects" id="subjCards"></div>
+  <button class="launch" id="launchBtn">⚡ إطلاق جلسة مذاكرة</button>
+  <div class="dash-tabs">
+    <button class="on" id="tabLogBtn">📜 سجل الإنجازات</button>
+  </div>
+</section>
+
+<!-- ============ FOCUS MODE ============ -->
+<section class="screen" id="focusScreen">
+  <div class="top-bar">
+    <div class="bar-lbl"><span>⏱ الجلسة الحالية</span><span id="sessionBarTxt">0m</span></div>
+    <div class="neo-bar"><div class="neo-fill" id="sessionBarFill"></div></div>
+  </div>
+  <div class="focus-center">
+    <div class="session-timer" id="sessionTimer">00:00</div>
+    <div class="session-sub">ركّز بهدوء.. الطاقة تُشحن ⚡</div>
+    <div class="focus-btns">
+      <button class="fbtn break" id="breakBtn">☕ أخذ استراحة</button>
+      <button class="fbtn end" id="endBtn">🏁 إنهاء الجلسة</button>
+    </div>
+  </div>
+  <div class="bottom-bar-wrap">
+    <div class="bar-lbl"><span>🌌 الإنجاز العام</span><span id="totalBarTxt">0h 00m</span></div>
+    <div class="neo-bar big-bar"><div class="neo-fill big-fill" id="totalBarFill"></div></div>
+  </div>
+</section>
+
+<!-- ============ CHRONO LOG ============ -->
+<section class="screen" id="logScreen">
+  <h2 class="sec">📜 <span>سجل الإنجازات — خط زمني لبطولاتك</span></h2>
+  <div class="log-list" id="logList"></div>
+  <div class="dash-tabs" style="margin-top:26px">
+    <button id="backDashBtn">⬅ عودة للوحة التحكم</button>
+  </div>
+</section>
+
+<!-- ============ BREAK OVERLAY ============ -->
+<div id="breakOverlay">
+  <div class="q">خذ نفساً عميقاً..<br>حان وقت الراحة المُبرهنة 🌙</div>
+  <div class="bt" id="breakTimer">00:00</div>
+  <button id="resumeBtn">▶ استئناف المذاكرة</button>
+</div>
+
+<!-- ============ MISSION LOGGER ============ -->
+<div id="loggerModal">
+  <div class="logger">
+    <h3>📝 وثّق مهماتك</h3>
+    <div class="dur" id="loggerDur"></div>
+    <div id="missionRows"></div>
+    <button class="add-subj" id="addMissionBtn">+ إضافة مادة أخرى لهذه الجلسة</button>
+    <button class="save-btn" id="saveBtn">🕳️ احفر في التاريخ (حفظ الجلسة)</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, push, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBMBd9C41EyU7kWi06CVMgXrYFBVAvU1v8",
+  authDomain: "shapap-13c58.firebaseapp.com",
+  databaseURL: "https://shapap-13c58-default-rtdb.firebaseio.com",
+  projectId: "shapap-13c58",
+  storageBucket: "shapap-13c58.firebasestorage.app",
+  messagingSenderId: "818487036065",
+  appId: "1:818487036065:web:350734adcc4fcd779c48e0",
+  measurementId: "G-8L138W57KK"
+};
+
+const SUBJECTS = [
+  {id:'history', name:'تاريخ', ico:'📜', color:'#4ade80'},
+  {id:'arabic',  name:'عربي',  ico:'📖', color:'#fbbf24'},
+  {id:'english', name:'إنجليزي', ico:'🔤', color:'#22d3ee'},
+  {id:'physics', name:'فيزياء', ico:'⚛️', color:'#a855f7'},
+];
+const RING_MINUTES = 300; // 5 hours per ring
+
+/* ---------- State ---------- */
+let db = null, sessionsRef = null, firebaseOk = false;
+let sessions = []; // [{tsStart, tsEnd, minutes, entries:[{subj, task}]}]
+let session = null; // active session {startTs, elapsedBefore, breakStart, timerInt, breakInt}
+let totalMinutes = 0;
+let subjMinutes = {history:0, arabic:0, english:0, physics:0};
+
+/* ---------- Init Firebase ---------- */
+try {
+  const app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  sessionsRef = ref(db, 'shapap/sessions');
+  onValue(sessionsRef, snap => {
+    const val = snap.val();
+    sessions = val ? Object.values(val) : [];
+    recalc();
+    renderAll();
+    firebaseOk = true;
+    setSync(true);
+  });
+} catch(e) { console.warn('Firebase init failed, local mode', e); }
+
+/* local fallback */
+const LS_KEY = 'shapap_sessions_v1';
+function loadLocal(){ try{ const d = JSON.parse(localStorage.getItem(LS_KEY)||'[]'); sessions = Array.isArray(d)?d:[]; }catch(e){ sessions=[]; } }
+function saveLocal(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(sessions)); }catch(e){} }
+loadLocal(); recalc(); renderAll();
+
+function setSync(on){
+  const el = document.getElementById('syncInd');
+  el.classList.toggle('on', on);
+  document.getElementById('syncTxt').textContent = on ? 'متصل بالسحابة ☁️' : 'وضع محلي';
+}
+setSync(firebaseOk);
+
+/* ---------- Helpers ---------- */
+function recalc(){
+  totalMinutes = 0;
+  subjMinutes = {history:0, arabic:0, english:0, physics:0};
+  sessions.forEach(s => {
+    totalMinutes += s.minutes;
+    (s.entries||[]).forEach(en => { if(subjMinutes[en.subj]!==undefined) subjMinutes[en.subj] += s.minutes; });
+  });
+  if (session){
+    const cur = getSessionMinutes();
+    totalMinutes += cur;
+  }
+}
+function getSessionMinutes(){
+  if(!session) return 0;
+  const now = Date.now();
+  const base = session.elapsedBefore + (now - session.startTs);
+  return Math.floor(base/60000);
+}
+function getSessionSeconds(){
+  if(!session) return 0;
+  const now = Date.now();
+  return Math.floor((session.elapsedBefore + (now - session.startTs))/1000);
+}
+function fmtHM(min){
+  const h = Math.floor(min/60), m = min%60;
+  return `${h}h ${String(m).padStart(2,'0')}m`;
+}
+function fmtClock(sec){
+  const m = Math.floor(sec/60), s = sec%60;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+/* ---------- Stars background ---------- */
+(function(){
+  const c = document.getElementById('stars'), x = c.getContext('2d');
+  let W,H,stars;
+  function init(){ W=c.width=innerWidth; H=c.height=innerHeight;
+    stars = Array.from({length:90},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.3+.3,p:Math.random()*Math.PI*2}));
+  }
+  init(); addEventListener('resize',init);
+  (function loop(t){
+    x.clearRect(0,0,W,H);
+    stars.forEach(s=>{
+      const a = .25 + .55*Math.abs(Math.sin(t/1400 + s.p));
+      x.beginPath(); x.arc(s.x,s.y,s.r,0,7); x.fillStyle=`rgba(200,210,255,${a})`; x.fill();
+    });
+    requestAnimationFrame(loop);
+  })(0);
+})();
+
+/* ---------- 3D Glow Spiral ---------- */
+const spiralC = document.getElementById('spiralCanvas');
+const sx = spiralC.getContext('2d');
+function drawSpiral(){
+  const size = spiralC.parentElement.clientWidth * (window.devicePixelRatio||1);
+  spiralC.width = size; spiralC.height = size;
+  const cx = size/2, cy = size/2;
+  sx.clearRect(0,0,size,size);
+  const rings = Math.floor(totalMinutes / RING_MINUTES);
+  const partial = (totalMinutes % RING_MINUTES) / RING_MINUTES;
+  const grad = ['#a855f7','#22d3ee','#4ade80','#fbbf24','#fb7185'];
+  const t = performance.now()/1000;
+  const maxR = size*.46;
+
+  // completed rings
+  for(let r=0; r<rings; r++){
+    const rr = maxR * (r+1)/(Math.max(rings,1)+ (partial>0?1:0) );
+    sx.beginPath();
+    sx.arc(cx,cy,rr,0,Math.PI*2);
+    sx.strokeStyle = grad[r%grad.length];
+    sx.globalAlpha = .8;
+    sx.lineWidth = 2.5;
+    sx.shadowBlur = 18; sx.shadowColor = grad[r%grad.length];
+    sx.stroke();
+  }
+  // partial growing spiral (3D coil effect)
+  if (totalMinutes > 0){
+    const baseR = rings>0 ? maxR*rings/(rings+(partial>0?1:1)) : 0;
+    const steps = 160;
+    sx.beginPath();
+    const turns = 3;
+    for(let i=0;i<=steps*partial;i++){
+      const p = i/steps;
+      const ang = p*Math.PI*2*turns + t*.15;
+      const rr = baseR + (maxR-baseR)*p + Math.sin(ang*3)*size*.006;
+      const px = cx + Math.cos(ang)*rr, py = cy + Math.sin(ang)*rr*.92;
+      i===0 ? sx.moveTo(px,py) : sx.lineTo(px,py);
+    }
+    const g = grad[rings%grad.length];
+    sx.strokeStyle = g; sx.lineWidth = 2.5; sx.globalAlpha = .95;
+    sx.shadowBlur = 22; sx.shadowColor = g; sx.stroke();
+    // glowing head
+    const p = partial;
+    const ang = p*Math.PI*2*turns + t*.15;
+    const rr = baseR + (maxR-baseR)*p + Math.sin(ang*3)*size*.006;
+    sx.beginPath();
+    sx.arc(cx+Math.cos(ang)*rr, cy+Math.sin(ang)*rr*.92, 4*(window.devicePixelRatio||1), 0, 7);
+    sx.fillStyle='#fff'; sx.shadowBlur=30; sx.shadowColor=g; sx.fill();
+  }
+  sx.globalAlpha=1; sx.shadowBlur=0;
+  requestAnimationFrame(drawSpiral);
+}
+requestAnimationFrame(drawSpiral);
+
+/* ---------- Renders ---------- */
+function renderSubjects(){
+  document.getElementById('subjCards').innerHTML = SUBJECTS.map(s=>`
+    <div class="subj" style="--sc:${s.color}">
+      <div class="ico">${s.ico}</div>
+      <div class="nm">${s.name}</div>
+      <div class="hr">${fmtHM(subjMinutes[s.id])}</div>
+    </div>`).join('');
+}
+function renderLog(){
+  const list = document.getElementById('logList');
+  if(!sessions.length){
+    list.innerHTML = '<div class="empty-log">لا إنجازات بعد.. الحلزون بانتظار أول شرارة ⚡</div>';
+    return;
+  }
+  const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const sorted = [...sessions].sort((a,b)=>b.tsStart-a.tsStart);
+  list.innerHTML = sorted.map(s=>{
+    const d = new Date(s.tsStart);
+    const startStr = d.toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'});
+    const durStr = s.minutes>=60 ? `${Math.floor(s.minutes/60)} ساعة و ${s.minutes%60} دقيقة` : `${s.minutes} دقيقة`;
+    const entries = (s.entries||[]).map(en=>{
+      const sub = SUBJECTS.find(x=>x.id===en.subj);
+      return `<div class="task-line"><span class="dot" style="background:${sub?sub.color:'#fff'};box-shadow:0 0 8px ${sub?sub.color:'#fff'}"></span><b style="color:${sub?sub.color:'#fff'}">${sub?sub.name:en.subj}:</b> ${en.task||'—'}</div>`;
+    }).join('');
+    return `<div class="log-item">
+      <div class="log-date">📅 ${days[d.getDay()]}، ${d.toLocaleDateString('ar-EG',{day:'numeric',month:'long',year:'numeric'})}</div>
+      <div class="log-meta">بدأت الساعة ${startStr} واستمرت لمدة ${durStr}</div>
+      ${entries}
+    </div>`;
+  }).join('');
+}
+function renderAll(){
+  document.getElementById('totalHours').textContent = fmtHM(totalMinutes);
+  renderSubjects();
+  renderLog();
+  const totalPct = Math.min(100, (totalMinutes % 100000)/100);
+  document.getElementById('totalBarFill').style.width = Math.min(100,(totalMinutes/(RING_MINUTES*4))*100) + '%';
+  document.getElementById('totalBarTxt').textContent = fmtHM(totalMinutes);
+}
+
+/* ---------- Session flow ---------- */
+document.getElementById('launchBtn').onclick = () => {
+  session = { startTs: Date.now(), elapsedBefore: 0, timerInt: null, breakInt: null, breakStart: null };
+  showScreen('focusScreen');
+  startTimer();
+  toast('⚡ الجلسة انطلقت.. بالتوفيق يا بطل!');
+};
+function startTimer(){
+  clearInterval(session.timerInt);
+  session.timerInt = setInterval(()=>{
+    const sec = getSessionSeconds();
+    document.getElementById('sessionTimer').textContent = fmtClock(sec);
+    const min = Math.floor(sec/60);
+    document.getElementById('sessionBarTxt').textContent = min + 'm';
+    document.getElementById('sessionBarFill').style.width = Math.min(100, (sec/ (RING_MINUTES*60)) *100) + '%';
+    recalc();
+    document.getElementById('totalBarTxt').textContent = fmtHM(totalMinutes);
+    document.getElementById('totalBarFill').style.width = Math.min(100,(totalMinutes/(RING_MINUTES*4))*100) + '%';
+    document.getElementById('totalHours').textContent = fmtHM(totalMinutes);
+  }, 1000);
+}
+document.getElementById('breakBtn').onclick = () => {
+  if(!session || session.breakStart) return;
+  session.breakStart = Date.now();
+  document.getElementById('breakOverlay').classList.add('show');
+  clearInterval(session.timerInt);
+  session.breakInt = setInterval(()=>{
+    document.getElementById('breakTimer').textContent = fmtClock(Math.floor((Date.now()-session.breakStart)/1000));
+  },1000);
+};
+document.getElementById('resumeBtn').onclick = () => {
+  if(!session || !session.breakStart) return;
+  session.elapsedBefore += Date.now() - session.breakStart;
+  session.breakStart = null;
+  clearInterval(session.breakInt);
+  document.getElementById('breakOverlay').classList.remove('show');
+  startTimer();
+  toast('▶ عدت أقوى.. استئناف!');
+};
+document.getElementById('endBtn').onclick = () => {
+  if(!session) return;
+  if(session.breakStart){ session.elapsedBefore += Date.now()-session.breakStart; session.breakStart=null; clearInterval(session.breakInt); document.getElementById('breakOverlay').classList.remove('show'); }
+  const sec = getSessionSeconds();
+  clearInterval(session.timerInt);
+  if(sec < 60){ toast('⏳ الجلسة أقل من دقيقة.. لن تُحفظ'); finishSession(null); return; }
+  openLogger(sec);
+};
+function finishSession(payload){
+  session = null;
+  document.getElementById('loggerModal').classList.remove('show');
+  showScreen('dashScreen');
+  recalc(); renderAll();
+}
+document.getElementById('tabLogBtn').onclick = () => showScreen('logScreen');
+document.getElementById('backDashBtn').onclick = () => showScreen('dashScreen');
+
+/* ---------- Mission Logger ---------- */
+let missionRows = [];
+function openLogger(sec){
+  const min = Math.floor(sec/60);
+  document.getElementById('loggerDur').textContent = `مدة الجلسة: ${min} دقيقة ⏱ — ما الذي أنجزتَه؟`;
+  missionRows = [newRow()];
+  renderRows();
+  document.getElementById('loggerModal').classList.add('show');
+}
+function newRow(){
+  const div = document.createElement('div');
+  div.className = 'mrow';
+  div.innerHTML = SUBJECTS.map(s=>`<button class="msubj" data-id="${s.id}" style="--mc:${s.color}">${s.ico} ${s.name}</button>`).join('')
+    + '<input class="mtask" placeholder="اكتب المهمة (مثال: حل نموذج امتحان 2025)">';
+  div.querySelectorAll('.msubj').forEach(b=>{
+    b.onclick = () => {
+      div.querySelectorAll('.msubj').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel');
+      validateSave();
+    };
+  });
+  div.querySelector('.mtask').addEventListener('input', validateSave);
+  return div;
+}
+function renderRows(){
+  const box = document.getElementById('missionRows');
+  box.innerHTML = '';
+  missionRows.forEach(r=>box.appendChild(r));
+  validateSave();
+}
+function validateSave(){
+  const ok = missionRows.length>0 && missionRows.every(r=>r.querySelector('.msubj.sel') && r.querySelector('.mtask').value.trim());
+  document.getElementById('saveBtn').disabled = !ok;
+}
+document.getElementById('addMissionBtn').onclick = () => {
+  missionRows.push(newRow());
+  renderRows();
+};
+document.getElementById('saveBtn').onclick = async () => {
+  const sec = getSessionSeconds();
+  const payload = {
+    tsStart: session.startTs,
+    tsEnd: Date.now(),
+    minutes: Math.floor(sec/60),
+    entries: missionRows.map(r=>({
+      subj: r.querySelector('.msubj.sel').dataset.id,
+      task: r.querySelector('.mtask').value.trim()
+    }))
+  };
+  try{
+    if(db){ await push(sessionsRef, payload); }
+    else { sessions.push(payload); saveLocal(); }
+  }catch(e){
+    sessions.push(payload); saveLocal();
+    toast('⚠️ حُفظ محلياً (انقطع الاتصال)');
+  }
+  finishSession(payload);
+  toast('🕳️ حُفر في التاريخ.. إنجاز خالد!');
+};
+</script>
+</body>
+</html>
