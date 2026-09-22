@@ -159,14 +159,14 @@ body::before{
 }
 .logger h3{font-size:19px;margin-bottom:4px;background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .logger .dur{font-size:12px;color:var(--dim);margin-bottom:18px}
-.mrow{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+.mrow{display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap}
 .msubj{
   flex:0 0 auto;border-radius:12px;padding:10px 14px;font-family:'Cairo';font-size:13px;font-weight:700;cursor:pointer;
   background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--dim);transition:.2s;
 }
 .msubj.sel{color:#0a0a12;background:var(--mc);border-color:var(--mc);box-shadow:0 0 16px var(--mc)}
 .mtask{
-  flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;
+  flex:1 1 100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;
   padding:10px 14px;color:var(--txt);font-family:'Cairo';font-size:13px;outline:none;transition:.2s;min-width:0;
 }
 .mtask:focus{border-color:var(--violet);box-shadow:0 0 14px rgba(168,85,247,.25)}
@@ -199,12 +199,16 @@ body::before{
   position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);z-index:99;
   background:rgba(20,20,32,.95);border:1px solid rgba(74,222,128,.4);color:var(--green);
   padding:12px 26px;border-radius:40px;font-size:14px;transition:.4s;opacity:0;pointer-events:none;
-  box-shadow:0 0 24px rgba(74,222,128,.2);
+  box-shadow:0 0 24px rgba(74,222,128,.2);max-width:90vw;text-align:center;
 }
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 .sync-ind{position:fixed;top:14px;left:16px;z-index:40;font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
 .sync-ind .d{width:8px;height:8px;border-radius:50%;background:var(--rose)}
 .sync-ind.on .d{background:var(--green);box-shadow:0 0 10px var(--green)}
+.live-ind{position:fixed;top:14px;right:16px;z-index:40;font-size:11px;color:var(--green);display:none;align-items:center;gap:6px;font-family:'Orbitron',monospace}
+.live-ind .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:blink 1.2s infinite}
+.live-ind.show{display:flex}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 h2.sec{font-size:22px;font-weight:800;margin:6px 0 20px}
 h2.sec span{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 </style>
@@ -212,6 +216,7 @@ h2.sec span{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-
 <body>
 <canvas class="stars" id="stars"></canvas>
 <div class="sync-ind" id="syncInd"><span class="d"></span><span id="syncTxt">محلي</span></div>
+<div class="live-ind" id="liveInd"><span class="dot"></span>LIVE SYNC</div>
 
 <!-- ============ DASHBOARD ============ -->
 <section class="screen active" id="dashScreen">
@@ -239,7 +244,7 @@ h2.sec span{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-
   </div>
   <div class="focus-center">
     <div class="session-timer" id="sessionTimer">00:00</div>
-    <div class="session-sub">ركّز بهدوء.. الطاقة تُشحن ⚡</div>
+    <div class="session-sub" id="focusHint">ركّز بهدوء.. الطاقة تُشحن ⚡</div>
     <div class="focus-btns">
       <button class="fbtn break" id="breakBtn">☕ أخذ استراحة</button>
       <button class="fbtn end" id="endBtn">🏁 إنهاء الجلسة</button>
@@ -282,7 +287,7 @@ h2.sec span{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, push, onValue, set, remove, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBMBd9C41EyU7kWi06CVMgXrYFBVAvU1v8",
@@ -304,32 +309,145 @@ const SUBJECTS = [
 const RING_MINUTES = 300; // 5 hours per ring
 
 /* ---------- State ---------- */
-let db = null, sessionsRef = null, firebaseOk = false;
-let sessions = []; // [{tsStart, tsEnd, minutes, entries:[{subj, task}]}]
-let session = null; // active session {startTs, elapsedBefore, breakStart, timerInt, breakInt}
+let db = null, sessionsRef = null, activeRef = null, firebaseOk = false;
+let sessions = [];
+let session = null; // {startTs, elapsedBefore, breakStart, timerInt, syncInt, breakInt, ended}
 let totalMinutes = 0;
 let subjMinutes = {history:0, arabic:0, english:0, physics:0};
+let remoteActive = null;        // last snapshot from Firebase of shapap/active
+let lastLocalWrite = 0;         // ts of our last write to active
+let suppressRemote = false;     // guard while we're ending locally
 
 /* ---------- Init Firebase ---------- */
 try {
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
   sessionsRef = ref(db, 'shapap/sessions');
+  activeRef = ref(db, 'shapap/active');
+
   onValue(sessionsRef, snap => {
     const val = snap.val();
     sessions = val ? Object.values(val) : [];
-    recalc();
-    renderAll();
-    firebaseOk = true;
-    setSync(true);
+    recalc(); renderAll();
+    firebaseOk = true; setSync(true);
+  });
+
+  onValue(activeRef, snap => {
+    remoteActive = snap.val();
+    handleRemoteActive();
   });
 } catch(e) { console.warn('Firebase init failed, local mode', e); }
 
 /* local fallback */
 const LS_KEY = 'shapap_sessions_v1';
+const LS_ACTIVE = 'shapap_active_v1';
 function loadLocal(){ try{ const d = JSON.parse(localStorage.getItem(LS_KEY)||'[]'); sessions = Array.isArray(d)?d:[]; }catch(e){ sessions=[]; } }
 function saveLocal(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(sessions)); }catch(e){} }
+function loadLocalActive(){ try{ return JSON.parse(localStorage.getItem(LS_ACTIVE)||'null'); }catch(e){ return null; } }
+function saveLocalActive(a){ try{ a ? localStorage.setItem(LS_ACTIVE, JSON.stringify(a)) : localStorage.removeItem(LS_ACTIVE); }catch(e){} }
 loadLocal(); recalc(); renderAll();
+
+/* ---------- Cross-tab / refresh resume logic ---------- */
+function handleRemoteActive(){
+  // Case 1: remote session exists, we have none locally -> resume
+  if(remoteActive && !session){
+    session = {
+      startTs: remoteActive.startTs,
+      elapsedBefore: (remoteActive.elapsedBefore||0) + (remoteActive.breakStart ? 0 : Math.max(0, Date.now() - (remoteActive.lastSync||remoteActive.startTs))),
+      breakStart: remoteActive.breakStart || null,
+      timerInt:null, syncInt:null, breakInt:null
+    };
+    showScreen('focusScreen');
+    startTimer();
+    startLiveSync();
+    if(session.breakStart){
+      document.getElementById('breakOverlay').classList.add('show');
+      runBreakTimer();
+    }
+    document.getElementById('focusHint').textContent = '🔄 استئناف تلقائي — جلستك محفوظة ثانية بثانية';
+    toast('⚡ تم استئناف جلستك تلقائياً من حيث توقفت!');
+  }
+  // Case 2: remote cleared (ended from another tab) while we still run locally
+  else if(!remoteActive && session && !suppressRemote){
+    const s = session; session = null;
+    clearInterval(s.timerInt); clearInterval(s.syncInt); clearInterval(s.breakInt);
+    document.getElementById('breakOverlay').classList.remove('show');
+    showScreen('dashScreen');
+    recalc(); renderAll();
+    toast('🏁 الجلسة أُنهيت من نافذة أخرى — أُضيفت لسجل إنجازاتك');
+  }
+}
+
+/* ---------- Live sync (every second) ---------- */
+function startLiveSync(){
+  clearInterval(session.syncInt);
+  document.getElementById('liveInd').classList.add('show');
+  session.syncInt = setInterval(()=>{
+    if(!session) return;
+    const payload = {
+      startTs: session.startTs,
+      elapsedBefore: session.elapsedBefore,
+      breakStart: session.breakStart || null,
+      lastSync: Date.now()
+    };
+    lastLocalWrite = Date.now();
+    saveLocalActive(payload); // mirror locally as fallback
+    if(db){ set(activeRef, payload).catch(()=>{}); }
+  }, 1000);
+}
+function stopLiveSync(){
+  if(session) clearInterval(session.syncInt);
+  document.getElementById('liveInd').classList.remove('show');
+}
+
+/* flush final state on tab close/refresh */
+window.addEventListener('beforeunload', ()=>{
+  if(!session) return;
+  const payload = {
+    startTs: session.startTs,
+    elapsedBefore: session.elapsedBefore + (session.breakStart ? 0 : Date.now() - session.startTs),
+    breakStart: session.breakStart || null,
+    lastSync: Date.now()
+  };
+  saveLocalActive(payload);
+  if(db){
+    try{ navigator.sendBeacon; }catch(e){}
+    // best-effort sync (async may not complete; the 1s interval already keeps it fresh)
+    set(activeRef, payload).catch(()=>{});
+  }
+});
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && session){
+    const payload = {
+      startTs: session.startTs,
+      elapsedBefore: session.elapsedBefore,
+      breakStart: session.breakStart || null,
+      lastSync: Date.now()
+    };
+    saveLocalActive(payload);
+    if(db) set(activeRef, payload).catch(()=>{});
+  }
+});
+
+/* offline fallback: resume from localStorage mirror */
+if(!remoteActive && !session){
+  const la = loadLocalActive();
+  if(la && la.startTs && !la.ended){
+    session = {
+      startTs: la.startTs,
+      elapsedBefore: (la.elapsedBefore||0) + (la.breakStart ? 0 : Math.max(0, Date.now() - (la.lastSync||la.startTs))),
+      breakStart: la.breakStart || null,
+      timerInt:null, syncInt:null, breakInt:null
+    };
+    showScreen('focusScreen');
+    startTimer(); startLiveSync();
+    if(session.breakStart){
+      document.getElementById('breakOverlay').classList.add('show');
+      runBreakTimer();
+    }
+    toast('⚡ استُئنفت جلستك (وضع محلي)');
+  }
+}
 
 function setSync(on){
   const el = document.getElementById('syncInd');
@@ -346,22 +464,14 @@ function recalc(){
     totalMinutes += s.minutes;
     (s.entries||[]).forEach(en => { if(subjMinutes[en.subj]!==undefined) subjMinutes[en.subj] += s.minutes; });
   });
-  if (session){
-    const cur = getSessionMinutes();
-    totalMinutes += cur;
-  }
-}
-function getSessionMinutes(){
-  if(!session) return 0;
-  const now = Date.now();
-  const base = session.elapsedBefore + (now - session.startTs);
-  return Math.floor(base/60000);
+  if (session) totalMinutes += getSessionMinutes();
 }
 function getSessionSeconds(){
   if(!session) return 0;
   const now = Date.now();
   return Math.floor((session.elapsedBefore + (now - session.startTs))/1000);
 }
+function getSessionMinutes(){ return Math.floor(getSessionSeconds()/60); }
 function fmtHM(min){
   const h = Math.floor(min/60), m = min%60;
   return `${h}h ${String(m).padStart(2,'0')}m`;
@@ -373,7 +483,7 @@ function fmtClock(sec){
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2600);
+  setTimeout(()=>t.classList.remove('show'), 3200);
 }
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -413,9 +523,8 @@ function drawSpiral(){
   const t = performance.now()/1000;
   const maxR = size*.46;
 
-  // completed rings
   for(let r=0; r<rings; r++){
-    const rr = maxR * (r+1)/(Math.max(rings,1)+ (partial>0?1:0) );
+    const rr = maxR * (r+1)/(Math.max(rings,1)+(partial>0?1:0));
     sx.beginPath();
     sx.arc(cx,cy,rr,0,Math.PI*2);
     sx.strokeStyle = grad[r%grad.length];
@@ -424,9 +533,8 @@ function drawSpiral(){
     sx.shadowBlur = 18; sx.shadowColor = grad[r%grad.length];
     sx.stroke();
   }
-  // partial growing spiral (3D coil effect)
   if (totalMinutes > 0){
-    const baseR = rings>0 ? maxR*rings/(rings+(partial>0?1:1)) : 0;
+    const baseR = rings>0 ? maxR*rings/(rings+1) : 0;
     const steps = 160;
     sx.beginPath();
     const turns = 3;
@@ -440,7 +548,6 @@ function drawSpiral(){
     const g = grad[rings%grad.length];
     sx.strokeStyle = g; sx.lineWidth = 2.5; sx.globalAlpha = .95;
     sx.shadowBlur = 22; sx.shadowColor = g; sx.stroke();
-    // glowing head
     const p = partial;
     const ang = p*Math.PI*2*turns + t*.15;
     const rr = baseR + (maxR-baseR)*p + Math.sin(ang*3)*size*.006;
@@ -489,16 +596,17 @@ function renderAll(){
   document.getElementById('totalHours').textContent = fmtHM(totalMinutes);
   renderSubjects();
   renderLog();
-  const totalPct = Math.min(100, (totalMinutes % 100000)/100);
   document.getElementById('totalBarFill').style.width = Math.min(100,(totalMinutes/(RING_MINUTES*4))*100) + '%';
   document.getElementById('totalBarTxt').textContent = fmtHM(totalMinutes);
 }
 
 /* ---------- Session flow ---------- */
 document.getElementById('launchBtn').onclick = () => {
-  session = { startTs: Date.now(), elapsedBefore: 0, timerInt: null, breakInt: null, breakStart: null };
+  if(session){ toast('⚡ لديك جلسة نشطة بالفعل!'); return; }
+  session = { startTs: Date.now(), elapsedBefore: 0, breakStart: null, timerInt: null, syncInt: null, breakInt: null };
   showScreen('focusScreen');
   startTimer();
+  startLiveSync();
   toast('⚡ الجلسة انطلقت.. بالتوفيق يا بطل!');
 };
 function startTimer(){
@@ -515,14 +623,20 @@ function startTimer(){
     document.getElementById('totalHours').textContent = fmtHM(totalMinutes);
   }, 1000);
 }
+function runBreakTimer(){
+  clearInterval(session.breakInt);
+  session.breakInt = setInterval(()=>{
+    document.getElementById('breakTimer').textContent = fmtClock(Math.floor((Date.now()-session.breakStart)/1000));
+  },1000);
+}
 document.getElementById('breakBtn').onclick = () => {
   if(!session || session.breakStart) return;
   session.breakStart = Date.now();
   document.getElementById('breakOverlay').classList.add('show');
   clearInterval(session.timerInt);
-  session.breakInt = setInterval(()=>{
-    document.getElementById('breakTimer').textContent = fmtClock(Math.floor((Date.now()-session.breakStart)/1000));
-  },1000);
+  runBreakTimer();
+  // immediate sync so other tabs know
+  if(db) set(activeRef, {startTs:session.startTs, elapsedBefore:session.elapsedBefore, breakStart:session.breakStart, lastSync:Date.now()}).catch(()=>{});
 };
 document.getElementById('resumeBtn').onclick = () => {
   if(!session || !session.breakStart) return;
@@ -531,19 +645,38 @@ document.getElementById('resumeBtn').onclick = () => {
   clearInterval(session.breakInt);
   document.getElementById('breakOverlay').classList.remove('show');
   startTimer();
+  if(db) set(activeRef, {startTs:session.startTs, elapsedBefore:session.elapsedBefore, breakStart:null, lastSync:Date.now()}).catch(()=>{});
   toast('▶ عدت أقوى.. استئناف!');
 };
 document.getElementById('endBtn').onclick = () => {
   if(!session) return;
-  if(session.breakStart){ session.elapsedBefore += Date.now()-session.breakStart; session.breakStart=null; clearInterval(session.breakInt); document.getElementById('breakOverlay').classList.remove('show'); }
+  if(session.breakStart){
+    session.elapsedBefore += Date.now()-session.breakStart;
+    session.breakStart=null;
+    clearInterval(session.breakInt);
+    document.getElementById('breakOverlay').classList.remove('show');
+  }
   const sec = getSessionSeconds();
   clearInterval(session.timerInt);
-  if(sec < 60){ toast('⏳ الجلسة أقل من دقيقة.. لن تُحفظ'); finishSession(null); return; }
+  if(sec < 60){ toast('⏳ الجلسة أقل من دقيقة.. لن تُحفظ'); abortSession(); return; }
   openLogger(sec);
 };
-function finishSession(payload){
+function abortSession(){
   session = null;
+  stopLiveSync();
+  saveLocalActive(null);
+  if(db) remove(activeRef).catch(()=>{});
+  showScreen('dashScreen');
+  recalc(); renderAll();
+}
+function finishSession(){
+  session = null;
+  stopLiveSync();
+  saveLocalActive(null);
   document.getElementById('loggerModal').classList.remove('show');
+  suppressRemote = true;
+  if(db) remove(activeRef).catch(()=>{});
+  setTimeout(()=>{ suppressRemote = false; }, 1500);
   showScreen('dashScreen');
   recalc(); renderAll();
 }
@@ -606,7 +739,7 @@ document.getElementById('saveBtn').onclick = async () => {
     sessions.push(payload); saveLocal();
     toast('⚠️ حُفظ محلياً (انقطع الاتصال)');
   }
-  finishSession(payload);
+  finishSession();
   toast('🕳️ حُفر في التاريخ.. إنجاز خالد!');
 };
 </script>
