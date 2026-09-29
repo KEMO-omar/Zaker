@@ -4,6 +4,27 @@
  * session persistence across reloads, wasted time calculations, and lesson exemptions.
  */
 
+// --- FIREBASE CLOUD INTEGRATION ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBMBd9C41EyU7kWi06CVMgXrYFBVAvU1v8",
+  authDomain: "shapap-13c58.firebaseapp.com",
+  databaseURL: "https://shapap-13c58-default-rtdb.firebaseio.com",
+  projectId: "shapap-13c58",
+  storageBucket: "shapap-13c58.firebasestorage.app",
+  messagingSenderId: "818487036065",
+  appId: "1:818487036065:web:350734adcc4fcd779c48e0",
+  measurementId: "G-8L138W57KK"
+};
+
+let firebaseApp = null;
+let rtdb = null;
+let sessionsDbRef = null;
+let exemptionsDbRef = null;
+let isFirebaseConnected = false;
+
 // --- SUBJECTS CONFIGURATION ---
 const DEFAULT_SUBJECTS = [
   { id: 'history', name: 'تاريخ', color: '#10b981', targetMinutes: 120, icon: 'book-open' },
@@ -645,6 +666,71 @@ function finishSession() {
   document.getElementById('finishModal').classList.add('show');
 }
 
+// --- FIREBASE SYNC FUNCTIONS ---
+function updateCloudIndicator(connected) {
+  const el = document.getElementById('cloudStatusIndicator');
+  if (!el) return;
+  if (connected) {
+    el.style.background = 'rgba(16, 185, 129, 0.12)';
+    el.style.color = '#10b981';
+    el.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#10b981; display:inline-block;"></span> سحابي (Firebase متصل)`;
+  } else {
+    el.style.background = 'rgba(245, 158, 11, 0.12)';
+    el.style.color = '#f59e0b';
+    el.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#f59e0b; display:inline-block;"></span> وضع محلي آمن`;
+  }
+}
+
+function initFirebase() {
+  try {
+    firebaseApp = initializeApp(firebaseConfig);
+    rtdb = getDatabase(firebaseApp);
+    sessionsDbRef = ref(rtdb, 'shapap/sessions');
+    exemptionsDbRef = ref(rtdb, 'shapap/exemptions');
+
+    // Live sync for sessions
+    onValue(sessionsDbRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const list = Object.entries(data).map(([key, item]) => ({
+          fbKey: key,
+          ...item
+        }));
+        state.sessions = list;
+        localStorage.setItem('kareem_sessions_v3', JSON.stringify(list));
+        isFirebaseConnected = true;
+        updateCloudIndicator(true);
+        renderUI();
+      }
+    }, (err) => {
+      console.warn('Firebase sessions note (local mode active):', err.message);
+      updateCloudIndicator(false);
+    });
+
+    // Live sync for exemptions
+    onValue(exemptionsDbRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const list = Object.entries(data).map(([key, item]) => ({
+          fbKey: key,
+          ...item
+        }));
+        state.lessonExemptions = list;
+        localStorage.setItem('kareem_exemptions_today', JSON.stringify(list));
+        renderUI();
+      }
+    }, (err) => {
+      console.warn('Firebase exemptions note:', err.message);
+    });
+
+    isFirebaseConnected = true;
+    updateCloudIndicator(true);
+  } catch (err) {
+    console.warn('Firebase init fallback:', err);
+    updateCloudIndicator(false);
+  }
+}
+
 function saveFinishedSession() {
   const sec = getActiveSessionSeconds();
   const mins = Math.floor(sec / 60);
@@ -659,6 +745,15 @@ function saveFinishedSession() {
     entries: [{ subj: subjId, task }]
   };
   
+  // Realtime Database Push
+  if (rtdb && sessionsDbRef) {
+    try {
+      push(sessionsDbRef, sessionRecord).catch(e => console.warn('Firebase push offline:', e));
+    } catch (e) {
+      console.warn('Firebase error:', e);
+    }
+  }
+
   state.sessions.push(sessionRecord);
   localStorage.setItem('kareem_sessions_v3', JSON.stringify(state.sessions));
   
@@ -668,29 +763,50 @@ function saveFinishedSession() {
   document.getElementById('finishModal').classList.remove('show');
   showView('dashView');
   renderUI();
-  toast('تم توثيق إنجازك بنجاح في السجل!', 'check');
+  toast('تم توثيق إنجازك وحفظه سحابياً في تاريخك!', 'check');
 }
 
 // Exemption (Lesson / Class)
 function addExemption(title, minutes) {
-  state.lessonExemptions.push({
+  const record = {
     id: 'ex_' + Date.now(),
     title,
     minutes: parseInt(minutes, 10),
     timestamp: Date.now()
-  });
+  };
+  
+  // Realtime Database Push
+  if (rtdb && exemptionsDbRef) {
+    try {
+      push(exemptionsDbRef, record).catch(e => console.warn('Exemption push note:', e));
+    } catch(e) {}
+  }
+
+  state.lessonExemptions.push(record);
   localStorage.setItem('kareem_exemptions_today', JSON.stringify(state.lessonExemptions));
   renderUI();
   toast('تم تسجيل الحصة ولن تُحسب كوقت ضائع!', 'check');
 }
 
 window.deleteExemption = function(idx) {
+  const item = state.lessonExemptions[idx];
+  if (item && item.fbKey && rtdb) {
+    try {
+      remove(ref(rtdb, `shapap/exemptions/${item.fbKey}`)).catch(e => console.warn('Exemption remove note', e));
+    } catch(e) {}
+  }
   state.lessonExemptions.splice(idx, 1);
   localStorage.setItem('kareem_exemptions_today', JSON.stringify(state.lessonExemptions));
   renderUI();
 };
 
 window.deleteSession = function(idx) {
+  const item = state.sessions[idx];
+  if (item && item.fbKey && rtdb) {
+    try {
+      remove(ref(rtdb, `shapap/sessions/${item.fbKey}`)).catch(e => console.warn('Remove error', e));
+    } catch(e) {}
+  }
   state.sessions.splice(idx, 1);
   localStorage.setItem('kareem_sessions_v3', JSON.stringify(state.sessions));
   renderUI();
@@ -869,6 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   // Load quotes and start render loops
+  initFirebase();
   loadMotivationQuotes();
   drawMainVisualizer();
   restoreActiveSession();
