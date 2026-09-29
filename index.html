@@ -1,705 +1,365 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>SHAPAP | Kareem Edition ⚡</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;800;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
-<style>
-/* المتغيرات الأساسية (الثيم الافتراضي - النيون) */
-:root {
-  --bg: #050507;
-  --bg2: #0a0a10;
-  --panel: rgba(18,18,28,.55);
-  --violet: #a855f7;
-  --cyan: #22d3ee;
-  --green: #4ade80;
-  --amber: #fbbf24;
-  --rose: #fb7185;
-  --txt: #e8e8f0;
-  --dim: #8b8b9e;
-  --font-ar: 'Cairo', sans-serif;
-  --font-en: 'Orbitron', monospace;
-}
-
-/* ثيم السايبر بانك */
-[data-theme="cyber"] {
-  --bg: #0d0e15;
-  --panel: rgba(20,20,25,.8);
-  --violet: #fcee0a; /* أصفر سايبر */
-  --cyan: #00f0ff; /* أزرق سايبر */
-  --green: #ff003c; /* أحمر سايبر */
-}
-
-/* ثيم الطبيعة / زين */
-[data-theme="zen"] {
-  --bg: #0a110a;
-  --panel: rgba(10,25,10,.5);
-  --violet: #4ade80; 
-  --cyan: #10b981; 
-  --green: #84cc16; 
-}
-
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{
-  background:var(--bg); color:var(--txt); font-family:var(--font-ar);
-  overflow-x:hidden; min-height:100vh; transition: background 0.5s ease;
-}
-body::before{
-  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
-  background: radial-gradient(ellipse 60% 40% at 20% 10%, rgba(var(--violet),.08), transparent 60%),
-              radial-gradient(ellipse 50% 40% at 85% 80%, rgba(var(--cyan),.06), transparent 60%);
-}
-.stars{position:fixed;inset:0;z-index:0;pointer-events:none}
-
-/* شريط التخصيص العلوي */
-.top-nav {
-  position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-between;
-  padding: 0 20px; z-index: 10;
-}
-.kareem-badge {
-  font-weight: 900; font-size: 14px; background: linear-gradient(90deg, var(--cyan), var(--violet));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-  letter-spacing: 1px; display: flex; align-items: center; gap: 5px;
-}
-.controls { display: flex; gap: 10px; }
-.ctrl-btn {
-  background: var(--panel); border: 1px solid rgba(255,255,255,.1); color: var(--txt);
-  padding: 5px 10px; border-radius: 8px; font-size: 12px; cursor: pointer; transition: 0.3s;
-}
-.ctrl-btn:hover { border-color: var(--cyan); box-shadow: 0 0 10px rgba(34,211,238,.2); }
-
-.screen{position:relative;z-index:2;display:none;min-height:100vh;flex-direction:column;align-items:center;padding:60px 16px 60px}
-.screen.active{display:flex;animation:fadeIn .6s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-
-/* ===== Dashboard ===== */
-.brand{font-size:14px;letter-spacing:4px;color:var(--dim);margin-top:8px;font-family:var(--font-en);text-transform:uppercase}
-.brand b{color:var(--cyan);text-shadow:0 0 14px var(--cyan)}
-.spiral-wrap{position:relative;width:min(78vw,380px);height:min(78vw,380px);margin:22px auto 6px}
-.spiral-wrap canvas{width:100%;height:100%}
-.total-clock{
-  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;
-}
-.total-clock .num{
-  font-family:var(--font-en);font-weight:900;font-size:clamp(26px,8vw,40px);
-  background:linear-gradient(120deg,var(--cyan),var(--violet),var(--green));
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 0 18px rgba(168,85,247,.55));direction:ltr;
-}
-.total-clock .lbl{font-size:12px;color:var(--dim);margin-top:4px; font-weight: 600;}
-.subjects{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%;max-width:520px;margin-bottom:26px}
-.subj{
-  background:var(--panel);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.07);
-  border-radius:18px;padding:14px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;transition:.3s;
-}
-.subj:hover{transform:translateY(-4px);border-color:var(--sc)}
-.subj .ico{font-size:22px}
-.subj .nm{font-size:12px;font-weight:600;color:var(--sc);text-shadow:0 0 10px var(--sc)}
-.launch{
-  position:relative;border:none;cursor:pointer;font-family:var(--font-ar);
-  padding:18px 54px;border-radius:60px;font-size:19px;font-weight:800;color:#04040a;
-  background:linear-gradient(120deg,var(--cyan),var(--violet) 55%,var(--green));
-  box-shadow:0 0 30px rgba(168,85,247,.45),0 0 70px rgba(34,211,238,.2);
-  animation:pulse 2.6s ease-in-out infinite;transition:.25s;
-}
-.launch:hover{transform:scale(1.05)}
-@keyframes pulse{0%,100%{box-shadow:0 0 26px rgba(168,85,247,.4),0 0 60px rgba(34,211,238,.15)}50%{box-shadow:0 0 46px rgba(168,85,247,.7),0 0 100px rgba(74,222,128,.3)}}
-
-/* ===== Focus Mode & Progress Bars ===== */
-#focusScreen{justify-content:space-between;padding-top:30px}
-.top-bar{width:100%;max-width:640px}
-.bar-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:6px; font-weight:600;}
-.neo-bar{
-  height:14px; border-radius:20px; background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.08); overflow:hidden; position:relative;
-}
-
-/* ستايل البار المتصل (الافتراضي) */
-[data-bar="solid"] .neo-fill {
-  height:100%; width:0%; border-radius:20px;
-  background:linear-gradient(90deg,var(--cyan),var(--violet));
-  box-shadow:0 0 16px var(--cyan); transition:width 1s linear;
-}
-
-/* ستايل البار المتقطع (Dashed) */
-[data-bar="dashed"] .neo-fill {
-  height:100%; width:0%; border-radius:20px;
-  background: repeating-linear-gradient(
-    45deg, var(--cyan), var(--cyan) 10px, var(--violet) 10px, var(--violet) 20px
-  );
-  box-shadow:0 0 16px var(--cyan); transition:width 1s linear;
-  animation: moveDashed 2s linear infinite;
-}
-@keyframes moveDashed { from { background-position: 0 0; } to { background-position: 28px 0; } }
-
-/* ستايل البار السائل (Liquid) */
-[data-bar="liquid"] .neo-bar { border-radius: 10px; }
-[data-bar="liquid"] .neo-fill {
-  height:100%; width:0%; position: relative; overflow: hidden;
-  background: var(--cyan); box-shadow:0 0 16px var(--cyan); transition:width 1s linear;
-}
-[data-bar="liquid"] .neo-fill::after {
-  content: ''; position: absolute; top: -10px; right: 0; width: 30px; height: 30px;
-  background: rgba(255,255,255,0.3); border-radius: 40%;
-  animation: liquidSpin 2s linear infinite;
-}
-@keyframes liquidSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-.focus-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%}
-.session-timer{
-  font-family:var(--font-en);font-size:clamp(52px,15vw,96px);font-weight:700;
-  color:var(--txt);opacity:.9;direction:ltr;letter-spacing:4px;
-  text-shadow:0 0 30px rgba(168,85,247,.5);
-}
-.quote-box {
-  background: var(--panel); border: 1px dashed var(--cyan); padding: 15px 20px;
-  border-radius: 12px; margin-top: 20px; text-align: center; max-width: 90%; min-height: 70px;
-  display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--cyan);
-  transition: opacity 0.5s ease;
-}
-.focus-btns{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap;justify-content:center}
-.fbtn{
-  border-radius:16px;padding:14px 26px;font-family:var(--font-ar);font-size:15px;font-weight:700;cursor:pointer;
-  transition:.25s;border:1px solid rgba(255,255,255,.12);
-}
-.fbtn.break{background:rgba(251,191,36,.1);color:var(--amber);border-color:rgba(251,191,36,.35)}
-.fbtn.break:hover{box-shadow:0 0 20px rgba(251,191,36,.3)}
-.fbtn.end{background:rgba(251,113,133,.12);color:var(--rose);border-color:rgba(251,113,133,.4)}
-.fbtn.end:hover{box-shadow:0 0 22px rgba(251,113,133,.35)}
-.fbtn.sound { background: rgba(34,211,238,.1); color: var(--cyan); border-color: rgba(34,211,238,.4); }
-.fbtn.sound.active { background: var(--cyan); color: #000; box-shadow: 0 0 20px var(--cyan); }
-
-.bottom-bar-wrap{width:100%;max-width:640px;margin-top:20px}
-.big-bar{height:20px}
-.big-fill{background:linear-gradient(90deg,var(--violet),var(--green));box-shadow:0 0 22px rgba(74,222,128,.6)}
-
-/* Break overlay & Logger & Toast (Same Structure, enhanced UI) */
-#breakOverlay{
-  position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;flex-direction:column;
-  background:#020204;animation:breath 6s ease-in-out infinite;
-}
-#breakOverlay.show{display:flex}
-@keyframes breath{ 0%,100%{box-shadow:inset 0 0 120px rgba(251,191,36,.04)} 50%{box-shadow:inset 0 0 220px rgba(251,191,36,.14)} }
-#breakOverlay .q{font-size:22px;color:var(--amber);text-align:center;padding:0 30px;line-height:2;}
-#breakOverlay .bt{font-family:var(--font-en);color:var(--dim);margin-top:22px;font-size:20px;direction:ltr}
-#breakOverlay button{
-  margin-top:40px;background:var(--amber); color:#000; border:none; font-weight:800;
-  border-radius:40px;padding:12px 34px;font-family:var(--font-ar);font-size:16px;cursor:pointer;
-}
-
-#loggerModal{
-  position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:20px;
-  background:rgba(3,3,6,.8);backdrop-filter:blur(10px);
-}
-#loggerModal.show{display:flex;animation:fadeIn .35s ease}
-.logger{
-  width:100%;max-width:480px;background:rgba(16,16,26,.95);border:1px solid var(--cyan);
-  border-radius:24px;padding:26px;box-shadow:0 0 60px rgba(34,211,238,.2);max-height:85vh;overflow-y:auto;
-}
-.logger h3{color:var(--cyan); margin-bottom:8px;}
-.mtask{
-  width: 100%; background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;
-  padding:12px;color:var(--txt);font-family:var(--font-ar);font-size:14px;outline:none; margin-top: 10px;
-}
-.mtask:focus{border-color:var(--cyan);}
-.msubj { padding: 8px 12px; border-radius: 8px; border: 1px solid gray; background: transparent; color: gray; cursor: pointer; margin: 2px;}
-.msubj.sel { background: var(--mc); color: #000; border-color: var(--mc); font-weight: bold;}
-.save-btn{
-  width:100%;border:none;border-radius:14px;padding:15px;font-family:var(--font-ar);font-size:16px;font-weight:800;cursor:pointer;
-  background:linear-gradient(120deg,var(--cyan),var(--violet));color:#fff; margin-top: 20px;
-}
-.save-btn:disabled{opacity:.4;cursor:not-allowed}
-
-.toast{
-  position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);z-index:99;
-  background:rgba(20,20,32,.95);border:1px solid var(--cyan);color:var(--cyan);
-  padding:12px 26px;border-radius:40px;font-size:14px;transition:.4s;opacity:0;
-}
-.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>SHAPAP | Kareem Workspace ⚡</title>
+  <meta name="description" content="منصة متطورة لمتابعة المذاكرة والتركيز مع عدادات حلزونية دقيقة وحساب ذكي للوقت الضائع والدروس.">
+  <meta property="og:title" content="SHAPAP | Kareem Workspace ⚡">
+  <meta property="og:description" content="منصة متطورة لمتابعة المذاكرة والتركيز مع عدادات حلزونية دقيقة وحساب ذكي للوقت الضائع والدروس.">
+  <link rel="stylesheet" href="/styles.css">
 </head>
-<body data-theme="neon" data-bar="solid">
+<body data-theme="default">
 
-<canvas class="stars" id="stars"></canvas>
+  <!-- Main Top Bar -->
+  <header class="app-header">
+    <div class="brand-wrap">
+      <div class="brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20"/>
+          <path d="M12 6a6 6 0 1 1 0 12 4 4 0 0 1 0-8"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">SHAPAP <span style="font-weight:400; opacity:0.7;">| مساحة كريم</span></div>
+        <div class="brand-sub">نظام التركيز والإنتاجية الدراسي المتكامل</div>
+      </div>
+    </div>
 
-<!-- شريط تحكم كريم -->
-<div class="top-nav">
-  <div class="kareem-badge">👑 KAREEM WORKSPACE</div>
-  <div class="controls">
-    <select id="themeSelect" class="ctrl-btn">
-      <option value="neon">🟣 نيون (افتراضي)</option>
-      <option value="cyber">🟡 سايبر بانك</option>
-      <option value="zen">🟢 طبيعة (زين)</option>
-    </select>
-    <select id="barSelect" class="ctrl-btn">
-      <option value="solid">➖ متصل</option>
-      <option value="dashed">🔲 متقطع</option>
-      <option value="liquid">🌊 سائل</option>
-    </select>
-  </div>
-</div>
+    <div class="header-actions">
+      <!-- Theme Selection (Calm, Elegant, Balanced) -->
+      <select id="themeSelect" class="btn btn-sm" aria-label="اختيار المظهر">
+        <option value="default">🌿 نور الساج الهادئ (افتراضي)</option>
+        <option value="indigo">🌌 نيلي نايت ديب</option>
+        <option value="warm-sand">☕ رمل دافئ كلاسيك</option>
+        <option value="minimal-light">☀️ ضوء نهاري مريح</option>
+      </select>
+    </div>
+  </header>
 
-<!-- ============ DASHBOARD ============ -->
-<section class="screen active" id="dashScreen">
-  <div class="brand">SHAPAP <b>∞</b> INFINITE SPIRAL</div>
-  <div class="spiral-wrap">
-    <canvas id="spiralCanvas"></canvas>
-    <div class="total-clock">
-      <div class="num" id="totalHours">0h 00m</div>
-      <div class="lbl">إجمالي طاقة المذاكرة يا بطل</div>
+  <main class="container">
+    <!-- View Switcher Navigation -->
+    <nav class="view-nav" aria-label="أقسام التطبيق">
+      <button class="tab-btn active" data-tab="dashView">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        لوحة المذاكرة
+      </button>
+      <button class="tab-btn" data-tab="focusView">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        غرفة التركيز
+      </button>
+      <button class="tab-btn" data-tab="wastedView">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        إدارة الوقت والدروس
+      </button>
+      <button class="tab-btn" data-tab="logView">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        سجل الإنجازات
+      </button>
+    </nav>
+
+    <!-- Top Running Session Alert (Visible on reload if session is active) -->
+    <div id="activeSessionBanner" class="focus-active-banner" style="display: none;">
+      <div class="focus-banner-text">
+        <div class="pulse-indicator"></div>
+        <div>
+          <strong style="color:var(--text-main);">جلسة مذاكرة نشطة جارية الآن: <span id="bannerSubjName" style="color:var(--accent-primary);"></span></strong>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">الوقت المنقضي: <span id="bannerSecNum" class="tabular" style="font-weight:700; color:var(--text-main);"></span></div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="showView('focusView')">
+        الانتقال إلى غرفة التركيز
+      </button>
+    </div>
+
+    <!-- ================= VIEW 1: DASHBOARD ================= -->
+    <section id="dashView" class="view-panel active">
+      <div class="dash-grid">
+        
+        <!-- Left: Interactive Visualizer & Clock -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20"/></svg>
+              عداد الإنجاز اللولبي الذكي
+            </div>
+            
+            <!-- Visualization Selector -->
+            <div class="viz-switcher">
+              <button class="viz-btn" data-viz="spiral" title="حلزون متصل ثلاثي الأبعاد">حلزون لولبي</button>
+              <button class="viz-btn" data-viz="rings" title="حلقات المواد المدارية">مدار المواد</button>
+              <button class="viz-btn" data-viz="zen" title="قرص زن هادئ">قرص زن</button>
+            </div>
+          </div>
+
+          <div class="visualizer-wrap">
+            <div class="canvas-holder">
+              <canvas id="mainVisualizerCanvas"></canvas>
+              <div class="canvas-center-info">
+                <div class="center-num tabular" id="canvasCenterNum">0h 00m</div>
+                <div class="center-lbl">إجمالي طاقة اليوم</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:center; gap:12px; margin-top:16px;">
+            <button id="launchFocusBtn" class="btn btn-primary" style="padding:12px 32px; font-size:15px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              بدء جلسة مذاكرة جديدة
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Daily Balance & Time Drama Summary -->
+        <div style="display:flex; flex-direction:column; gap:24px;">
+          
+          <!-- Wasted Time Drama Card (مأساة الوقت الضائع) -->
+          <div id="wastedTimeCard" class="card wasted-card">
+            <div class="card-header">
+              <div class="card-title" style="color:var(--danger);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                الوقت الضائع من اليوم
+              </div>
+              <button class="btn btn-sm" onclick="showView('wastedView')">إدارة الدروس</button>
+            </div>
+
+            <div class="wasted-value tabular" id="wastedValueNum">0 س و 00 د</div>
+            <div class="wasted-sub" id="wastedSubText">جاري الحساب الدقيق...</div>
+
+            <div class="wasted-bar">
+              <div id="wastedBarFill" class="wasted-bar-fill" style="width: 0%;"></div>
+            </div>
+
+            <div id="wastedDramaBadge" style="display:inline-flex; align-items:center; gap:6px; font-size:12px; margin-top:12px; color:var(--text-muted); font-weight:600;">
+            </div>
+          </div>
+
+          <!-- Motivational Quote Capsule -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+              <span style="font-size:12px; color:var(--text-muted); font-weight:700;">ومضة تحفيزية</span>
+              <button id="nextQuoteBtn" class="btn btn-sm btn-icon" title="مقولة أخرى">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              </button>
+            </div>
+            <div id="motivationQuoteBox" class="quote-card" style="margin:0; border:none; background:transparent; padding:0; text-align:right; font-size:13px; line-height:1.7;">
+              جاري تجهيز التحفيز...
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Subjects Progress with Mini Spiral Gauges -->
+      <div style="margin-top:30px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <h3 style="font-size:16px; font-weight:800; color:var(--text-main);">تقدم المواد الدراسية</h3>
+          <span style="font-size:12px; color:var(--text-muted);">عدادات لولبية دقيقة لكل مادة</span>
+        </div>
+
+        <div class="subjects-grid" id="subjectsContainer">
+          <!-- Populated dynamically with mini gauges -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= VIEW 2: FOCUS ROOM ================= -->
+    <section id="focusView" class="view-panel">
+      <div class="card focus-view">
+        <div>
+          <div id="focusSubjBadge" class="focus-subject-badge">فيزياء</div>
+          <div class="focus-main-clock tabular" id="focusSessionTimer">00:00</div>
+          <div style="font-size:13px; color:var(--text-muted);">جلسة تركيز صافية ومحسوبة بدقة</div>
+        </div>
+
+        <div class="quote-card" id="focusQuoteDisplay">
+          "ركّز في هذه اللحظة، فالمستقبل يُبنى الآن خطوة بخطوة."
+        </div>
+
+        <div class="focus-action-bar">
+          <button id="focusBreakBtn" class="btn" style="color:var(--warning); border-color:rgba(245, 158, 11, 0.3);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+            أخذ استراحة
+          </button>
+          
+          <button id="rainAudioBtn" class="btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16" y1="13" x2="16" y2="21"/><line x1="8" y1="13" x2="8" y2="21"/><line x1="12" y1="15" x2="12" y2="23"/><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>
+            صوت المطر
+          </button>
+
+          <button id="focusEndBtn" class="btn" style="color:var(--danger); border-color:rgba(239, 83, 80, 0.3);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            إنهاء الجلسة وحفظها
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= VIEW 3: WASTED TIME & LESSON EXEMPTIONS ================= -->
+    <section id="wastedView" class="view-panel">
+      <div class="dash-grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              استثناءات الدروس والحصص
+            </div>
+            <button id="addExemptModalBtn" class="btn btn-primary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              إضافة حصة / درس
+            </button>
+          </div>
+          
+          <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+            أضف الحصص الدراسية أو الدروس الخصوصية والأنشطة الإلزامية حتى لا تُحسب ضمن "الوقت الضائع من اليوم".
+          </p>
+
+          <div id="exemptList">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
+              تحليل توزيع ساعات اليوم
+            </div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:16px; margin-top:8px;">
+            <div>
+              <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">
+                <span>المذاكرة الصافية</span>
+                <span id="statStudyTime" class="tabular" style="color:var(--accent-primary); font-weight:700;">--</span>
+              </div>
+            </div>
+
+            <div>
+              <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">
+                <span>الحصص والدروس المستثناة</span>
+                <span id="statLessonTime" class="tabular" style="color:var(--accent-secondary); font-weight:700;">--</span>
+              </div>
+            </div>
+
+            <div style="padding-top:12px; border-top:1px solid var(--border-subtle);">
+              <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:800;">
+                <span style="color:var(--danger);">الوقت الضائع / غير المستغل</span>
+                <span id="statWastedTime" class="tabular" style="color:var(--danger);">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= VIEW 4: ACHIEVEMENTS LOG ================= -->
+    <section id="logView" class="view-panel">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            سجل بطولاتك وإنجازاتك الدراسية
+          </div>
+        </div>
+
+        <div id="logItemsContainer">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= MODALS & OVERLAYS ================= -->
+
+  <!-- Start Session Modal -->
+  <div id="startSessionModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        إعداد جلسة التركيز الجديدة
+      </div>
+      
+      <label style="font-size:12px; color:var(--text-muted);">المادة الدراسية:</label>
+      <select id="startModalSubjSelect" class="input-field"></select>
+
+      <label style="font-size:12px; color:var(--text-muted);">عنوان المهمة أو الدرس:</label>
+      <input type="text" id="startModalTaskInput" class="input-field" placeholder="مثال: حل مسائل الفيزياء الحديثة، مراجعة النحو...">
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+        <button class="btn modal-close">إلغاء</button>
+        <button id="confirmStartSessionBtn" class="btn btn-primary">انطلاق ⚡</button>
+      </div>
     </div>
   </div>
-  <div class="subjects" id="subjCards"></div>
-  <button class="launch" id="launchBtn">⚡ إطلاق جلسة تركيز</button>
-  <button id="tabLogBtn" class="ctrl-btn" style="margin-top: 20px; padding: 10px 20px; font-size: 14px;">📜 سجل الإنجازات</button>
-</section>
 
-<!-- ============ FOCUS MODE ============ -->
-<section class="screen" id="focusScreen">
-  <div class="top-bar">
-    <div class="bar-lbl"><span>⏱ الجلسة الحالية</span><span id="sessionBarTxt">0m</span></div>
-    <div class="neo-bar"><div class="neo-fill" id="sessionBarFill"></div></div>
-  </div>
-  
-  <div class="focus-center">
-    <div class="session-timer" id="sessionTimer">00:00</div>
-    <div class="quote-box" id="quoteBox">جاري شحن التحفيز... ⚡</div>
-    
-    <div class="focus-btns">
-      <button class="fbtn break" id="breakBtn">☕ أخذ استراحة</button>
-      <button class="fbtn sound" id="soundBtn">🌧️ تشغيل مطر</button>
-      <button class="fbtn end" id="endBtn">🏁 إنهاء الجلسة</button>
+  <!-- Break Overlay (Strictly excludes break from study time) -->
+  <div id="breakModal" class="break-modal">
+    <div style="max-width:500px; padding:20px;">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+      <h2 style="font-size:22px; font-weight:800; color:var(--warning); margin-top:12px;">استراحة مستحقة يا بطل</h2>
+      <p style="font-size:14px; color:var(--text-muted); margin-top:8px;">
+        التقط أنفاسك واشرب ماءً، وقت الاستراحة لا يُحسب إطلاقاً من وقت مذاكرتك الصافي.
+      </p>
+
+      <div class="break-clock tabular" id="breakClockNum">00:00</div>
+
+      <button id="resumeBreakBtn" class="btn btn-primary" style="padding:12px 32px; font-size:15px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        استئناف المذاكرة الآن
+      </button>
     </div>
   </div>
 
-  <div class="bottom-bar-wrap">
-    <div class="bar-lbl"><span>🌌 الإنجاز العام</span><span id="totalBarTxt">0h 00m</span></div>
-    <div class="neo-bar big-bar"><div class="neo-fill big-fill" id="totalBarFill"></div></div>
-  </div>
-</section>
+  <!-- Finish & Save Modal -->
+  <div id="finishModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        توثيق إنجاز الجلسة
+      </div>
+      
+      <div id="logDurationNotice" style="font-size:14px; font-weight:700; color:var(--accent-primary); margin-bottom:12px;"></div>
 
-<!-- ============ LOG SCREEN ============ -->
-<section class="screen" id="logScreen">
-  <h2 style="color:var(--cyan); margin-bottom: 20px;">📜 سجل بطولاتك يا كريم</h2>
-  <div id="logList" style="width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px;"></div>
-  <button id="backDashBtn" class="ctrl-btn" style="margin-top: 20px; padding: 10px 20px;">⬅ عودة</button>
-</section>
+      <label style="font-size:12px; color:var(--text-muted);">تأكيد المادة:</label>
+      <select id="finishSubjSelect" class="input-field"></select>
 
-<!-- ============ OVERLAYS ============ -->
-<div id="breakOverlay">
-  <div class="q">استرح قليلاً يا كريم.. المحارب يحتاج لالتقاط الأنفاس 🌙</div>
-  <div class="bt" id="breakTimer">00:00</div>
-  <button id="resumeBtn">▶ استئناف المذاكرة بقوة</button>
-</div>
+      <label style="font-size:12px; color:var(--text-muted);">ما الذي أنجزته بالتحديد؟</label>
+      <input type="text" id="finishTaskInput" class="input-field" placeholder="ما درسته خلال هذه الجلسة...">
 
-<div id="loggerModal">
-  <div class="logger">
-    <h3>📝 وثّق مهمتك يا كريم</h3>
-    <div style="color:gray; font-size: 12px; margin-bottom: 15px;" id="loggerDur"></div>
-    <div id="missionRows"></div>
-    <button class="save-btn" id="saveBtn">🕳️ حفظ الإنجاز في تاريخك</button>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<!-- ملف الصوت المحيطي (مطر) -->
-<audio id="rainAudio" loop src="https://cdn.pixabay.com/download/audio/2021/08/09/audio_6b825eb94c.mp3?filename=light-rain-109591.mp3"></audio>
-
-<script type="module">
-// إعدادات فايربيز (كما هي من الكود الخاص بك)
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, set, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBMBd9C41EyU7kWi06CVMgXrYFBVAvU1v8",
-  authDomain: "shapap-13c58.firebaseapp.com",
-  databaseURL: "https://shapap-13c58-default-rtdb.firebaseio.com",
-  projectId: "shapap-13c58",
-  storageBucket: "shapap-13c58.firebasestorage.app",
-  messagingSenderId: "818487036065",
-  appId: "1:818487036065:web:350734adcc4fcd779c48e0"
-};
-
-const SUBJECTS = [
-  {id:'history', name:'تاريخ', ico:'📜', color:'#4ade80'},
-  {id:'arabic',  name:'عربي',  ico:'📖', color:'#fbbf24'},
-  {id:'english', name:'إنجليزي', ico:'🔤', color:'#22d3ee'},
-  {id:'physics', name:'فيزياء', ico:'⚛️', color:'#a855f7'},
-];
-const RING_MINUTES = 300; 
-
-/* ---------- State & Fixes ---------- */
-let db = null, sessionsRef = null;
-let sessions = [];
-// تم إصلاح نظام الجلسة ليكون رياضياً دقيقاً 100%
-let session = null; // {startTs, elapsedBefore, breakStart, timerInt}
-let totalPastMinutes = 0; // الدقائق السابقة فقط
-let quotes = [];
-let quoteInterval;
-
-/* ---------- جلب التحفيزات ---------- */
-const fallbackQuotes = [
-  "يا كريم، العرق في التدريب يوفر الدماء في المعركة.. استمر! ⚡",
-  "التركيز هو السلاح السري للعباقرة.. ابقَ في منطقة العمل! 🧠",
-  "النجاح لا يأتي لمن ينتظر، بل لمن يعمل بجد. 💪",
-  "كل ثانية هنا هي استثمار في مستقبلك الأسطوري يا بطل. 🎯"
-];
-
-async function loadQuotes() {
-  try {
-    const res = await fetch('تحفيز.json');
-    if(res.ok) {
-      quotes = await res.json();
-    } else {
-      quotes = fallbackQuotes;
-    }
-  } catch(e) {
-    quotes = fallbackQuotes; // Fallback if local server not running
-  }
-}
-loadQuotes();
-
-function changeQuote() {
-  const qBox = document.getElementById('quoteBox');
-  qBox.style.opacity = 0;
-  setTimeout(() => {
-    qBox.textContent = quotes[Math.floor(Math.random() * quotes.length)];
-    qBox.style.opacity = 1;
-  }, 500);
-}
-
-/* ---------- الثيمات والإعدادات ---------- */
-const themeSel = document.getElementById('themeSelect');
-const barSel = document.getElementById('barSelect');
-
-// تحميل الإعدادات المحفوظة
-if(localStorage.getItem('kareem_theme')) {
-  document.body.setAttribute('data-theme', localStorage.getItem('kareem_theme'));
-  themeSel.value = localStorage.getItem('kareem_theme');
-}
-if(localStorage.getItem('kareem_bar')) {
-  document.body.setAttribute('data-bar', localStorage.getItem('kareem_bar'));
-  barSel.value = localStorage.getItem('kareem_bar');
-}
-
-themeSel.addEventListener('change', (e) => {
-  document.body.setAttribute('data-theme', e.target.value);
-  localStorage.setItem('kareem_theme', e.target.value);
-});
-barSel.addEventListener('change', (e) => {
-  document.body.setAttribute('data-bar', e.target.value);
-  localStorage.setItem('kareem_bar', e.target.value);
-});
-
-
-/* ---------- Init Firebase ---------- */
-try {
-  const app = initializeApp(firebaseConfig);
-  db = getDatabase(app);
-  sessionsRef = ref(db, 'shapap/sessions');
-  onValue(sessionsRef, snap => {
-    const val = snap.val();
-    sessions = val ? Object.values(val) : [];
-    recalc(); renderAll();
-  });
-} catch(e) { 
-  console.warn('Firebase init failed, local mode', e);
-  const d = JSON.parse(localStorage.getItem('kareem_sessions_v2')||'[]');
-  sessions = Array.isArray(d) ? d : [];
-  recalc(); renderAll();
-}
-
-function saveLocal() { localStorage.setItem('kareem_sessions_v2', JSON.stringify(sessions)); }
-
-/* ---------- Math & Time Helpers (FIXED) ---------- */
-function recalc(){
-  totalPastMinutes = sessions.reduce((sum, s) => sum + s.minutes, 0);
-}
-
-// دالة حساب الثواني الدقيقة للجلسة الحالية
-function getSessionSeconds(){
-  if(!session) return 0;
-  if(session.breakStart){
-      // إذا كنا في استراحة، الوقت يتوقف عند ما تم إنجازه مسبقاً
-      return Math.floor(session.elapsedBefore / 1000);
-  }
-  // إذا كنا نعمل، الوقت هو: ما تم إنجازه + (الوقت الحالي - وقت آخر انطلاق)
-  return Math.floor((session.elapsedBefore + (Date.now() - session.startTs)) / 1000);
-}
-
-function fmtHM(min){
-  const h = Math.floor(min/60), m = min%60;
-  return `${h}h ${String(m).padStart(2,'0')}m`;
-}
-function fmtClock(sec){
-  const m = Math.floor(sec/60), s = sec%60;
-  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-}
-function toast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 3200);
-}
-function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  window.scrollTo(0,0);
-}
-
-/* ---------- 3D Spiral Background ---------- */
-const spiralC = document.getElementById('spiralCanvas');
-const sx = spiralC.getContext('2d');
-function drawSpiral(){
-  const size = spiralC.parentElement.clientWidth * (window.devicePixelRatio||1);
-  spiralC.width = size; spiralC.height = size;
-  const cx = size/2, cy = size/2;
-  sx.clearRect(0,0,size,size);
-  
-  // حساب الوقت الكلي (الماضي + الحالي) للرسم
-  let currentTotalMin = totalPastMinutes + (session ? Math.floor(getSessionSeconds()/60) : 0);
-  
-  const rings = Math.floor(currentTotalMin / RING_MINUTES);
-  const partial = (currentTotalMin % RING_MINUTES) / RING_MINUTES;
-  
-  // قراءة الألوان من الثيم الحالي
-  const style = getComputedStyle(document.body);
-  const cViolet = style.getPropertyValue('--violet').trim();
-  const cCyan = style.getPropertyValue('--cyan').trim();
-  const cGreen = style.getPropertyValue('--green').trim();
-  
-  const grad = [cViolet, cCyan, cGreen, '#fbbf24', '#fb7185'];
-  const t = performance.now()/1000;
-  const maxR = size*.46;
-
-  for(let r=0; r<rings; r++){
-    const rr = maxR * (r+1)/(Math.max(rings,1)+(partial>0?1:0));
-    sx.beginPath(); sx.arc(cx,cy,rr,0,Math.PI*2);
-    sx.strokeStyle = grad[r%grad.length]; sx.globalAlpha = .8;
-    sx.lineWidth = 3; sx.shadowBlur = 15; sx.shadowColor = grad[r%grad.length];
-    sx.stroke();
-  }
-  if (currentTotalMin > 0){
-    const baseR = rings>0 ? maxR*rings/(rings+1) : 0;
-    const steps = 160; sx.beginPath(); const turns = 3;
-    for(let i=0;i<=steps*partial;i++){
-      const p = i/steps;
-      const ang = p*Math.PI*2*turns + t*.15;
-      const rr = baseR + (maxR-baseR)*p + Math.sin(ang*3)*size*.006;
-      const px = cx + Math.cos(ang)*rr, py = cy + Math.sin(ang)*rr*.92;
-      i===0 ? sx.moveTo(px,py) : sx.lineTo(px,py);
-    }
-    const g = grad[rings%grad.length];
-    sx.strokeStyle = g; sx.lineWidth = 3; sx.globalAlpha = 1;
-    sx.shadowBlur = 20; sx.shadowColor = g; sx.stroke();
-  }
-  requestAnimationFrame(drawSpiral);
-}
-requestAnimationFrame(drawSpiral);
-
-/* ---------- Renders ---------- */
-function renderAll(){
-  let currentTotalMin = totalPastMinutes + (session ? Math.floor(getSessionSeconds()/60) : 0);
-  document.getElementById('totalHours').textContent = fmtHM(currentTotalMin);
-  
-  // Subjects calc
-  let sMins = {history:0, arabic:0, english:0, physics:0};
-  sessions.forEach(s => { (s.entries||[]).forEach(en => { if(sMins[en.subj]!==undefined) sMins[en.subj] += s.minutes; }); });
-  
-  document.getElementById('subjCards').innerHTML = SUBJECTS.map(s=>`
-    <div class="subj" style="--sc:${s.color}">
-      <div class="ico">${s.ico}</div>
-      <div class="nm">${s.name}</div>
-      <div style="font-family:var(--font-en); font-size:11px;">${fmtHM(sMins[s.id])}</div>
-    </div>`).join('');
-
-  // Log 
-  const list = document.getElementById('logList');
-  if(!sessions.length) { list.innerHTML = '<div style="text-align:center;color:gray;">لا يوجد إنجازات بعد يا بطل. ابدأ الآن!</div>'; }
-  else {
-    list.innerHTML = [...sessions].sort((a,b)=>b.tsStart-a.tsStart).map(s=>{
-      const entries = (s.entries||[]).map(en=>{
-        const sub = SUBJECTS.find(x=>x.id===en.subj);
-        return `<span style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:6px; font-size:12px; margin:2px; display:inline-block;">${sub?sub.name:''} - ${en.task}</span>`;
-      }).join('');
-      return `<div style="background:var(--panel); padding:15px; border-radius:15px; border-right:4px solid var(--cyan);">
-        <div style="font-size:12px; color:var(--cyan); margin-bottom:5px;">🕒 ${s.minutes} دقيقة</div>
-        <div>${entries}</div>
-      </div>`;
-    }).join('');
-  }
-}
-
-/* ---------- Session flow ---------- */
-document.getElementById('launchBtn').onclick = () => {
-  session = { startTs: Date.now(), elapsedBefore: 0, breakStart: null, timerInt: null };
-  showScreen('focusScreen');
-  changeQuote();
-  quoteInterval = setInterval(changeQuote, 30000); // تغيير المقولة كل 30 ثانية
-  startTimer();
-  toast('⚡ انطلقت الجلسة يا كريم.. ركز نحو الهدف!');
-};
-
-function startTimer(){
-  clearInterval(session.timerInt);
-  session.timerInt = setInterval(()=>{
-    const sec = getSessionSeconds();
-    document.getElementById('sessionTimer').textContent = fmtClock(sec);
-    const min = Math.floor(sec/60);
-    document.getElementById('sessionBarTxt').textContent = min + 'm';
-    
-    // شريط التقدم الحالي يمتلئ كل ساعة (60 دقيقة)
-    document.getElementById('sessionBarFill').style.width = Math.min(100, (sec/3600)*100) + '%'; 
-    
-    let currentTotalMin = totalPastMinutes + min;
-    document.getElementById('totalBarTxt').textContent = fmtHM(currentTotalMin);
-    document.getElementById('totalBarFill').style.width = Math.min(100,(currentTotalMin/(RING_MINUTES*4))*100) + '%';
-    document.getElementById('totalHours').textContent = fmtHM(currentTotalMin);
-  }, 200); // تحديث سريع للواجهة
-}
-
-// أزرار الاستراحة والصوت
-let breakInterval;
-document.getElementById('breakBtn').onclick = () => {
-  if(!session || session.breakStart) return;
-  // تسجيل الوقت المنقضي بدقة قبل الاستراحة
-  session.elapsedBefore += (Date.now() - session.startTs);
-  session.breakStart = Date.now();
-  
-  document.getElementById('breakOverlay').classList.add('show');
-  clearInterval(session.timerInt);
-  
-  breakInterval = setInterval(()=>{
-    document.getElementById('breakTimer').textContent = fmtClock(Math.floor((Date.now()-session.breakStart)/1000));
-  },1000);
-};
-
-document.getElementById('resumeBtn').onclick = () => {
-  if(!session || !session.breakStart) return;
-  // تحديث وقت البدء للحظة الحالية
-  session.startTs = Date.now();
-  session.breakStart = null;
-  
-  clearInterval(breakInterval);
-  document.getElementById('breakOverlay').classList.remove('show');
-  startTimer();
-  toast('▶ مرحباً بعودتك يا بطل!');
-};
-
-// زر الصوت
-const rainAudio = document.getElementById('rainAudio');
-document.getElementById('soundBtn').onclick = function() {
-  if(rainAudio.paused) {
-    rainAudio.play();
-    this.classList.add('active');
-    this.innerHTML = '⏸️ إيقاف المطر';
-  } else {
-    rainAudio.pause();
-    this.classList.remove('active');
-    this.innerHTML = '🌧️ تشغيل مطر';
-  }
-};
-
-document.getElementById('endBtn').onclick = () => {
-  if(!session) return;
-  if(session.breakStart){
-    // إذا انتهت الجلسة وهو في استراحة، لا نضيف وقت الاستراحة
-    session.breakStart=null;
-    clearInterval(breakInterval);
-    document.getElementById('breakOverlay').classList.remove('show');
-  }
-  const sec = getSessionSeconds();
-  clearInterval(session.timerInt);
-  clearInterval(quoteInterval);
-  rainAudio.pause(); document.getElementById('soundBtn').classList.remove('active'); document.getElementById('soundBtn').innerHTML = '🌧️ تشغيل مطر';
-  
-  if(sec < 60){ 
-    toast('⏳ الجلسة أقل من دقيقة.. لم تُحسب يا كريم.'); 
-    session = null; showScreen('dashScreen'); renderAll(); 
-    return; 
-  }
-  openLogger(sec);
-};
-
-/* ---------- Mission Logger ---------- */
-function openLogger(sec){
-  const min = Math.floor(sec/60);
-  document.getElementById('loggerDur').textContent = `أنجزت ${min} دقيقة ⏱ — ما الذي درسته يا بطل؟`;
-  
-  const box = document.getElementById('missionRows');
-  box.innerHTML = `
-    <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px;" id="subjSelector">
-      ${SUBJECTS.map(s=>`<button class="msubj" data-id="${s.id}" style="--mc:${s.color}">${s.ico}${s.name}</button>`).join('')}
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+        <button class="btn modal-close">إلغاء</button>
+        <button id="saveSessionBtn" class="btn btn-primary">حفظ في سجل البطولات</button>
+      </div>
     </div>
-    <input type="text" id="finalTaskInput" class="mtask" placeholder="مثال: حل تدريبات الباب الأول...">
-  `;
-  
-  let selectedSubj = null;
-  box.querySelectorAll('.msubj').forEach(btn => {
-    btn.onclick = () => {
-      box.querySelectorAll('.msubj').forEach(b => b.classList.remove('sel'));
-      btn.classList.add('sel');
-      selectedSubj = btn.dataset.id;
-      validateSave();
-    }
-  });
-  
-  const input = document.getElementById('finalTaskInput');
-  input.addEventListener('input', validateSave);
-  
-  function validateSave() {
-    document.getElementById('saveBtn').disabled = !(selectedSubj && input.value.trim());
-  }
-  validateSave();
-  document.getElementById('loggerModal').classList.add('show');
-  
-  document.getElementById('saveBtn').onclick = async () => {
-    const payload = {
-      tsStart: session.startTs, // Not perfectly accurate due to breaks, but good enough for logs
-      tsEnd: Date.now(),
-      minutes: min,
-      entries: [{ subj: selectedSubj, task: input.value.trim() }]
-    };
-    
-    try{
-      if(db){ await push(sessionsRef, payload); }
-      else { sessions.push(payload); saveLocal(); }
-    }catch(e){
-      sessions.push(payload); saveLocal();
-      toast('⚠️ حُفظت محلياً (لا يوجد إنترنت)');
-    }
-    
-    session = null;
-    document.getElementById('loggerModal').classList.remove('show');
-    showScreen('dashScreen');
-    recalc(); renderAll();
-    toast('🏆 تم إضافة إنجاز جديد لتاريخك يا كريم!');
-  };
-}
+  </div>
 
-// التنقلات
-document.getElementById('tabLogBtn').onclick = () => showScreen('logScreen');
-document.getElementById('backDashBtn').onclick = () => showScreen('dashScreen');
+  <!-- Add Lesson / Class Exemption Modal -->
+  <div id="exemptModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        إضافة درس أو حصة مستثناة
+      </div>
+      
+      <label style="font-size:12px; color:var(--text-muted);">عنوان الحصة أو النشاط:</label>
+      <input type="text" id="exemptTitleInput" class="input-field" placeholder="مثال: سنتر الفيزياء، حصة المدرسة، درس إنجليزي...">
 
-// نجوم الخلفية
-(function(){
-  const c = document.getElementById('stars'), x = c.getContext('2d');
-  let W,H,stars;
-  function init(){ W=c.width=innerWidth; H=c.height=innerHeight;
-    stars = Array.from({length:70},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.3+.3,p:Math.random()*Math.PI*2}));
-  }
-  init(); addEventListener('resize',init);
-  (function loop(t){
-    x.clearRect(0,0,W,H);
-    stars.forEach(s=>{
-      const a = .25 + .55*Math.abs(Math.sin(t/1400 + s.p));
-      x.beginPath(); x.arc(s.x,s.y,s.r,0,7); x.fillStyle=`rgba(255,255,255,${a})`; x.fill();
-    });
-    requestAnimationFrame(loop);
-  })(0);
-})();
-</script>
+      <label style="font-size:12px; color:var(--text-muted);">المدة المستغرقة بالدقائق:</label>
+      <input type="number" id="exemptMinutesInput" class="input-field" placeholder="مثال: 90 أو 120 دقيقة" min="10" max="600">
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+        <button class="btn modal-close">إلغاء</button>
+        <button id="confirmExemptBtn" class="btn btn-primary">إضافة للاستثناء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="appToast" class="toast"></div>
+
+  <script src="/app.js"></script>
 </body>
 </html>
