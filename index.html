@@ -215,6 +215,12 @@
     </div>
 
     <div class="header-actions">
+      <!-- All-Time Metric Badge -->
+      <div id="headerAllTimeBadge" style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; background:var(--bg-elevated); border:1px solid var(--border-subtle); padding:6px 14px; border-radius:var(--radius-sm); color:var(--accent-primary);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20"/></svg>
+        <span>كله في كله: <strong id="headerAllTimeValue" class="tabular">0h 00m</strong></span>
+      </div>
+
       <!-- Theme Selection (Calm, Elegant, Balanced) -->
       <select id="themeSelect" class="btn btn-sm" aria-label="اختيار المظهر">
         <option value="default">🌿 نور الساج الهادئ (افتراضي)</option>
@@ -283,14 +289,27 @@
           <div class="visualizer-wrap">
             <div class="canvas-holder">
               <canvas id="mainVisualizerCanvas"></canvas>
-              <div class="canvas-center-info">
+              <div class="canvas-center-info" title="انقر للتبديل بين إجمالي المسيرة واليوم">
                 <div class="center-num tabular" id="canvasCenterNum">0h 00m</div>
-                <div class="center-lbl">إجمالي طاقة اليوم</div>
+                <div class="center-lbl" id="canvasCenterLbl">إجمالي المسيرة (كله في كله)</div>
+                <div id="canvasCenterToday" style="font-size:11px; font-weight:700; color:var(--accent-secondary); margin-top:4px;">طاقة اليوم: 0h 00m</div>
               </div>
             </div>
           </div>
 
-          <div style="display:flex; justify-content:center; gap:12px; margin-top:16px;">
+          <!-- Dual Stat Quick Indicator -->
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin:0 auto 16px; width:100%; max-width:380px;">
+            <div style="background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:10px 14px; text-align:center;">
+              <div style="font-size:11px; color:var(--text-muted); font-weight:600;">🌌 كله في كله (التراكمي)</div>
+              <div id="statAllTimeNum" class="tabular" style="font-size:18px; font-weight:800; color:var(--accent-primary); margin-top:2px;">0h 00m</div>
+            </div>
+            <div style="background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:10px 14px; text-align:center;">
+              <div style="font-size:11px; color:var(--text-muted); font-weight:600;">⏱️ إنجاز اليوم الصافي</div>
+              <div id="statTodayNum" class="tabular" style="font-size:18px; font-weight:800; color:var(--accent-secondary); margin-top:2px;">0h 00m</div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:center; gap:12px; margin-top:8px;">
             <button id="launchFocusBtn" class="btn btn-primary" style="padding:12px 32px; font-size:15px;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               بدء جلسة مذاكرة جديدة
@@ -358,6 +377,11 @@
           <div id="focusSubjBadge" class="focus-subject-badge">فيزياء</div>
           <div class="focus-main-clock tabular" id="focusSessionTimer">00:00</div>
           <div style="font-size:13px; color:var(--text-muted);">جلسة تركيز صافية ومحسوبة بدقة</div>
+          <div style="display:flex; justify-content:center; gap:16px; margin-top:10px; font-size:13px; color:var(--text-muted);">
+            <span>طاقة اليوم: <strong id="focusTodayTotal" class="tabular" style="color:var(--accent-secondary);">0h 00m</strong></span>
+            <span>•</span>
+            <span>إجمالي المسيرة (كله في كله): <strong id="focusAllTimeTotal" class="tabular" style="color:var(--accent-primary);">0h 00m</strong></span>
+          </div>
         </div>
 
         <div class="quote-card" id="focusQuoteDisplay">

@@ -59,15 +59,42 @@ function getSvgIcon(name, size = 18) {
   return icons[name] || '';
 }
 
+// Load and merge all legacy (v2) and current (v3) sessions so past history is preserved 100%
+function loadInitialSessions() {
+  const v3 = JSON.parse(localStorage.getItem('kareem_sessions_v3') || '[]');
+  const v2 = JSON.parse(localStorage.getItem('kareem_sessions_v2') || '[]');
+  const map = new Map();
+  v2.forEach(s => {
+    if (s && (s.minutes || s.tsStart)) {
+      const key = s.id || (s.tsStart ? `ts_${s.tsStart}` : `rnd_${Math.random()}`);
+      map.set(key, s);
+    }
+  });
+  v3.forEach(s => {
+    if (s && (s.minutes || s.tsStart)) {
+      const key = s.id || (s.tsStart ? `ts_${s.tsStart}` : `rnd_${Math.random()}`);
+      map.set(key, s);
+    }
+  });
+  const merged = Array.from(map.values());
+  // Keep both local storage keys in sync
+  try {
+    localStorage.setItem('kareem_sessions_v3', JSON.stringify(merged));
+    localStorage.setItem('kareem_sessions_v2', JSON.stringify(merged));
+  } catch(e) {}
+  return merged;
+}
+
 // App State
 const state = {
   subjects: JSON.parse(localStorage.getItem('kareem_subjects') || 'null') || DEFAULT_SUBJECTS,
-  sessions: JSON.parse(localStorage.getItem('kareem_sessions_v3') || '[]'),
+  sessions: loadInitialSessions(),
   lessonExemptions: JSON.parse(localStorage.getItem('kareem_exemptions_today') || '[]'),
   dayStartHour: 8, // Day considered starting at 8:00 AM
   activeSession: null, // Restored from localStorage if exists
   breakTimer: null,
   vizMode: localStorage.getItem('kareem_viz_mode') || 'spiral', // 'spiral' | 'rings' | 'zen'
+  displayTimeMode: localStorage.getItem('kareem_display_mode') || 'allTime', // 'allTime' | 'today'
   quotes: [],
   currentQuoteIdx: 0,
   quoteTimer: null,
@@ -153,10 +180,30 @@ function getStudyMinutesToday() {
   const today = new Date().toDateString();
   const pastMins = state.sessions
     .filter(s => new Date(s.tsEnd).toDateString() === today)
-    .reduce((acc, s) => acc + s.minutes, 0);
+    .reduce((acc, s) => acc + (s.minutes || 0), 0);
     
   const currentMins = state.activeSession ? Math.floor(getActiveSessionSeconds() / 60) : 0;
   return pastMins + currentMins;
+}
+
+// All-time study minutes (كله في كله - التراكمي الشامل)
+function getAllTimeStudyMinutes() {
+  const pastMins = state.sessions.reduce((acc, s) => acc + (s.minutes || 0), 0);
+  const currentMins = state.activeSession ? Math.floor(getActiveSessionSeconds() / 60) : 0;
+  return pastMins + currentMins;
+}
+
+// All-time minutes for a specific subject
+function getSubjectAllTimeMinutes(subjId) {
+  const past = state.sessions.reduce((acc, s) => {
+    const en = (s.entries || []).find(e => e.subj === subjId);
+    return acc + (en ? (s.minutes || 0) : 0);
+  }, 0);
+  let current = 0;
+  if (state.activeSession && state.activeSession.subjId === subjId) {
+    current = Math.floor(getActiveSessionSeconds() / 60);
+  }
+  return past + current;
 }
 
 // Total lesson exemption minutes today
@@ -213,7 +260,9 @@ function drawMainVisualizer() {
   const cy = size / 2;
   ctx.clearRect(0, 0, size, size);
   
-  const studyMins = getStudyMinutesToday();
+  const todayMins = getStudyMinutesToday();
+  const allTimeMins = getAllTimeStudyMinutes();
+  const activeDisplayMins = state.displayTimeMode === 'today' ? todayMins : allTimeMins;
   const t = performance.now() / 1000;
   
   const style = getComputedStyle(document.body);
@@ -225,7 +274,9 @@ function drawMainVisualizer() {
     const maxRadius = size * 0.44;
     const baseR = size * 0.08;
     const turns = 3.5;
-    const progressRings = Math.min(turns, Math.max(0.1, (studyMins / 60) * 0.6));
+    // Each full turn revolution = 300 minutes (5 hours)
+    const RING_MINUTES = 300;
+    const progressRings = Math.min(turns, Math.max(0.08, activeDisplayMins / RING_MINUTES));
     
     // Background faint spiral path
     ctx.beginPath();
@@ -293,8 +344,9 @@ function drawMainVisualizer() {
     const subjs = state.subjects;
     subjs.forEach((s, idx) => {
       const r = (maxR / rings) * (idx + 1);
-      const subMins = getSubjectMinutesToday(s.id);
-      const ratio = Math.min(1, subMins / (s.targetMinutes || 120));
+      const subMins = state.displayTimeMode === 'today' ? getSubjectMinutesToday(s.id) : getSubjectAllTimeMinutes(s.id);
+      const target = state.displayTimeMode === 'today' ? (s.targetMinutes || 120) : (s.targetMinutes * 5 || 600);
+      const ratio = Math.min(1, subMins / target);
       if (ratio > 0) {
         ctx.beginPath();
         ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio);
@@ -330,8 +382,8 @@ function drawMainVisualizer() {
     }
     
     // Main target sweep
-    const target = 300; // 5 hours goal
-    const pct = Math.min(1, studyMins / target);
+    const target = state.displayTimeMode === 'today' ? 300 : 1500;
+    const pct = Math.min(1, activeDisplayMins / target);
     ctx.beginPath();
     ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct);
     ctx.strokeStyle = primaryColor;
@@ -401,12 +453,35 @@ function getSubjectMinutesToday(subjId) {
 
 // --- RENDER APPLICATION VIEWS ---
 function renderUI() {
-  const studyMins = getStudyMinutesToday();
-  const clockText = fmtHMEn(studyMins);
+  const todayMins = getStudyMinutesToday();
+  const allTimeMins = getAllTimeStudyMinutes();
   
-  // Center Clock in Canvas
+  // Top Header Badge
+  const headerVal = document.getElementById('headerAllTimeValue');
+  if (headerVal) headerVal.textContent = fmtHMEn(allTimeMins);
+
+  // Center Clock in Canvas (Shows all-time and today simultaneously)
   const centerNum = document.getElementById('canvasCenterNum');
-  if (centerNum) centerNum.textContent = clockText;
+  const centerLbl = document.getElementById('canvasCenterLbl');
+  const centerSub = document.getElementById('canvasCenterToday');
+  
+  if (state.displayTimeMode === 'today') {
+    if (centerNum) centerNum.textContent = fmtHMEn(todayMins);
+    if (centerLbl) centerLbl.textContent = 'إنجاز اليوم';
+    if (centerSub) centerSub.innerHTML = `كله في كله: <strong class="tabular" style="color:var(--accent-primary);">${fmtHMEn(allTimeMins)}</strong>`;
+  } else {
+    if (centerNum) centerNum.textContent = fmtHMEn(allTimeMins);
+    if (centerLbl) centerLbl.textContent = 'إجمالي المسيرة (كله في كله)';
+    if (centerSub) centerSub.innerHTML = `طاقة اليوم: <strong class="tabular" style="color:var(--accent-secondary);">${fmtHMEn(todayMins)}</strong>`;
+  }
+
+  // Under-canvas quick stat numbers
+  const statAllTime = document.getElementById('statAllTimeNum');
+  if (statAllTime) statAllTime.textContent = fmtHMEn(allTimeMins);
+  const statToday = document.getElementById('statTodayNum');
+  if (statToday) statToday.textContent = fmtHMEn(todayMins);
+  const statSessions = document.getElementById('statSessionsCount');
+  if (statSessions) statSessions.textContent = `${state.sessions.length} جلسة`;
   
   // Header Active Session Banner
   const banner = document.getElementById('activeSessionBanner');
@@ -433,6 +508,10 @@ function renderUI() {
       subBadge.style.color = sub.color;
     }
   }
+  const focusToday = document.getElementById('focusTodayTotal');
+  if (focusToday) focusToday.textContent = fmtHMEn(todayMins);
+  const focusAll = document.getElementById('focusAllTimeTotal');
+  if (focusAll) focusAll.textContent = fmtHMEn(allTimeMins);
   
   // Wasted Time Card
   const wasted = calculateWastedTime();
@@ -478,7 +557,8 @@ function renderSubjectsGrid() {
   if (!container) return;
   
   container.innerHTML = state.subjects.map(s => {
-    const mins = getSubjectMinutesToday(s.id);
+    const todayMins = getSubjectMinutesToday(s.id);
+    const allMins = getSubjectAllTimeMinutes(s.id);
     return `
       <div class="subject-card" style="--sub-color:${s.color}">
         <div class="subject-info">
@@ -487,7 +567,10 @@ function renderSubjectsGrid() {
           </div>
           <div>
             <div class="subject-name">${s.name}</div>
-            <div class="subject-time tabular">${fmtHM(mins)} / هدف ${fmtHM(s.targetMinutes)}</div>
+            <div class="subject-time tabular">
+              <div style="font-weight:700; color:var(--text-main);">كله في كله: ${fmtHM(allMins)}</div>
+              <div style="font-size:11px; color:var(--text-muted);">اليوم: ${fmtHM(todayMins)}</div>
+            </div>
           </div>
         </div>
         <div class="subject-gauge">
@@ -984,6 +1067,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
   
+  // Toggle time mode on canvas center click
+  const centerInfo = document.querySelector('.canvas-center-info');
+  if (centerInfo) {
+    centerInfo.style.pointerEvents = 'auto';
+    centerInfo.style.cursor = 'pointer';
+    centerInfo.addEventListener('click', () => {
+      state.displayTimeMode = state.displayTimeMode === 'allTime' ? 'today' : 'allTime';
+      localStorage.setItem('kareem_display_mode', state.displayTimeMode);
+      toast(state.displayTimeMode === 'allTime' ? 'تم تحويل العرض إلى: إجمالي المسيرة (كله في كله)' : 'تم تحويل العرض إلى: طاقة اليوم', 'timer');
+      renderUI();
+    });
+  }
+
   // Load quotes and start render loops
   initFirebase();
   loadMotivationQuotes();
