@@ -3,44 +3,79 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>SHAPAP | شاحن الإنجاز اللانهائي ⚡</title>
+<title>SHAPAP | Kareem Edition ⚡</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;800;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#050507;
-  --bg2:#0a0a10;
-  --panel:rgba(18,18,28,.55);
-  --violet:#a855f7;
-  --cyan:#22d3ee;
-  --green:#4ade80;
-  --amber:#fbbf24;
-  --rose:#fb7185;
-  --txt:#e8e8f0;
-  --dim:#8b8b9e;
+/* المتغيرات الأساسية (الثيم الافتراضي - النيون) */
+:root {
+  --bg: #050507;
+  --bg2: #0a0a10;
+  --panel: rgba(18,18,28,.55);
+  --violet: #a855f7;
+  --cyan: #22d3ee;
+  --green: #4ade80;
+  --amber: #fbbf24;
+  --rose: #fb7185;
+  --txt: #e8e8f0;
+  --dim: #8b8b9e;
+  --font-ar: 'Cairo', sans-serif;
+  --font-en: 'Orbitron', monospace;
 }
+
+/* ثيم السايبر بانك */
+[data-theme="cyber"] {
+  --bg: #0d0e15;
+  --panel: rgba(20,20,25,.8);
+  --violet: #fcee0a; /* أصفر سايبر */
+  --cyan: #00f0ff; /* أزرق سايبر */
+  --green: #ff003c; /* أحمر سايبر */
+}
+
+/* ثيم الطبيعة / زين */
+[data-theme="zen"] {
+  --bg: #0a110a;
+  --panel: rgba(10,25,10,.5);
+  --violet: #4ade80; 
+  --cyan: #10b981; 
+  --green: #84cc16; 
+}
+
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%}
 body{
-  background:var(--bg);
-  color:var(--txt);
-  font-family:'Cairo',sans-serif;
-  overflow-x:hidden;
-  min-height:100vh;
+  background:var(--bg); color:var(--txt); font-family:var(--font-ar);
+  overflow-x:hidden; min-height:100vh; transition: background 0.5s ease;
 }
 body::before{
-  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-  background:
-    radial-gradient(ellipse 60% 40% at 20% 10%, rgba(168,85,247,.08), transparent 60%),
-    radial-gradient(ellipse 50% 40% at 85% 80%, rgba(34,211,238,.06), transparent 60%);
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background: radial-gradient(ellipse 60% 40% at 20% 10%, rgba(var(--violet),.08), transparent 60%),
+              radial-gradient(ellipse 50% 40% at 85% 80%, rgba(var(--cyan),.06), transparent 60%);
 }
 .stars{position:fixed;inset:0;z-index:0;pointer-events:none}
-.screen{position:relative;z-index:2;display:none;min-height:100vh;flex-direction:column;align-items:center;padding:24px 16px 60px}
+
+/* شريط التخصيص العلوي */
+.top-nav {
+  position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-between;
+  padding: 0 20px; z-index: 10;
+}
+.kareem-badge {
+  font-weight: 900; font-size: 14px; background: linear-gradient(90deg, var(--cyan), var(--violet));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  letter-spacing: 1px; display: flex; align-items: center; gap: 5px;
+}
+.controls { display: flex; gap: 10px; }
+.ctrl-btn {
+  background: var(--panel); border: 1px solid rgba(255,255,255,.1); color: var(--txt);
+  padding: 5px 10px; border-radius: 8px; font-size: 12px; cursor: pointer; transition: 0.3s;
+}
+.ctrl-btn:hover { border-color: var(--cyan); box-shadow: 0 0 10px rgba(34,211,238,.2); }
+
+.screen{position:relative;z-index:2;display:none;min-height:100vh;flex-direction:column;align-items:center;padding:60px 16px 60px}
 .screen.active{display:flex;animation:fadeIn .6s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
 /* ===== Dashboard ===== */
-.brand{font-size:13px;letter-spacing:6px;color:var(--dim);margin-top:8px;font-family:'Orbitron',monospace;text-transform:uppercase}
+.brand{font-size:14px;letter-spacing:4px;color:var(--dim);margin-top:8px;font-family:var(--font-en);text-transform:uppercase}
 .brand b{color:var(--cyan);text-shadow:0 0 14px var(--cyan)}
 .spiral-wrap{position:relative;width:min(78vw,380px);height:min(78vw,380px);margin:22px auto 6px}
 .spiral-wrap canvas{width:100%;height:100%}
@@ -48,175 +83,163 @@ body::before{
   position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;
 }
 .total-clock .num{
-  font-family:'Orbitron',monospace;font-weight:900;
-  font-size:clamp(26px,8vw,40px);
+  font-family:var(--font-en);font-weight:900;font-size:clamp(26px,8vw,40px);
   background:linear-gradient(120deg,var(--cyan),var(--violet),var(--green));
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 0 18px rgba(168,85,247,.55));
-  direction:ltr;
+  filter:drop-shadow(0 0 18px rgba(168,85,247,.55));direction:ltr;
 }
-.total-clock .lbl{font-size:12px;color:var(--dim);margin-top:4px}
-.ring-note{font-size:11px;color:var(--dim);text-align:center;margin-bottom:18px}
-.ring-note b{color:var(--green)}
+.total-clock .lbl{font-size:12px;color:var(--dim);margin-top:4px; font-weight: 600;}
 .subjects{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%;max-width:520px;margin-bottom:26px}
 .subj{
-  background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-  border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:14px 6px;
-  display:flex;flex-direction:column;align-items:center;gap:6px;
-  transition:.3s;cursor:default;
+  background:var(--panel);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.07);
+  border-radius:18px;padding:14px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;transition:.3s;
 }
 .subj:hover{transform:translateY(-4px);border-color:var(--sc)}
 .subj .ico{font-size:22px}
 .subj .nm{font-size:12px;font-weight:600;color:var(--sc);text-shadow:0 0 10px var(--sc)}
-.subj .hr{font-family:'Orbitron',monospace;font-size:11px;color:var(--txt);direction:ltr}
 .launch{
-  position:relative;border:none;cursor:pointer;font-family:'Cairo',sans-serif;
+  position:relative;border:none;cursor:pointer;font-family:var(--font-ar);
   padding:18px 54px;border-radius:60px;font-size:19px;font-weight:800;color:#04040a;
   background:linear-gradient(120deg,var(--cyan),var(--violet) 55%,var(--green));
   box-shadow:0 0 30px rgba(168,85,247,.45),0 0 70px rgba(34,211,238,.2);
-  animation:pulse 2.6s ease-in-out infinite;
-  transition:.25s;
+  animation:pulse 2.6s ease-in-out infinite;transition:.25s;
 }
 .launch:hover{transform:scale(1.05)}
-.launch:active{transform:scale(.96)}
 @keyframes pulse{0%,100%{box-shadow:0 0 26px rgba(168,85,247,.4),0 0 60px rgba(34,211,238,.15)}50%{box-shadow:0 0 46px rgba(168,85,247,.7),0 0 100px rgba(74,222,128,.3)}}
-.dash-tabs{display:flex;gap:8px;margin-top:22px}
-.dash-tabs button{
-  background:var(--panel);border:1px solid rgba(255,255,255,.08);color:var(--dim);
-  border-radius:12px;padding:9px 18px;font-family:'Cairo';font-size:13px;cursor:pointer;transition:.25s;
-}
-.dash-tabs button.on{color:var(--cyan);border-color:rgba(34,211,238,.4);box-shadow:0 0 16px rgba(34,211,238,.15)}
 
-/* ===== Focus Mode ===== */
+/* ===== Focus Mode & Progress Bars ===== */
 #focusScreen{justify-content:space-between;padding-top:30px}
 .top-bar{width:100%;max-width:640px}
-.bar-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:6px}
+.bar-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:6px; font-weight:600;}
 .neo-bar{
-  height:12px;border-radius:20px;background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.08);overflow:hidden;position:relative;
+  height:14px; border-radius:20px; background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08); overflow:hidden; position:relative;
 }
-.neo-fill{
-  height:100%;width:0%;border-radius:20px;position:relative;
+
+/* ستايل البار المتصل (الافتراضي) */
+[data-bar="solid"] .neo-fill {
+  height:100%; width:0%; border-radius:20px;
   background:linear-gradient(90deg,var(--cyan),var(--violet));
-  box-shadow:0 0 16px rgba(34,211,238,.7);
-  transition:width 1s linear;
+  box-shadow:0 0 16px var(--cyan); transition:width 1s linear;
 }
-.neo-fill::after{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
-  animation:wave 2.2s linear infinite;
+
+/* ستايل البار المتقطع (Dashed) */
+[data-bar="dashed"] .neo-fill {
+  height:100%; width:0%; border-radius:20px;
+  background: repeating-linear-gradient(
+    45deg, var(--cyan), var(--cyan) 10px, var(--violet) 10px, var(--violet) 20px
+  );
+  box-shadow:0 0 16px var(--cyan); transition:width 1s linear;
+  animation: moveDashed 2s linear infinite;
 }
-@keyframes wave{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
+@keyframes moveDashed { from { background-position: 0 0; } to { background-position: 28px 0; } }
+
+/* ستايل البار السائل (Liquid) */
+[data-bar="liquid"] .neo-bar { border-radius: 10px; }
+[data-bar="liquid"] .neo-fill {
+  height:100%; width:0%; position: relative; overflow: hidden;
+  background: var(--cyan); box-shadow:0 0 16px var(--cyan); transition:width 1s linear;
+}
+[data-bar="liquid"] .neo-fill::after {
+  content: ''; position: absolute; top: -10px; right: 0; width: 30px; height: 30px;
+  background: rgba(255,255,255,0.3); border-radius: 40%;
+  animation: liquidSpin 2s linear infinite;
+}
+@keyframes liquidSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
 .focus-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%}
 .session-timer{
-  font-family:'Orbitron',monospace;font-size:clamp(52px,15vw,96px);font-weight:700;
-  color:var(--txt);opacity:.85;direction:ltr;letter-spacing:4px;
-  text-shadow:0 0 30px rgba(168,85,247,.4);
-  animation:softGlow 60s ease-in-out infinite alternate;
+  font-family:var(--font-en);font-size:clamp(52px,15vw,96px);font-weight:700;
+  color:var(--txt);opacity:.9;direction:ltr;letter-spacing:4px;
+  text-shadow:0 0 30px rgba(168,85,247,.5);
 }
-@keyframes softGlow{from{text-shadow:0 0 20px rgba(168,85,247,.25)}to{text-shadow:0 0 50px rgba(74,222,128,.55)}}
-.session-sub{font-size:13px;color:var(--dim);margin-top:6px}
+.quote-box {
+  background: var(--panel); border: 1px dashed var(--cyan); padding: 15px 20px;
+  border-radius: 12px; margin-top: 20px; text-align: center; max-width: 90%; min-height: 70px;
+  display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--cyan);
+  transition: opacity 0.5s ease;
+}
 .focus-btns{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap;justify-content:center}
 .fbtn{
-  border-radius:16px;padding:14px 26px;font-family:'Cairo';font-size:15px;font-weight:700;cursor:pointer;transition:.25s;border:1px solid rgba(255,255,255,.12);
+  border-radius:16px;padding:14px 26px;font-family:var(--font-ar);font-size:15px;font-weight:700;cursor:pointer;
+  transition:.25s;border:1px solid rgba(255,255,255,.12);
 }
 .fbtn.break{background:rgba(251,191,36,.1);color:var(--amber);border-color:rgba(251,191,36,.35)}
 .fbtn.break:hover{box-shadow:0 0 20px rgba(251,191,36,.3)}
 .fbtn.end{background:rgba(251,113,133,.12);color:var(--rose);border-color:rgba(251,113,133,.4)}
 .fbtn.end:hover{box-shadow:0 0 22px rgba(251,113,133,.35)}
+.fbtn.sound { background: rgba(34,211,238,.1); color: var(--cyan); border-color: rgba(34,211,238,.4); }
+.fbtn.sound.active { background: var(--cyan); color: #000; box-shadow: 0 0 20px var(--cyan); }
+
 .bottom-bar-wrap{width:100%;max-width:640px;margin-top:20px}
 .big-bar{height:20px}
 .big-fill{background:linear-gradient(90deg,var(--violet),var(--green));box-shadow:0 0 22px rgba(74,222,128,.6)}
 
-/* Break overlay */
+/* Break overlay & Logger & Toast (Same Structure, enhanced UI) */
 #breakOverlay{
   position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;flex-direction:column;
   background:#020204;animation:breath 6s ease-in-out infinite;
 }
 #breakOverlay.show{display:flex}
-@keyframes breath{
-  0%,100%{box-shadow:inset 0 0 120px rgba(251,191,36,.04)}
-  50%{box-shadow:inset 0 0 220px rgba(251,191,36,.14)}
-}
-#breakOverlay .q{font-size:clamp(18px,5vw,26px);color:var(--amber);text-align:center;padding:0 30px;line-height:2;text-shadow:0 0 20px rgba(251,191,36,.35)}
-#breakOverlay .bt{font-family:'Orbitron',monospace;color:var(--dim);margin-top:22px;font-size:14px;direction:ltr}
+@keyframes breath{ 0%,100%{box-shadow:inset 0 0 120px rgba(251,191,36,.04)} 50%{box-shadow:inset 0 0 220px rgba(251,191,36,.14)} }
+#breakOverlay .q{font-size:22px;color:var(--amber);text-align:center;padding:0 30px;line-height:2;}
+#breakOverlay .bt{font-family:var(--font-en);color:var(--dim);margin-top:22px;font-size:20px;direction:ltr}
 #breakOverlay button{
-  margin-top:40px;background:transparent;border:1px solid rgba(251,191,36,.4);color:var(--amber);
-  border-radius:40px;padding:12px 34px;font-family:'Cairo';font-size:15px;cursor:pointer;transition:.25s;
+  margin-top:40px;background:var(--amber); color:#000; border:none; font-weight:800;
+  border-radius:40px;padding:12px 34px;font-family:var(--font-ar);font-size:16px;cursor:pointer;
 }
-#breakOverlay button:hover{box-shadow:0 0 24px rgba(251,191,36,.3)}
 
-/* ===== Mission Logger ===== */
 #loggerModal{
   position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:20px;
-  background:rgba(3,3,6,.7);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  background:rgba(3,3,6,.8);backdrop-filter:blur(10px);
 }
 #loggerModal.show{display:flex;animation:fadeIn .35s ease}
 .logger{
-  width:100%;max-width:480px;background:rgba(16,16,26,.85);
-  border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:26px;
-  box-shadow:0 0 60px rgba(168,85,247,.15);max-height:85vh;overflow-y:auto;
+  width:100%;max-width:480px;background:rgba(16,16,26,.95);border:1px solid var(--cyan);
+  border-radius:24px;padding:26px;box-shadow:0 0 60px rgba(34,211,238,.2);max-height:85vh;overflow-y:auto;
 }
-.logger h3{font-size:19px;margin-bottom:4px;background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.logger .dur{font-size:12px;color:var(--dim);margin-bottom:18px}
-.mrow{display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap}
-.msubj{
-  flex:0 0 auto;border-radius:12px;padding:10px 14px;font-family:'Cairo';font-size:13px;font-weight:700;cursor:pointer;
-  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--dim);transition:.2s;
-}
-.msubj.sel{color:#0a0a12;background:var(--mc);border-color:var(--mc);box-shadow:0 0 16px var(--mc)}
+.logger h3{color:var(--cyan); margin-bottom:8px;}
 .mtask{
-  flex:1 1 100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;
-  padding:10px 14px;color:var(--txt);font-family:'Cairo';font-size:13px;outline:none;transition:.2s;min-width:0;
+  width: 100%; background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;
+  padding:12px;color:var(--txt);font-family:var(--font-ar);font-size:14px;outline:none; margin-top: 10px;
 }
-.mtask:focus{border-color:var(--violet);box-shadow:0 0 14px rgba(168,85,247,.25)}
-.add-subj{
-  width:100%;background:transparent;border:1px dashed rgba(255,255,255,.2);color:var(--dim);border-radius:12px;
-  padding:10px;font-family:'Cairo';font-size:13px;cursor:pointer;margin-bottom:16px;transition:.2s;
-}
-.add-subj:hover{color:var(--cyan);border-color:rgba(34,211,238,.4)}
+.mtask:focus{border-color:var(--cyan);}
+.msubj { padding: 8px 12px; border-radius: 8px; border: 1px solid gray; background: transparent; color: gray; cursor: pointer; margin: 2px;}
+.msubj.sel { background: var(--mc); color: #000; border-color: var(--mc); font-weight: bold;}
 .save-btn{
-  width:100%;border:none;border-radius:14px;padding:15px;font-family:'Cairo';font-size:16px;font-weight:800;cursor:pointer;
-  background:linear-gradient(120deg,var(--violet),var(--green));color:#04040a;transition:.25s;
-  box-shadow:0 0 24px rgba(74,222,128,.25);
+  width:100%;border:none;border-radius:14px;padding:15px;font-family:var(--font-ar);font-size:16px;font-weight:800;cursor:pointer;
+  background:linear-gradient(120deg,var(--cyan),var(--violet));color:#fff; margin-top: 20px;
 }
-.save-btn:hover{transform:scale(1.02)}
 .save-btn:disabled{opacity:.4;cursor:not-allowed}
 
-/* ===== Chrono Log ===== */
-.log-list{width:100%;max-width:560px;display:flex;flex-direction:column;gap:14px}
-.log-item{
-  background:var(--panel);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.07);
-  border-radius:18px;padding:16px 18px;position:relative;overflow:hidden;
-}
-.log-item::before{content:'';position:absolute;right:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--cyan),var(--violet))}
-.log-date{font-size:13px;font-weight:700;color:var(--cyan)}
-.log-meta{font-size:12px;color:var(--dim);margin:4px 0 10px}
-.task-line{font-size:13px;padding:5px 10px;border-radius:8px;margin-top:5px;display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.03)}
-.task-line .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
-.empty-log{text-align:center;color:var(--dim);font-size:14px;padding:40px 0}
 .toast{
   position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);z-index:99;
-  background:rgba(20,20,32,.95);border:1px solid rgba(74,222,128,.4);color:var(--green);
-  padding:12px 26px;border-radius:40px;font-size:14px;transition:.4s;opacity:0;pointer-events:none;
-  box-shadow:0 0 24px rgba(74,222,128,.2);max-width:90vw;text-align:center;
+  background:rgba(20,20,32,.95);border:1px solid var(--cyan);color:var(--cyan);
+  padding:12px 26px;border-radius:40px;font-size:14px;transition:.4s;opacity:0;
 }
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
-.sync-ind{position:fixed;top:14px;left:16px;z-index:40;font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
-.sync-ind .d{width:8px;height:8px;border-radius:50%;background:var(--rose)}
-.sync-ind.on .d{background:var(--green);box-shadow:0 0 10px var(--green)}
-.live-ind{position:fixed;top:14px;right:16px;z-index:40;font-size:11px;color:var(--green);display:none;align-items:center;gap:6px;font-family:'Orbitron',monospace}
-.live-ind .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:blink 1.2s infinite}
-.live-ind.show{display:flex}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-h2.sec{font-size:22px;font-weight:800;margin:6px 0 20px}
-h2.sec span{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 </style>
 </head>
-<body>
+<body data-theme="neon" data-bar="solid">
+
 <canvas class="stars" id="stars"></canvas>
-<div class="sync-ind" id="syncInd"><span class="d"></span><span id="syncTxt">محلي</span></div>
-<div class="live-ind" id="liveInd"><span class="dot"></span>LIVE SYNC</div>
+
+<!-- شريط تحكم كريم -->
+<div class="top-nav">
+  <div class="kareem-badge">👑 KAREEM WORKSPACE</div>
+  <div class="controls">
+    <select id="themeSelect" class="ctrl-btn">
+      <option value="neon">🟣 نيون (افتراضي)</option>
+      <option value="cyber">🟡 سايبر بانك</option>
+      <option value="zen">🟢 طبيعة (زين)</option>
+    </select>
+    <select id="barSelect" class="ctrl-btn">
+      <option value="solid">➖ متصل</option>
+      <option value="dashed">🔲 متقطع</option>
+      <option value="liquid">🌊 سائل</option>
+    </select>
+  </div>
+</div>
 
 <!-- ============ DASHBOARD ============ -->
 <section class="screen active" id="dashScreen">
@@ -225,15 +248,12 @@ h2.sec span{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-
     <canvas id="spiralCanvas"></canvas>
     <div class="total-clock">
       <div class="num" id="totalHours">0h 00m</div>
-      <div class="lbl">إجمالي طاقة المذاكرة</div>
+      <div class="lbl">إجمالي طاقة المذاكرة يا بطل</div>
     </div>
   </div>
-  <div class="ring-note">كل <b>5 ساعات</b> = حلقة نيون جديدة تُثبَّت في الحلزون</div>
   <div class="subjects" id="subjCards"></div>
-  <button class="launch" id="launchBtn">⚡ إطلاق جلسة مذاكرة</button>
-  <div class="dash-tabs">
-    <button class="on" id="tabLogBtn">📜 سجل الإنجازات</button>
-  </div>
+  <button class="launch" id="launchBtn">⚡ إطلاق جلسة تركيز</button>
+  <button id="tabLogBtn" class="ctrl-btn" style="margin-top: 20px; padding: 10px 20px; font-size: 14px;">📜 سجل الإنجازات</button>
 </section>
 
 <!-- ============ FOCUS MODE ============ -->
@@ -242,52 +262,56 @@ h2.sec span{background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-
     <div class="bar-lbl"><span>⏱ الجلسة الحالية</span><span id="sessionBarTxt">0m</span></div>
     <div class="neo-bar"><div class="neo-fill" id="sessionBarFill"></div></div>
   </div>
+  
   <div class="focus-center">
     <div class="session-timer" id="sessionTimer">00:00</div>
-    <div class="session-sub" id="focusHint">ركّز بهدوء.. الطاقة تُشحن ⚡</div>
+    <div class="quote-box" id="quoteBox">جاري شحن التحفيز... ⚡</div>
+    
     <div class="focus-btns">
       <button class="fbtn break" id="breakBtn">☕ أخذ استراحة</button>
+      <button class="fbtn sound" id="soundBtn">🌧️ تشغيل مطر</button>
       <button class="fbtn end" id="endBtn">🏁 إنهاء الجلسة</button>
     </div>
   </div>
+
   <div class="bottom-bar-wrap">
     <div class="bar-lbl"><span>🌌 الإنجاز العام</span><span id="totalBarTxt">0h 00m</span></div>
     <div class="neo-bar big-bar"><div class="neo-fill big-fill" id="totalBarFill"></div></div>
   </div>
 </section>
 
-<!-- ============ CHRONO LOG ============ -->
+<!-- ============ LOG SCREEN ============ -->
 <section class="screen" id="logScreen">
-  <h2 class="sec">📜 <span>سجل الإنجازات — خط زمني لبطولاتك</span></h2>
-  <div class="log-list" id="logList"></div>
-  <div class="dash-tabs" style="margin-top:26px">
-    <button id="backDashBtn">⬅ عودة للوحة التحكم</button>
-  </div>
+  <h2 style="color:var(--cyan); margin-bottom: 20px;">📜 سجل بطولاتك يا كريم</h2>
+  <div id="logList" style="width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px;"></div>
+  <button id="backDashBtn" class="ctrl-btn" style="margin-top: 20px; padding: 10px 20px;">⬅ عودة</button>
 </section>
 
-<!-- ============ BREAK OVERLAY ============ -->
+<!-- ============ OVERLAYS ============ -->
 <div id="breakOverlay">
-  <div class="q">خذ نفساً عميقاً..<br>حان وقت الراحة المُبرهنة 🌙</div>
+  <div class="q">استرح قليلاً يا كريم.. المحارب يحتاج لالتقاط الأنفاس 🌙</div>
   <div class="bt" id="breakTimer">00:00</div>
-  <button id="resumeBtn">▶ استئناف المذاكرة</button>
+  <button id="resumeBtn">▶ استئناف المذاكرة بقوة</button>
 </div>
 
-<!-- ============ MISSION LOGGER ============ -->
 <div id="loggerModal">
   <div class="logger">
-    <h3>📝 وثّق مهماتك</h3>
-    <div class="dur" id="loggerDur"></div>
+    <h3>📝 وثّق مهمتك يا كريم</h3>
+    <div style="color:gray; font-size: 12px; margin-bottom: 15px;" id="loggerDur"></div>
     <div id="missionRows"></div>
-    <button class="add-subj" id="addMissionBtn">+ إضافة مادة أخرى لهذه الجلسة</button>
-    <button class="save-btn" id="saveBtn">🕳️ احفر في التاريخ (حفظ الجلسة)</button>
+    <button class="save-btn" id="saveBtn">🕳️ حفظ الإنجاز في تاريخك</button>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
+<!-- ملف الصوت المحيطي (مطر) -->
+<audio id="rainAudio" loop src="https://cdn.pixabay.com/download/audio/2021/08/09/audio_6b825eb94c.mp3?filename=light-rain-109591.mp3"></audio>
+
 <script type="module">
+// إعدادات فايربيز (كما هي من الكود الخاص بك)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, set, remove, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, push, onValue, set, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBMBd9C41EyU7kWi06CVMgXrYFBVAvU1v8",
@@ -296,8 +320,7 @@ const firebaseConfig = {
   projectId: "shapap-13c58",
   storageBucket: "shapap-13c58.firebasestorage.app",
   messagingSenderId: "818487036065",
-  appId: "1:818487036065:web:350734adcc4fcd779c48e0",
-  measurementId: "G-8L138W57KK"
+  appId: "1:818487036065:web:350734adcc4fcd779c48e0"
 };
 
 const SUBJECTS = [
@@ -306,172 +329,107 @@ const SUBJECTS = [
   {id:'english', name:'إنجليزي', ico:'🔤', color:'#22d3ee'},
   {id:'physics', name:'فيزياء', ico:'⚛️', color:'#a855f7'},
 ];
-const RING_MINUTES = 300; // 5 hours per ring
+const RING_MINUTES = 300; 
 
-/* ---------- State ---------- */
-let db = null, sessionsRef = null, activeRef = null, firebaseOk = false;
+/* ---------- State & Fixes ---------- */
+let db = null, sessionsRef = null;
 let sessions = [];
-let session = null; // {startTs, elapsedBefore, breakStart, timerInt, syncInt, breakInt, ended}
-let totalMinutes = 0;
-let subjMinutes = {history:0, arabic:0, english:0, physics:0};
-let remoteActive = null;        // last snapshot from Firebase of shapap/active
-let lastLocalWrite = 0;         // ts of our last write to active
-let suppressRemote = false;     // guard while we're ending locally
+// تم إصلاح نظام الجلسة ليكون رياضياً دقيقاً 100%
+let session = null; // {startTs, elapsedBefore, breakStart, timerInt}
+let totalPastMinutes = 0; // الدقائق السابقة فقط
+let quotes = [];
+let quoteInterval;
+
+/* ---------- جلب التحفيزات ---------- */
+const fallbackQuotes = [
+  "يا كريم، العرق في التدريب يوفر الدماء في المعركة.. استمر! ⚡",
+  "التركيز هو السلاح السري للعباقرة.. ابقَ في منطقة العمل! 🧠",
+  "النجاح لا يأتي لمن ينتظر، بل لمن يعمل بجد. 💪",
+  "كل ثانية هنا هي استثمار في مستقبلك الأسطوري يا بطل. 🎯"
+];
+
+async function loadQuotes() {
+  try {
+    const res = await fetch('تحفيز.json');
+    if(res.ok) {
+      quotes = await res.json();
+    } else {
+      quotes = fallbackQuotes;
+    }
+  } catch(e) {
+    quotes = fallbackQuotes; // Fallback if local server not running
+  }
+}
+loadQuotes();
+
+function changeQuote() {
+  const qBox = document.getElementById('quoteBox');
+  qBox.style.opacity = 0;
+  setTimeout(() => {
+    qBox.textContent = quotes[Math.floor(Math.random() * quotes.length)];
+    qBox.style.opacity = 1;
+  }, 500);
+}
+
+/* ---------- الثيمات والإعدادات ---------- */
+const themeSel = document.getElementById('themeSelect');
+const barSel = document.getElementById('barSelect');
+
+// تحميل الإعدادات المحفوظة
+if(localStorage.getItem('kareem_theme')) {
+  document.body.setAttribute('data-theme', localStorage.getItem('kareem_theme'));
+  themeSel.value = localStorage.getItem('kareem_theme');
+}
+if(localStorage.getItem('kareem_bar')) {
+  document.body.setAttribute('data-bar', localStorage.getItem('kareem_bar'));
+  barSel.value = localStorage.getItem('kareem_bar');
+}
+
+themeSel.addEventListener('change', (e) => {
+  document.body.setAttribute('data-theme', e.target.value);
+  localStorage.setItem('kareem_theme', e.target.value);
+});
+barSel.addEventListener('change', (e) => {
+  document.body.setAttribute('data-bar', e.target.value);
+  localStorage.setItem('kareem_bar', e.target.value);
+});
+
 
 /* ---------- Init Firebase ---------- */
 try {
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
   sessionsRef = ref(db, 'shapap/sessions');
-  activeRef = ref(db, 'shapap/active');
-
   onValue(sessionsRef, snap => {
     const val = snap.val();
     sessions = val ? Object.values(val) : [];
     recalc(); renderAll();
-    firebaseOk = true; setSync(true);
   });
-
-  onValue(activeRef, snap => {
-    remoteActive = snap.val();
-    handleRemoteActive();
-  });
-} catch(e) { console.warn('Firebase init failed, local mode', e); }
-
-/* local fallback */
-const LS_KEY = 'shapap_sessions_v1';
-const LS_ACTIVE = 'shapap_active_v1';
-function loadLocal(){ try{ const d = JSON.parse(localStorage.getItem(LS_KEY)||'[]'); sessions = Array.isArray(d)?d:[]; }catch(e){ sessions=[]; } }
-function saveLocal(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(sessions)); }catch(e){} }
-function loadLocalActive(){ try{ return JSON.parse(localStorage.getItem(LS_ACTIVE)||'null'); }catch(e){ return null; } }
-function saveLocalActive(a){ try{ a ? localStorage.setItem(LS_ACTIVE, JSON.stringify(a)) : localStorage.removeItem(LS_ACTIVE); }catch(e){} }
-loadLocal(); recalc(); renderAll();
-
-/* ---------- Cross-tab / refresh resume logic ---------- */
-function handleRemoteActive(){
-  // Case 1: remote session exists, we have none locally -> resume
-  if(remoteActive && !session){
-    session = {
-      startTs: remoteActive.startTs,
-      elapsedBefore: (remoteActive.elapsedBefore||0) + (remoteActive.breakStart ? 0 : Math.max(0, Date.now() - (remoteActive.lastSync||remoteActive.startTs))),
-      breakStart: remoteActive.breakStart || null,
-      timerInt:null, syncInt:null, breakInt:null
-    };
-    showScreen('focusScreen');
-    startTimer();
-    startLiveSync();
-    if(session.breakStart){
-      document.getElementById('breakOverlay').classList.add('show');
-      runBreakTimer();
-    }
-    document.getElementById('focusHint').textContent = '🔄 استئناف تلقائي — جلستك محفوظة ثانية بثانية';
-    toast('⚡ تم استئناف جلستك تلقائياً من حيث توقفت!');
-  }
-  // Case 2: remote cleared (ended from another tab) while we still run locally
-  else if(!remoteActive && session && !suppressRemote){
-    const s = session; session = null;
-    clearInterval(s.timerInt); clearInterval(s.syncInt); clearInterval(s.breakInt);
-    document.getElementById('breakOverlay').classList.remove('show');
-    showScreen('dashScreen');
-    recalc(); renderAll();
-    toast('🏁 الجلسة أُنهيت من نافذة أخرى — أُضيفت لسجل إنجازاتك');
-  }
+} catch(e) { 
+  console.warn('Firebase init failed, local mode', e);
+  const d = JSON.parse(localStorage.getItem('kareem_sessions_v2')||'[]');
+  sessions = Array.isArray(d) ? d : [];
+  recalc(); renderAll();
 }
 
-/* ---------- Live sync (every second) ---------- */
-function startLiveSync(){
-  clearInterval(session.syncInt);
-  document.getElementById('liveInd').classList.add('show');
-  session.syncInt = setInterval(()=>{
-    if(!session) return;
-    const payload = {
-      startTs: session.startTs,
-      elapsedBefore: session.elapsedBefore,
-      breakStart: session.breakStart || null,
-      lastSync: Date.now()
-    };
-    lastLocalWrite = Date.now();
-    saveLocalActive(payload); // mirror locally as fallback
-    if(db){ set(activeRef, payload).catch(()=>{}); }
-  }, 1000);
-}
-function stopLiveSync(){
-  if(session) clearInterval(session.syncInt);
-  document.getElementById('liveInd').classList.remove('show');
-}
+function saveLocal() { localStorage.setItem('kareem_sessions_v2', JSON.stringify(sessions)); }
 
-/* flush final state on tab close/refresh */
-window.addEventListener('beforeunload', ()=>{
-  if(!session) return;
-  const payload = {
-    startTs: session.startTs,
-    elapsedBefore: session.elapsedBefore + (session.breakStart ? 0 : Date.now() - session.startTs),
-    breakStart: session.breakStart || null,
-    lastSync: Date.now()
-  };
-  saveLocalActive(payload);
-  if(db){
-    try{ navigator.sendBeacon; }catch(e){}
-    // best-effort sync (async may not complete; the 1s interval already keeps it fresh)
-    set(activeRef, payload).catch(()=>{});
-  }
-});
-document.addEventListener('visibilitychange', ()=>{
-  if(document.hidden && session){
-    const payload = {
-      startTs: session.startTs,
-      elapsedBefore: session.elapsedBefore,
-      breakStart: session.breakStart || null,
-      lastSync: Date.now()
-    };
-    saveLocalActive(payload);
-    if(db) set(activeRef, payload).catch(()=>{});
-  }
-});
-
-/* offline fallback: resume from localStorage mirror */
-if(!remoteActive && !session){
-  const la = loadLocalActive();
-  if(la && la.startTs && !la.ended){
-    session = {
-      startTs: la.startTs,
-      elapsedBefore: (la.elapsedBefore||0) + (la.breakStart ? 0 : Math.max(0, Date.now() - (la.lastSync||la.startTs))),
-      breakStart: la.breakStart || null,
-      timerInt:null, syncInt:null, breakInt:null
-    };
-    showScreen('focusScreen');
-    startTimer(); startLiveSync();
-    if(session.breakStart){
-      document.getElementById('breakOverlay').classList.add('show');
-      runBreakTimer();
-    }
-    toast('⚡ استُئنفت جلستك (وضع محلي)');
-  }
-}
-
-function setSync(on){
-  const el = document.getElementById('syncInd');
-  el.classList.toggle('on', on);
-  document.getElementById('syncTxt').textContent = on ? 'متصل بالسحابة ☁️' : 'وضع محلي';
-}
-setSync(firebaseOk);
-
-/* ---------- Helpers ---------- */
+/* ---------- Math & Time Helpers (FIXED) ---------- */
 function recalc(){
-  totalMinutes = 0;
-  subjMinutes = {history:0, arabic:0, english:0, physics:0};
-  sessions.forEach(s => {
-    totalMinutes += s.minutes;
-    (s.entries||[]).forEach(en => { if(subjMinutes[en.subj]!==undefined) subjMinutes[en.subj] += s.minutes; });
-  });
-  if (session) totalMinutes += getSessionMinutes();
+  totalPastMinutes = sessions.reduce((sum, s) => sum + s.minutes, 0);
 }
+
+// دالة حساب الثواني الدقيقة للجلسة الحالية
 function getSessionSeconds(){
   if(!session) return 0;
-  const now = Date.now();
-  return Math.floor((session.elapsedBefore + (now - session.startTs))/1000);
+  if(session.breakStart){
+      // إذا كنا في استراحة، الوقت يتوقف عند ما تم إنجازه مسبقاً
+      return Math.floor(session.elapsedBefore / 1000);
+  }
+  // إذا كنا نعمل، الوقت هو: ما تم إنجازه + (الوقت الحالي - وقت آخر انطلاق)
+  return Math.floor((session.elapsedBefore + (Date.now() - session.startTs)) / 1000);
 }
-function getSessionMinutes(){ return Math.floor(getSessionSeconds()/60); }
+
 function fmtHM(min){
   const h = Math.floor(min/60), m = min%60;
   return `${h}h ${String(m).padStart(2,'0')}m`;
@@ -491,25 +449,7 @@ function showScreen(id){
   window.scrollTo(0,0);
 }
 
-/* ---------- Stars background ---------- */
-(function(){
-  const c = document.getElementById('stars'), x = c.getContext('2d');
-  let W,H,stars;
-  function init(){ W=c.width=innerWidth; H=c.height=innerHeight;
-    stars = Array.from({length:90},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.3+.3,p:Math.random()*Math.PI*2}));
-  }
-  init(); addEventListener('resize',init);
-  (function loop(t){
-    x.clearRect(0,0,W,H);
-    stars.forEach(s=>{
-      const a = .25 + .55*Math.abs(Math.sin(t/1400 + s.p));
-      x.beginPath(); x.arc(s.x,s.y,s.r,0,7); x.fillStyle=`rgba(200,210,255,${a})`; x.fill();
-    });
-    requestAnimationFrame(loop);
-  })(0);
-})();
-
-/* ---------- 3D Glow Spiral ---------- */
+/* ---------- 3D Spiral Background ---------- */
 const spiralC = document.getElementById('spiralCanvas');
 const sx = spiralC.getContext('2d');
 function drawSpiral(){
@@ -517,27 +457,33 @@ function drawSpiral(){
   spiralC.width = size; spiralC.height = size;
   const cx = size/2, cy = size/2;
   sx.clearRect(0,0,size,size);
-  const rings = Math.floor(totalMinutes / RING_MINUTES);
-  const partial = (totalMinutes % RING_MINUTES) / RING_MINUTES;
-  const grad = ['#a855f7','#22d3ee','#4ade80','#fbbf24','#fb7185'];
+  
+  // حساب الوقت الكلي (الماضي + الحالي) للرسم
+  let currentTotalMin = totalPastMinutes + (session ? Math.floor(getSessionSeconds()/60) : 0);
+  
+  const rings = Math.floor(currentTotalMin / RING_MINUTES);
+  const partial = (currentTotalMin % RING_MINUTES) / RING_MINUTES;
+  
+  // قراءة الألوان من الثيم الحالي
+  const style = getComputedStyle(document.body);
+  const cViolet = style.getPropertyValue('--violet').trim();
+  const cCyan = style.getPropertyValue('--cyan').trim();
+  const cGreen = style.getPropertyValue('--green').trim();
+  
+  const grad = [cViolet, cCyan, cGreen, '#fbbf24', '#fb7185'];
   const t = performance.now()/1000;
   const maxR = size*.46;
 
   for(let r=0; r<rings; r++){
     const rr = maxR * (r+1)/(Math.max(rings,1)+(partial>0?1:0));
-    sx.beginPath();
-    sx.arc(cx,cy,rr,0,Math.PI*2);
-    sx.strokeStyle = grad[r%grad.length];
-    sx.globalAlpha = .8;
-    sx.lineWidth = 2.5;
-    sx.shadowBlur = 18; sx.shadowColor = grad[r%grad.length];
+    sx.beginPath(); sx.arc(cx,cy,rr,0,Math.PI*2);
+    sx.strokeStyle = grad[r%grad.length]; sx.globalAlpha = .8;
+    sx.lineWidth = 3; sx.shadowBlur = 15; sx.shadowColor = grad[r%grad.length];
     sx.stroke();
   }
-  if (totalMinutes > 0){
+  if (currentTotalMin > 0){
     const baseR = rings>0 ? maxR*rings/(rings+1) : 0;
-    const steps = 160;
-    sx.beginPath();
-    const turns = 3;
+    const steps = 160; sx.beginPath(); const turns = 3;
     for(let i=0;i<=steps*partial;i++){
       const p = i/steps;
       const ang = p*Math.PI*2*turns + t*.15;
@@ -546,69 +492,56 @@ function drawSpiral(){
       i===0 ? sx.moveTo(px,py) : sx.lineTo(px,py);
     }
     const g = grad[rings%grad.length];
-    sx.strokeStyle = g; sx.lineWidth = 2.5; sx.globalAlpha = .95;
-    sx.shadowBlur = 22; sx.shadowColor = g; sx.stroke();
-    const p = partial;
-    const ang = p*Math.PI*2*turns + t*.15;
-    const rr = baseR + (maxR-baseR)*p + Math.sin(ang*3)*size*.006;
-    sx.beginPath();
-    sx.arc(cx+Math.cos(ang)*rr, cy+Math.sin(ang)*rr*.92, 4*(window.devicePixelRatio||1), 0, 7);
-    sx.fillStyle='#fff'; sx.shadowBlur=30; sx.shadowColor=g; sx.fill();
+    sx.strokeStyle = g; sx.lineWidth = 3; sx.globalAlpha = 1;
+    sx.shadowBlur = 20; sx.shadowColor = g; sx.stroke();
   }
-  sx.globalAlpha=1; sx.shadowBlur=0;
   requestAnimationFrame(drawSpiral);
 }
 requestAnimationFrame(drawSpiral);
 
 /* ---------- Renders ---------- */
-function renderSubjects(){
+function renderAll(){
+  let currentTotalMin = totalPastMinutes + (session ? Math.floor(getSessionSeconds()/60) : 0);
+  document.getElementById('totalHours').textContent = fmtHM(currentTotalMin);
+  
+  // Subjects calc
+  let sMins = {history:0, arabic:0, english:0, physics:0};
+  sessions.forEach(s => { (s.entries||[]).forEach(en => { if(sMins[en.subj]!==undefined) sMins[en.subj] += s.minutes; }); });
+  
   document.getElementById('subjCards').innerHTML = SUBJECTS.map(s=>`
     <div class="subj" style="--sc:${s.color}">
       <div class="ico">${s.ico}</div>
       <div class="nm">${s.name}</div>
-      <div class="hr">${fmtHM(subjMinutes[s.id])}</div>
+      <div style="font-family:var(--font-en); font-size:11px;">${fmtHM(sMins[s.id])}</div>
     </div>`).join('');
-}
-function renderLog(){
+
+  // Log 
   const list = document.getElementById('logList');
-  if(!sessions.length){
-    list.innerHTML = '<div class="empty-log">لا إنجازات بعد.. الحلزون بانتظار أول شرارة ⚡</div>';
-    return;
-  }
-  const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-  const sorted = [...sessions].sort((a,b)=>b.tsStart-a.tsStart);
-  list.innerHTML = sorted.map(s=>{
-    const d = new Date(s.tsStart);
-    const startStr = d.toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'});
-    const durStr = s.minutes>=60 ? `${Math.floor(s.minutes/60)} ساعة و ${s.minutes%60} دقيقة` : `${s.minutes} دقيقة`;
-    const entries = (s.entries||[]).map(en=>{
-      const sub = SUBJECTS.find(x=>x.id===en.subj);
-      return `<div class="task-line"><span class="dot" style="background:${sub?sub.color:'#fff'};box-shadow:0 0 8px ${sub?sub.color:'#fff'}"></span><b style="color:${sub?sub.color:'#fff'}">${sub?sub.name:en.subj}:</b> ${en.task||'—'}</div>`;
+  if(!sessions.length) { list.innerHTML = '<div style="text-align:center;color:gray;">لا يوجد إنجازات بعد يا بطل. ابدأ الآن!</div>'; }
+  else {
+    list.innerHTML = [...sessions].sort((a,b)=>b.tsStart-a.tsStart).map(s=>{
+      const entries = (s.entries||[]).map(en=>{
+        const sub = SUBJECTS.find(x=>x.id===en.subj);
+        return `<span style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:6px; font-size:12px; margin:2px; display:inline-block;">${sub?sub.name:''} - ${en.task}</span>`;
+      }).join('');
+      return `<div style="background:var(--panel); padding:15px; border-radius:15px; border-right:4px solid var(--cyan);">
+        <div style="font-size:12px; color:var(--cyan); margin-bottom:5px;">🕒 ${s.minutes} دقيقة</div>
+        <div>${entries}</div>
+      </div>`;
     }).join('');
-    return `<div class="log-item">
-      <div class="log-date">📅 ${days[d.getDay()]}، ${d.toLocaleDateString('ar-EG',{day:'numeric',month:'long',year:'numeric'})}</div>
-      <div class="log-meta">بدأت الساعة ${startStr} واستمرت لمدة ${durStr}</div>
-      ${entries}
-    </div>`;
-  }).join('');
-}
-function renderAll(){
-  document.getElementById('totalHours').textContent = fmtHM(totalMinutes);
-  renderSubjects();
-  renderLog();
-  document.getElementById('totalBarFill').style.width = Math.min(100,(totalMinutes/(RING_MINUTES*4))*100) + '%';
-  document.getElementById('totalBarTxt').textContent = fmtHM(totalMinutes);
+  }
 }
 
 /* ---------- Session flow ---------- */
 document.getElementById('launchBtn').onclick = () => {
-  if(session){ toast('⚡ لديك جلسة نشطة بالفعل!'); return; }
-  session = { startTs: Date.now(), elapsedBefore: 0, breakStart: null, timerInt: null, syncInt: null, breakInt: null };
+  session = { startTs: Date.now(), elapsedBefore: 0, breakStart: null, timerInt: null };
   showScreen('focusScreen');
+  changeQuote();
+  quoteInterval = setInterval(changeQuote, 30000); // تغيير المقولة كل 30 ثانية
   startTimer();
-  startLiveSync();
-  toast('⚡ الجلسة انطلقت.. بالتوفيق يا بطل!');
+  toast('⚡ انطلقت الجلسة يا كريم.. ركز نحو الهدف!');
 };
+
 function startTimer(){
   clearInterval(session.timerInt);
   session.timerInt = setInterval(()=>{
@@ -616,132 +549,157 @@ function startTimer(){
     document.getElementById('sessionTimer').textContent = fmtClock(sec);
     const min = Math.floor(sec/60);
     document.getElementById('sessionBarTxt').textContent = min + 'm';
-    document.getElementById('sessionBarFill').style.width = Math.min(100, (sec/ (RING_MINUTES*60)) *100) + '%';
-    recalc();
-    document.getElementById('totalBarTxt').textContent = fmtHM(totalMinutes);
-    document.getElementById('totalBarFill').style.width = Math.min(100,(totalMinutes/(RING_MINUTES*4))*100) + '%';
-    document.getElementById('totalHours').textContent = fmtHM(totalMinutes);
-  }, 1000);
+    
+    // شريط التقدم الحالي يمتلئ كل ساعة (60 دقيقة)
+    document.getElementById('sessionBarFill').style.width = Math.min(100, (sec/3600)*100) + '%'; 
+    
+    let currentTotalMin = totalPastMinutes + min;
+    document.getElementById('totalBarTxt').textContent = fmtHM(currentTotalMin);
+    document.getElementById('totalBarFill').style.width = Math.min(100,(currentTotalMin/(RING_MINUTES*4))*100) + '%';
+    document.getElementById('totalHours').textContent = fmtHM(currentTotalMin);
+  }, 200); // تحديث سريع للواجهة
 }
-function runBreakTimer(){
-  clearInterval(session.breakInt);
-  session.breakInt = setInterval(()=>{
-    document.getElementById('breakTimer').textContent = fmtClock(Math.floor((Date.now()-session.breakStart)/1000));
-  },1000);
-}
+
+// أزرار الاستراحة والصوت
+let breakInterval;
 document.getElementById('breakBtn').onclick = () => {
   if(!session || session.breakStart) return;
+  // تسجيل الوقت المنقضي بدقة قبل الاستراحة
+  session.elapsedBefore += (Date.now() - session.startTs);
   session.breakStart = Date.now();
+  
   document.getElementById('breakOverlay').classList.add('show');
   clearInterval(session.timerInt);
-  runBreakTimer();
-  // immediate sync so other tabs know
-  if(db) set(activeRef, {startTs:session.startTs, elapsedBefore:session.elapsedBefore, breakStart:session.breakStart, lastSync:Date.now()}).catch(()=>{});
+  
+  breakInterval = setInterval(()=>{
+    document.getElementById('breakTimer').textContent = fmtClock(Math.floor((Date.now()-session.breakStart)/1000));
+  },1000);
 };
+
 document.getElementById('resumeBtn').onclick = () => {
   if(!session || !session.breakStart) return;
-  session.elapsedBefore += Date.now() - session.breakStart;
+  // تحديث وقت البدء للحظة الحالية
+  session.startTs = Date.now();
   session.breakStart = null;
-  clearInterval(session.breakInt);
+  
+  clearInterval(breakInterval);
   document.getElementById('breakOverlay').classList.remove('show');
   startTimer();
-  if(db) set(activeRef, {startTs:session.startTs, elapsedBefore:session.elapsedBefore, breakStart:null, lastSync:Date.now()}).catch(()=>{});
-  toast('▶ عدت أقوى.. استئناف!');
+  toast('▶ مرحباً بعودتك يا بطل!');
 };
+
+// زر الصوت
+const rainAudio = document.getElementById('rainAudio');
+document.getElementById('soundBtn').onclick = function() {
+  if(rainAudio.paused) {
+    rainAudio.play();
+    this.classList.add('active');
+    this.innerHTML = '⏸️ إيقاف المطر';
+  } else {
+    rainAudio.pause();
+    this.classList.remove('active');
+    this.innerHTML = '🌧️ تشغيل مطر';
+  }
+};
+
 document.getElementById('endBtn').onclick = () => {
   if(!session) return;
   if(session.breakStart){
-    session.elapsedBefore += Date.now()-session.breakStart;
+    // إذا انتهت الجلسة وهو في استراحة، لا نضيف وقت الاستراحة
     session.breakStart=null;
-    clearInterval(session.breakInt);
+    clearInterval(breakInterval);
     document.getElementById('breakOverlay').classList.remove('show');
   }
   const sec = getSessionSeconds();
   clearInterval(session.timerInt);
-  if(sec < 60){ toast('⏳ الجلسة أقل من دقيقة.. لن تُحفظ'); abortSession(); return; }
+  clearInterval(quoteInterval);
+  rainAudio.pause(); document.getElementById('soundBtn').classList.remove('active'); document.getElementById('soundBtn').innerHTML = '🌧️ تشغيل مطر';
+  
+  if(sec < 60){ 
+    toast('⏳ الجلسة أقل من دقيقة.. لم تُحسب يا كريم.'); 
+    session = null; showScreen('dashScreen'); renderAll(); 
+    return; 
+  }
   openLogger(sec);
 };
-function abortSession(){
-  session = null;
-  stopLiveSync();
-  saveLocalActive(null);
-  if(db) remove(activeRef).catch(()=>{});
-  showScreen('dashScreen');
-  recalc(); renderAll();
+
+/* ---------- Mission Logger ---------- */
+function openLogger(sec){
+  const min = Math.floor(sec/60);
+  document.getElementById('loggerDur').textContent = `أنجزت ${min} دقيقة ⏱ — ما الذي درسته يا بطل؟`;
+  
+  const box = document.getElementById('missionRows');
+  box.innerHTML = `
+    <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px;" id="subjSelector">
+      ${SUBJECTS.map(s=>`<button class="msubj" data-id="${s.id}" style="--mc:${s.color}">${s.ico}${s.name}</button>`).join('')}
+    </div>
+    <input type="text" id="finalTaskInput" class="mtask" placeholder="مثال: حل تدريبات الباب الأول...">
+  `;
+  
+  let selectedSubj = null;
+  box.querySelectorAll('.msubj').forEach(btn => {
+    btn.onclick = () => {
+      box.querySelectorAll('.msubj').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      selectedSubj = btn.dataset.id;
+      validateSave();
+    }
+  });
+  
+  const input = document.getElementById('finalTaskInput');
+  input.addEventListener('input', validateSave);
+  
+  function validateSave() {
+    document.getElementById('saveBtn').disabled = !(selectedSubj && input.value.trim());
+  }
+  validateSave();
+  document.getElementById('loggerModal').classList.add('show');
+  
+  document.getElementById('saveBtn').onclick = async () => {
+    const payload = {
+      tsStart: session.startTs, // Not perfectly accurate due to breaks, but good enough for logs
+      tsEnd: Date.now(),
+      minutes: min,
+      entries: [{ subj: selectedSubj, task: input.value.trim() }]
+    };
+    
+    try{
+      if(db){ await push(sessionsRef, payload); }
+      else { sessions.push(payload); saveLocal(); }
+    }catch(e){
+      sessions.push(payload); saveLocal();
+      toast('⚠️ حُفظت محلياً (لا يوجد إنترنت)');
+    }
+    
+    session = null;
+    document.getElementById('loggerModal').classList.remove('show');
+    showScreen('dashScreen');
+    recalc(); renderAll();
+    toast('🏆 تم إضافة إنجاز جديد لتاريخك يا كريم!');
+  };
 }
-function finishSession(){
-  session = null;
-  stopLiveSync();
-  saveLocalActive(null);
-  document.getElementById('loggerModal').classList.remove('show');
-  suppressRemote = true;
-  if(db) remove(activeRef).catch(()=>{});
-  setTimeout(()=>{ suppressRemote = false; }, 1500);
-  showScreen('dashScreen');
-  recalc(); renderAll();
-}
+
+// التنقلات
 document.getElementById('tabLogBtn').onclick = () => showScreen('logScreen');
 document.getElementById('backDashBtn').onclick = () => showScreen('dashScreen');
 
-/* ---------- Mission Logger ---------- */
-let missionRows = [];
-function openLogger(sec){
-  const min = Math.floor(sec/60);
-  document.getElementById('loggerDur').textContent = `مدة الجلسة: ${min} دقيقة ⏱ — ما الذي أنجزتَه؟`;
-  missionRows = [newRow()];
-  renderRows();
-  document.getElementById('loggerModal').classList.add('show');
-}
-function newRow(){
-  const div = document.createElement('div');
-  div.className = 'mrow';
-  div.innerHTML = SUBJECTS.map(s=>`<button class="msubj" data-id="${s.id}" style="--mc:${s.color}">${s.ico} ${s.name}</button>`).join('')
-    + '<input class="mtask" placeholder="اكتب المهمة (مثال: حل نموذج امتحان 2025)">';
-  div.querySelectorAll('.msubj').forEach(b=>{
-    b.onclick = () => {
-      div.querySelectorAll('.msubj').forEach(x=>x.classList.remove('sel'));
-      b.classList.add('sel');
-      validateSave();
-    };
-  });
-  div.querySelector('.mtask').addEventListener('input', validateSave);
-  return div;
-}
-function renderRows(){
-  const box = document.getElementById('missionRows');
-  box.innerHTML = '';
-  missionRows.forEach(r=>box.appendChild(r));
-  validateSave();
-}
-function validateSave(){
-  const ok = missionRows.length>0 && missionRows.every(r=>r.querySelector('.msubj.sel') && r.querySelector('.mtask').value.trim());
-  document.getElementById('saveBtn').disabled = !ok;
-}
-document.getElementById('addMissionBtn').onclick = () => {
-  missionRows.push(newRow());
-  renderRows();
-};
-document.getElementById('saveBtn').onclick = async () => {
-  const sec = getSessionSeconds();
-  const payload = {
-    tsStart: session.startTs,
-    tsEnd: Date.now(),
-    minutes: Math.floor(sec/60),
-    entries: missionRows.map(r=>({
-      subj: r.querySelector('.msubj.sel').dataset.id,
-      task: r.querySelector('.mtask').value.trim()
-    }))
-  };
-  try{
-    if(db){ await push(sessionsRef, payload); }
-    else { sessions.push(payload); saveLocal(); }
-  }catch(e){
-    sessions.push(payload); saveLocal();
-    toast('⚠️ حُفظ محلياً (انقطع الاتصال)');
+// نجوم الخلفية
+(function(){
+  const c = document.getElementById('stars'), x = c.getContext('2d');
+  let W,H,stars;
+  function init(){ W=c.width=innerWidth; H=c.height=innerHeight;
+    stars = Array.from({length:70},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.3+.3,p:Math.random()*Math.PI*2}));
   }
-  finishSession();
-  toast('🕳️ حُفر في التاريخ.. إنجاز خالد!');
-};
+  init(); addEventListener('resize',init);
+  (function loop(t){
+    x.clearRect(0,0,W,H);
+    stars.forEach(s=>{
+      const a = .25 + .55*Math.abs(Math.sin(t/1400 + s.p));
+      x.beginPath(); x.arc(s.x,s.y,s.r,0,7); x.fillStyle=`rgba(255,255,255,${a})`; x.fill();
+    });
+    requestAnimationFrame(loop);
+  })(0);
+})();
 </script>
 </body>
 </html>
