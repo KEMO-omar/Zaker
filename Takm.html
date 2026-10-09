@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
-    <!-- Canvas Confetti CDN for celebration -->
+    <!-- Canvas Confetti CDN -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <script>
@@ -50,7 +50,6 @@
             color: #1e293b;
         }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -62,26 +61,21 @@
             background: #cbd5e1;
             border-radius: 4px;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
 
-        /* Interactive Overlay Slot Styles */
         .overlay-slot {
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
         }
         .overlay-slot:hover {
-            background-color: rgba(14, 165, 233, 0.18);
+            background-color: rgba(14, 165, 233, 0.22);
             outline: 2px solid #0284c7;
         }
         .overlay-slot.completed {
-            background-color: rgba(34, 197, 94, 0.35);
+            background-color: rgba(34, 197, 94, 0.45);
             backdrop-filter: blur(1px);
             border: 2px solid #16a34a;
         }
 
-        /* Task Item Transitions */
         .task-card {
             transition: all 0.2s ease-in-out;
         }
@@ -89,7 +83,6 @@
             transform: translateY(-2px);
         }
         
-        /* Custom Checkbox Checkmark animation */
         .custom-checkbox {
             appearance: none;
             -webkit-appearance: none;
@@ -121,25 +114,24 @@
 </head>
 <body class="min-h-screen pb-16">
 
-    <!-- Top Navigation Header -->
+    <!-- Top Header -->
     <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-lg border-b border-slate-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
             <div class="flex items-center space-x-3 space-x-reverse">
                 <div class="bg-gradient-to-tr from-sky-500 to-indigo-600 p-2.5 rounded-xl shadow-md">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 022 2h2a2 2 0 022-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
                     </svg>
                 </div>
                 <div>
                     <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
                         <span>جدول الإنقاذ اليومي</span>
-                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">المباشر التفاعلي</span>
+                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">مطابق للصورة بالملي</span>
                     </h1>
-                    <p class="text-xs text-slate-400">تابع مواعيد الدروس والمهام المتراكمة مع التحديد التلقائي على الصورة</p>
+                    <p class="text-xs text-slate-400">تابع مواعيد دروسك ومهامك المتراكمة مع المزامنة التلقائية اللحظية</p>
                 </div>
             </div>
 
-            <!-- Header Quick Stats & Controls -->
             <div class="flex items-center gap-3">
                 <button onclick="openResetModal()" class="px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800/60 rounded-lg transition-all flex items-center gap-1.5 shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -162,13 +154,9 @@
     <div class="bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 border-b border-sky-900/40 text-white py-4 shadow-inner">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                
-                <!-- Main Percentage Display -->
                 <div class="flex items-center gap-4">
-                    <div class="relative flex items-center justify-center">
-                        <div class="w-16 h-16 rounded-2xl bg-slate-800 border border-sky-500/30 flex items-center justify-center shadow-lg">
-                            <span id="overallPercentage" class="text-xl font-black text-sky-400">0%</span>
-                        </div>
+                    <div class="w-16 h-16 rounded-2xl bg-slate-800 border border-sky-500/30 flex items-center justify-center shadow-lg">
+                        <span id="overallPercentage" class="text-xl font-black text-sky-400">0%</span>
                     </div>
                     <div>
                         <div class="text-sm font-medium text-slate-300">معدل الإنجاز العام</div>
@@ -176,82 +164,70 @@
                     </div>
                 </div>
 
-                <!-- Visual Bar -->
                 <div class="flex-1 max-w-xl">
                     <div class="flex justify-between text-xs text-slate-300 mb-1.5">
                         <span class="font-medium">التقدم الإجمالي</span>
-                        <span id="completedCountBadge" class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-semibold border border-emerald-500/30">0 متبقي</span>
+                        <span id="completedCountBadge" class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-semibold border border-emerald-500/30">20 متبقي</span>
                     </div>
                     <div class="w-full bg-slate-800 rounded-full h-3.5 p-0.5 border border-slate-700 shadow-inner">
                         <div id="mainProgressBar" class="bg-gradient-to-r from-sky-500 to-emerald-500 h-2.5 rounded-full transition-all duration-500 ease-out w-0 shadow-md"></div>
                     </div>
                 </div>
 
-                <!-- Motivation Tag -->
                 <div class="hidden xl:flex items-center gap-2 bg-slate-800/80 px-3.5 py-2 rounded-xl border border-slate-700/60 text-xs text-sky-200">
                     <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 103.636 5.05l-.707.707a1 1 0 001.414 1.414l.707-.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1a1 1 0 00-2 0v1a1 1 0 002 0zM12 14a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM14.343 14.343a1 1 0 000 1.414l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 0z"></path>
                     </svg>
                     <span>استمر بالالتزام! كل مهمة تنجزها تقرّبك خطوة نحو الهدف.</span>
                 </div>
-
             </div>
         </div>
     </div>
 
-    <!-- Main Container -->
+    <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-8">
 
-        <!-- SECTION 1: Interactive Schedule Poster Image Overlay -->
+        <!-- Image Interactive Section -->
         <section class="bg-white rounded-2xl shadow-md border border-slate-200/80 overflow-hidden">
             <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3 bg-slate-50">
                 <div class="flex items-center gap-2">
                     <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block animate-ping"></span>
                     <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <span>صورة الجدول التفاعلية المباشرة</span>
-                        <span class="text-xs font-normal text-slate-500 hidden sm:inline">(اضغط على أي مربع في الصورة أو القائمة لعلامة الإنجاز)</span>
+                        <span class="text-xs font-normal text-slate-500 hidden sm:inline">(اضغط مباشرة على أي مهمة في الصورة للتعليم عليها)</span>
                     </h2>
                 </div>
                 
                 <div class="flex items-center gap-2">
-                    <span class="text-xs font-medium text-slate-600">إظهار علامات الإنجاز فوق الصورة:</span>
-                    <button id="toggleOverlayBtn" onclick="toggleOverlayVisibility()" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-emerald-600 transition-colors duration-200 ease-in-out focus:outline-none">
+                    <span class="text-xs font-medium text-slate-600">إظهار العلامات فوق الصورة:</span>
+                    <button id="toggleOverlayBtn" onclick="toggleOverlayVisibility()" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-emerald-600 transition-colors duration-200 ease-in-out">
                         <span id="toggleOverlayThumb" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0"></span>
                     </button>
                 </div>
             </div>
 
-            <!-- Image Container with Responsive Aspect Ratio & Overlay Layers -->
             <div class="relative w-full overflow-x-auto bg-slate-100 flex justify-center items-center p-2 sm:p-4">
                 <div id="posterWrapper" class="relative max-w-full min-w-[700px] md:min-w-0 shadow-2xl rounded-xl overflow-hidden border border-slate-300">
-                    
-                    <!-- Schedule Image -->
                     <img id="schedulePoster" 
-                         src="watermarked_img_1790035527206007880.jpg" 
-                         alt="جدول الإنقاذ اليومي المربوط بمواعيد دروسك" 
+                         src="42143.jpg" 
+                         alt="جدول الإنقاذ اليومي" 
                          class="w-full h-auto block object-cover rounded-xl"
-                         onerror="this.onerror=null; this.src='https://placehold.co/1200x675/1e293b/ffffff?text=%D8%AC%D8%AF%D9%88%D9%84+%D8%A7%D9%84%D8%A5%D9%86%D9%82%D8%A7%D8%B0+%D8%A7%D9%84%D9%8A%D9%88%D9%85%D9%8A';" />
+                         onerror="this.onerror=null; this.src='watermarked_img_1790035527206007880.jpg';" />
 
-                    <!-- Dynamic Interactive Overlay Canvas/DIV container -->
-                    <div id="imageOverlayContainer" class="absolute inset-0 w-full h-full pointer-events-auto">
-                        <!-- Overlays injected via JavaScript dynamically corresponding to image relative grid -->
-                    </div>
-
+                    <div id="imageOverlayContainer" class="absolute inset-0 w-full h-full pointer-events-auto"></div>
                 </div>
             </div>
             
             <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
                 <div class="flex items-center gap-4">
-                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500/40 border border-emerald-600 inline-block"></span> مهمة مكتملة</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500/50 border border-emerald-600 inline-block"></span> مهمة مكتملة</span>
                     <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-sky-500/10 border border-sky-400 inline-block"></span> مهمة قيد الانتظار</span>
                 </div>
-                <div class="text-slate-400">
-                    * المربعات تتزامن فورياً مع التحديد في القائمة التفصيلية بالأسفل
-                </div>
+                <div class="text-slate-400">* تتطابق الإحداثيات المحددة تماماً مع خانات الصورة بالملي</div>
             </div>
         </section>
 
-        <!-- SECTION 2: Day Filter & Quick Actions -->
+        <!-- Day Selector Filter -->
         <section class="space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
                 <div>
@@ -259,64 +235,41 @@
                     <p class="text-xs text-slate-500">اختر يوماً محدداً أو استعرض كافة أيام الأسبوع</p>
                 </div>
 
-                <!-- Day Selector Tabs -->
                 <div class="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                    <button onclick="filterDay('all')" id="tab-all" class="day-tab active px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-sky-600 text-white shadow-sm whitespace-nowrap">
-                        كافة الأيام (6)
-                    </button>
-                    <button onclick="filterDay('fri')" id="tab-fri" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">
-                        الجمعة
-                    </button>
-                    <button onclick="filterDay('sat')" id="tab-sat" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">
-                        السبت
-                    </button>
-                    <button onclick="filterDay('sun')" id="tab-sun" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">
-                        الأحد
-                    </button>
-                    <button onclick="filterDay('mon')" id="tab-mon" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">
-                        الإثنين
-                    </button>
-                    <button onclick="filterDay('tue')" id="tab-tue" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">
-                        الثلاثاء
-                    </button>
-                    <button onclick="filterDay('wed')" id="tab-wed" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">
-                        الأربعاء
-                    </button>
+                    <button onclick="filterDay('all')" id="tab-all" class="day-tab active px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-sky-600 text-white shadow-sm whitespace-nowrap">كافة الأيام (6)</button>
+                    <button onclick="filterDay('fri')" id="tab-fri" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">الجمعة</button>
+                    <button onclick="filterDay('sat')" id="tab-sat" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">السبت</button>
+                    <button onclick="filterDay('sun')" id="tab-sun" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">الأحد</button>
+                    <button onclick="filterDay('mon')" id="tab-mon" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">الإثنين</button>
+                    <button onclick="filterDay('tue')" id="tab-tue" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">الثلاثاء</button>
+                    <button onclick="filterDay('wed')" id="tab-wed" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">الأربعاء</button>
                 </div>
             </div>
         </section>
 
-        <!-- SECTION 3: Detailed Interactive Checklist Cards Grid -->
-        <section id="daysGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Cards generated dynamically via JS to keep state in sync -->
-        </section>
+        <!-- Tasks Cards Grid -->
+        <section id="daysGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></section>
 
     </main>
 
-    <!-- Reset Modal Confirmation -->
+    <!-- Reset Confirmation Modal -->
     <div id="resetModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-bounce-short">
             <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                </svg>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
             </div>
             <div class="text-center">
                 <h3 class="text-lg font-bold text-slate-900">إعادة تعيين كافة المهمات؟</h3>
-                <p class="text-sm text-slate-500 mt-1">هل أنت تأكد من أنك تريد إلغاء تحديد كل المهمات المكتملة؟ لا يمكن التراجع عن هذه العملية.</p>
+                <p class="text-sm text-slate-500 mt-1">هل أنت تأكد من أنك تريد إلغاء تحديد كل المهمات المكتملة؟</p>
             </div>
             <div class="flex items-center gap-3 pt-2">
-                <button onclick="confirmReset()" class="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md transition-all text-sm">
-                    نعم، مسح التقدم
-                </button>
-                <button onclick="closeResetModal()" class="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all text-sm">
-                    إلغاء
-                </button>
+                <button onclick="confirmReset()" class="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md transition-all text-sm">نعم، مسح التقدم</button>
+                <button onclick="closeResetModal()" class="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all text-sm">إلغاء</button>
             </div>
         </div>
     </div>
 
-    <!-- Zoom Poster Fullscreen Modal -->
+    <!-- Zoom Modal -->
     <div id="posterModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
         <div class="relative max-w-6xl w-full max-h-[90vh] flex flex-col items-center justify-center">
             <button onclick="togglePosterModal()" class="absolute -top-12 left-0 text-white hover:text-rose-400 font-bold bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700 text-sm flex items-center gap-1">
@@ -324,281 +277,61 @@
                 إغلاق الصورة
             </button>
             <div class="overflow-auto max-h-[85vh] rounded-2xl shadow-2xl border border-slate-700 bg-slate-900">
-                <img src="watermarked_img_1790035527206007880.jpg" alt="جدول الإنقاذ اليومي المكبر" class="w-full h-auto object-contain">
+                <img src="42143.jpg" alt="جدول الإنقاذ اليومي المكبر" class="w-full h-auto object-contain">
             </div>
         </div>
     </div>
 
     <script>
-        // Data Structure for Days and Tasks
         const DAYS_DATA = [
-            {
-                id: 'fri',
-                name: 'الجمعة',
-                date: '9 أكتوبر',
-                subtitle: 'طوارئ الفيزياء والبلاغة',
-                badge: 'يوم منزلي بالكامل',
-                color: 'sky',
-                columnRightPercent: 83.5, // Alignment coordinates on the visual poster
-                columnWidthPercent: 15.0
-            },
-            {
-                id: 'sat',
-                name: 'السبت',
-                date: '10 أكتوبر',
-                subtitle: 'استغلال فراغ مستر محمد صلاح',
-                badge: 'درس آخر 4:00 عصراً',
-                color: 'emerald',
-                columnRightPercent: 67.0,
-                columnWidthPercent: 15.0
-            },
-            {
-                id: 'sun',
-                name: 'الأحد',
-                date: '11 أكتوبر',
-                subtitle: 'فرم العربي والجديد',
-                badge: 'نزول محاضرة فيزياء جديدة',
-                color: 'teal',
-                columnRightPercent: 50.5,
-                columnWidthPercent: 15.0
-            },
-            {
-                id: 'mon',
-                name: 'الإثنين',
-                date: '12 أكتوبر',
-                subtitle: 'يوم السناتر المكثف',
-                badge: 'تاريخ 1:00ظ / إنجليزي 7:00م',
-                color: 'amber',
-                columnRightPercent: 34.0,
-                columnWidthPercent: 15.0
-            },
-            {
-                id: 'tue',
-                name: 'الثلاثاء',
-                date: '13 أكتوبر',
-                subtitle: 'التقفيل الأخير للعربي',
-                badge: 'عندك درس 4:00 عصراً',
-                color: 'indigo',
-                columnRightPercent: 17.5,
-                columnWidthPercent: 15.0
-            },
-            {
-                id: 'wed',
-                name: 'الأربعاء',
-                date: '14 أكتوبر',
-                subtitle: 'التثبيت النهائي - ليلة الامتحان',
-                badge: 'نزول محاضرة فيزياء جديدة',
-                color: 'purple',
-                columnRightPercent: 1.0,
-                columnWidthPercent: 15.0
-            }
+            { id: 'fri', name: 'الجمعة', date: '9 أكتوبر', subtitle: 'طوارئ الفيزياء والبلاغة', badge: 'يوم منزلي بالكامل' },
+            { id: 'sat', name: 'السبت', date: '10 أكتوبر', subtitle: 'استغلال فراغ مستر محمد صلاح', badge: 'درس آخر 4:00 عصراً' },
+            { id: 'sun', name: 'الأحد', date: '11 أكتوبر', subtitle: 'فرم العربي والجديد', badge: 'نزول محاضرة فيزياء جديدة' },
+            { id: 'mon', name: 'الإثنين', date: '12 أكتوبر', subtitle: 'يوم السناتر المكثف', badge: 'تاريخ 1:00ظ / إنجليزي 7:00م' },
+            { id: 'tue', name: 'الثلاثاء', date: '13 أكتوبر', subtitle: 'التقفيل الأخير للعربي', badge: 'عندك درس 4:00 عصراً' },
+            { id: 'wed', name: 'الأربعاء', date: '14 أكتوبر', subtitle: 'التثبيت النهائي - ليلة الامتحان', badge: 'نزول محاضرة فيزياء جديدة' }
         ];
 
-        // 20 Tasks detail list with precise positioning percentages on the poster graphic
+        // 20 Tasks with exact positioning matching 42143.jpg image proportions
         const TASKS = [
-            // الجمعة (3 tasks)
-            {
-                id: 1,
-                dayId: 'fri',
-                time: '3:00 عصراً - 5:00 مساءً',
-                text: 'حل واجب "عزم القوة" مباشرة (بما أنك مذاكره).',
-                subject: 'فيزياء',
-                type: 'home',
-                // Percentages overlay positioning on the image container
-                overlay: { top: 37.0, height: 13.5, left: 83.5, width: 15.0 }
-            },
-            {
-                id: 2,
-                dayId: 'fri',
-                time: '6:00 مساءً - 9:00 مساءً',
-                text: 'مذاكرة درس "اتزان القوى والقدرة والكفاءة" (الذي سمعته سابقاً) وحل واجبه فوراً.',
-                subject: 'فيزياء',
-                type: 'home',
-                overlay: { top: 52.0, height: 19.0, left: 83.5, width: 15.0 }
-            },
-            {
-                id: 3,
-                dayId: 'fri',
-                time: '10:00 مساءً - 11:30 مساءً',
-                text: 'تصفية نص درس "الأسلوب الإنشائي والإطناب" في العربي.',
-                subject: 'عربي',
-                type: 'home',
-                overlay: { top: 72.0, height: 16.0, left: 83.5, width: 15.0 }
-            },
+            // الجمعة (3 tasks - Column 1 far right)
+            { id: 1, dayId: 'fri', time: '3:00 عصراً - 5:00 مساءً', text: 'حل واجب "عزم القوة" مباشرة (بما أنك مذاكره).', subject: 'فيزياء', type: 'home', overlay: { top: 38.5, height: 16.5, left: 80.3, width: 13.5 } },
+            { id: 2, dayId: 'fri', time: '6:00 مساءً - 9:00 مساءً', text: 'مذاكرة درس "اتزان القوى والقدرة والكفاءة" وحل واجبه فوراً.', subject: 'فيزياء', type: 'home', overlay: { top: 57.5, height: 16.5, left: 80.3, width: 13.5 } },
+            { id: 3, dayId: 'fri', time: '10:00 مساءً - 11:30 مساءً', text: 'تصفية نص درس "الأسلوب الإنشائي والإطناب" في العربي.', subject: 'عربي', type: 'home', overlay: { top: 76.5, height: 16.5, left: 80.3, width: 13.5 } },
 
-            // السبت (4 tasks)
-            {
-                id: 4,
-                dayId: 'sat',
-                time: '10:00 صباحاً - 1:00 ظهراً',
-                text: 'سماع ومذاكرة محاضرة الفيزياء المتراكمة "كمية التحرك والدفع وحفظ كمية الحركة".',
-                subject: 'فيزياء',
-                type: 'home',
-                overlay: { top: 37.0, height: 16.0, left: 67.0, width: 15.0 }
-            },
-            {
-                id: 5,
-                dayId: 'sat',
-                time: '1:30 ظهراً - 3:30 عصراً',
-                text: 'سماع المحاضرة (1) المتراكمة لمستر محمد صلاح + مذاكرة درس "العلم نور".',
-                subject: 'عربي',
-                type: 'home',
-                overlay: { top: 54.0, height: 15.0, left: 67.0, width: 15.0 }
-            },
-            {
-                id: 6,
-                dayId: 'sat',
-                time: '4:00 عصراً - 6:30 مساءً',
-                text: '🟡 نزولك للدرس الثاني الثابت.',
-                subject: 'درس ثنائي',
-                type: 'yellow_center',
-                overlay: { top: 70.0, height: 10.0, left: 67.0, width: 15.0 }
-            },
-            {
-                id: 7,
-                dayId: 'sat',
-                time: '8:00 مساءً - 10:00 مساءً',
-                text: 'حفظ كلمات الوحدة الأولى إنجليزي (الدروس 2، 3، 4).',
-                subject: 'إنجليزي',
-                type: 'home',
-                overlay: { top: 81.0, height: 14.0, left: 67.0, width: 15.0 }
-            },
+            // السبت (4 tasks - Column 2)
+            { id: 4, dayId: 'sat', time: '10:00 صباحاً - 1:00 ظهراً', text: 'سماع ومذاكرة محاضرة الفيزياء المتراكمة "كمية التحرك والدفع".', subject: 'فيزياء', type: 'home', overlay: { top: 38.0, height: 12.0, left: 65.5, width: 13.5 } },
+            { id: 5, dayId: 'sat', time: '1:30 ظهراً - 3:30 عصراً', text: 'سماع المحاضرة (1) المتراكمة لصلاح + درس "العلم نور".', subject: 'عربي', type: 'home', overlay: { top: 51.5, height: 12.0, left: 65.5, width: 13.5 } },
+            { id: 6, dayId: 'sat', time: '4:00 عصراً - 6:30 مساءً', text: '🟡 نزولك للدرس الثاني الثابت.', subject: 'درس ثنائي', type: 'yellow_center', overlay: { top: 65.0, height: 12.0, left: 65.5, width: 13.5 } },
+            { id: 7, dayId: 'sat', time: '8:00 مساءً - 10:00 مساءً', text: 'حفظ كلمات الوحدة الأولى إنجليزي (الدروس 2، 3، 4).', subject: 'إنجليزي', type: 'home', overlay: { top: 78.5, height: 12.0, left: 65.5, width: 13.5 } },
 
-            // الأحد (3 tasks)
-            {
-                id: 8,
-                dayId: 'sun',
-                time: '11:00 صباحاً - 2:00 ظهراً',
-                text: 'سماع المحاضرة (2) المتراكمة لمستر محمد صلاح + درس "الخلق جوهر الفضيلة" + قصة "حكايات الغريب".',
-                subject: 'عربي',
-                type: 'home',
-                overlay: { top: 37.0, height: 19.0, left: 50.5, width: 15.0 }
-            },
-            {
-                id: 9,
-                dayId: 'sun',
-                time: '3:00 عصراً - 5:30 مساءً',
-                text: 'سماع ومذاكرة محاضرة الفيزياء الجديدة التي ستنزل اليوم (الأحد) لمنع أي تراكم.',
-                subject: 'فيزياء',
-                type: 'home',
-                overlay: { top: 57.0, height: 16.0, left: 50.5, width: 15.0 }
-            },
-            {
-                id: 10,
-                dayId: 'sun',
-                time: '7:00 مساءً - 10:00 مساءً',
-                text: 'مذاكرة قاعدة الإنجليزي المتراكمة "المشتقات" + كلمات الوحدة الثانية (الدروس 1، 2، 3).',
-                subject: 'إنجليزي',
-                type: 'home',
-                overlay: { top: 74.0, height: 16.0, left: 50.5, width: 15.0 }
-            },
+            // الأحد (3 tasks - Column 3)
+            { id: 8, dayId: 'sun', time: '11:00 صباحاً - 2:00 ظهراً', text: 'سماع محاضرة (2) صلاح + "الخلق جوهر الفضيلة" + "حكايات الغريب".', subject: 'عربي', type: 'home', overlay: { top: 38.5, height: 16.5, left: 50.8, width: 13.5 } },
+            { id: 9, dayId: 'sun', time: '3:00 عصراً - 5:30 مساءً', text: 'سماع ومذاكرة محاضرة الفيزياء الجديدة التي ستنزل اليوم.', subject: 'فيزياء', type: 'home', overlay: { top: 57.5, height: 16.5, left: 50.8, width: 13.5 } },
+            { id: 10, dayId: 'sun', time: '7:00 مساءً - 10:00 مساءً', text: 'مذاكرة قاعدة الإنجليزي "المشتقات" + كلمات الوحدة الثانية.', subject: 'إنجليزي', type: 'home', overlay: { top: 76.5, height: 16.5, left: 50.8, width: 13.5 } },
 
-            // الإثنين (4 tasks)
-            {
-                id: 11,
-                dayId: 'mon',
-                time: '9:00 صباحاً - 12:00 ظهراً',
-                text: 'ذاكر درسي التاريخ المتراكمين (التحولات الكبرى في العصر الوسيط + الحديث) لتذهب لدرسك مستعداً.',
-                subject: 'تاريخ',
-                type: 'home',
-                overlay: { top: 37.0, height: 18.0, left: 34.0, width: 15.0 }
-            },
-            {
-                id: 12,
-                dayId: 'mon',
-                time: '1:00 ظهراً - 3:30 عصراً',
-                text: '🔴 ذهابك لدرس التاريخ (الساعة 1).',
-                subject: 'تاريخ',
-                type: 'red_center',
-                overlay: { top: 56.0, height: 10.0, left: 34.0, width: 15.0 }
-            },
-            {
-                id: 13,
-                dayId: 'mon',
-                time: '4:00 عصراً - 6:30 مساءً',
-                text: 'مراجعة سريعة لقاعدة الإنجليزي المتراكمة (Gerund & Infinitive - الأفعال التي يتبعها to+المصدر أو ing).',
-                subject: 'إنجليزي',
-                type: 'home',
-                overlay: { top: 67.0, height: 16.0, left: 34.0, width: 15.0 }
-            },
-            {
-                id: 14,
-                dayId: 'mon',
-                time: '7:00 مساءً - 9:30 مساءً',
-                text: '🔴 ذهابك لدرس الإنجليزي (الساعة 7).',
-                subject: 'إنجليزي',
-                type: 'red_center',
-                overlay: { top: 84.0, height: 10.0, left: 34.0, width: 15.0 }
-            },
+            // الإثنين (4 tasks - Column 4)
+            { id: 11, dayId: 'mon', time: '9:00 صباحاً - 12:00 ظهراً', text: 'ذاكر درسي التاريخ المتراكمين (العصر الوسيط + الحديث).', subject: 'تاريخ', type: 'home', overlay: { top: 38.0, height: 12.0, left: 36.0, width: 13.5 } },
+            { id: 12, dayId: 'mon', time: '1:00 ظهراً - 3:30 عصراً', text: '🔴 ذهابك لدرس التاريخ (الساعة 1).', subject: 'تاريخ', type: 'red_center', overlay: { top: 51.5, height: 12.0, left: 36.0, width: 13.5 } },
+            { id: 13, dayId: 'mon', time: '4:00 عصراً - 6:30 مساءً', text: 'مراجعة قاعدة الإنجليزي المتراكمة (Gerund & Infinitive).', subject: 'إنجليزي', type: 'home', overlay: { top: 65.0, height: 12.0, left: 36.0, width: 13.5 } },
+            { id: 14, dayId: 'mon', time: '7:00 مساءً - 9:30 مساءً', text: '🔴 ذهابك لدرس الإنجليزي (الساعة 7).', subject: 'إنجليزي', type: 'red_center', overlay: { top: 78.5, height: 12.0, left: 36.0, width: 13.5 } },
 
-            // الثلاثاء (3 tasks)
-            {
-                id: 15,
-                dayId: 'tue',
-                time: '10:00 صباحاً - 1:00 ظهراً',
-                text: 'سماع المحاضرة (3) والأخيرة المتراكمة لمستر محمد صلاح + درس "العلم بين القانون والضمير" + قصة "حكاية روح". (بذلك قفلت العربي تماماً ومحاضراته الثلاثة).',
-                subject: 'عربي',
-                type: 'home',
-                overlay: { top: 37.0, height: 22.0, left: 17.5, width: 15.0 }
-            },
-            {
-                id: 16,
-                dayId: 'tue',
-                time: '1:30 ظهراً - 3:30 عصراً',
-                text: 'سماع ومذاكرة آخر محاضرة فيزياء متراكمة "كمية التحرك والطاقة الميكانيكية".',
-                subject: 'فيزياء',
-                type: 'home',
-                overlay: { top: 60.0, height: 16.0, left: 17.5, width: 15.0 }
-            },
-            {
-                id: 17,
-                dayId: 'tue',
-                time: '4:00 عصراً - 6:30 مساءً',
-                text: '🟡 نزولك للدرس الثاني الثابت.',
-                subject: 'درس ثنائي',
-                type: 'yellow_center',
-                overlay: { top: 77.0, height: 10.0, left: 17.5, width: 15.0 }
-            },
+            // الثلاثاء (3 tasks - Column 5)
+            { id: 15, dayId: 'tue', time: '10:00 صباحاً - 1:00 ظهراً', text: 'سماع المحاضرة (3) لصلاح + "العلم بين القانون والضمير" + "حكاية روح".', subject: 'عربي', type: 'home', overlay: { top: 38.5, height: 16.5, left: 21.3, width: 13.5 } },
+            { id: 16, dayId: 'tue', time: '1:30 ظهراً - 3:30 عصراً', text: 'سماع ومذاكرة آخر محاضرة فيزياء متراكمة "كمية التحرك والطاقة".', subject: 'فيزياء', type: 'home', overlay: { top: 57.5, height: 16.5, left: 21.3, width: 13.5 } },
+            { id: 17, dayId: 'tue', time: '4:00 عصراً - 6:30 مساءً', text: '🟡 نزولك للدرس الثاني الثابت.', subject: 'درس ثنائي', type: 'yellow_center', overlay: { top: 76.5, height: 16.5, left: 21.3, width: 13.5 } },
 
-            // الأربعاء (3 tasks)
-            {
-                id: 18,
-                dayId: 'wed',
-                time: '11:00 صباحاً - 1:30 ظهراً',
-                text: 'سماع ومذاكرة محاضرة الفيزياء الجديدة (التي ستنزل اليوم الأربعاء).',
-                subject: 'فيزياء',
-                type: 'home',
-                overlay: { top: 37.0, height: 15.0, left: 1.0, width: 15.0 }
-            },
-            {
-                id: 19,
-                dayId: 'wed',
-                time: '2:30 عصراً - 5:00 مساءً',
-                text: 'مذاكرة درس التاريخ المتراكم الأخير "سياسات الاحتلال بمصر في العصر الحديث".',
-                subject: 'تاريخ',
-                type: 'home',
-                overlay: { top: 53.0, height: 18.0, left: 1.0, width: 15.0 }
-            },
-            {
-                id: 20,
-                dayId: 'wed',
-                time: '6:00 مساءً فصاعداً',
-                text: 'مراجعة شاملة سريعة على كل النقاط، وحل الشيتات والواجبات الخاصة بالامتحان، والنوم مبكراً.',
-                subject: 'مراجعة عامة',
-                type: 'home',
-                overlay: { top: 72.0, height: 18.0, left: 1.0, width: 15.0 }
-            }
+            // الأربعاء (3 tasks - Column 6 far left)
+            { id: 18, dayId: 'wed', time: '11:00 صباحاً - 1:30 ظهراً', text: 'سماع ومذاكرة محاضرة الفيزياء الجديدة.', subject: 'فيزياء', type: 'home', overlay: { top: 38.5, height: 16.5, left: 6.5, width: 13.5 } },
+            { id: 19, dayId: 'wed', time: '2:30 عصراً - 5:00 مساءً', text: 'مذاكرة درس التاريخ المتراكم "سياسات الاحتلال بمصر".', subject: 'تاريخ', type: 'home', overlay: { top: 57.5, height: 16.5, left: 6.5, width: 13.5 } },
+            { id: 20, dayId: 'wed', time: '6:00 مساءً فصاعداً', text: 'مراجعة شاملة سريعة وحل الشيتات والواجبات، والنوم مبكراً.', subject: 'مراجعة عامة', type: 'home', overlay: { top: 76.5, height: 16.5, left: 6.5, width: 13.5 } }
         ];
 
-        // Local Storage Key
-        const STORAGE_KEY = 'rescue_schedule_completed_tasks_v1';
-
-        // Application State
+        const STORAGE_KEY = 'rescue_schedule_tasks_exact_v2';
         let completedTaskIds = new Set();
         let activeDayFilter = 'all';
         let showOverlay = true;
 
-        // Web Audio API Sound Chime
         function playChimeSound(isCompletion = true) {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -606,91 +339,57 @@
                 const ctx = new AudioContext();
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
-                
                 osc.type = 'sine';
                 if (isCompletion) {
-                    osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
-                    osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.1); // E5
-                    osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.2); // G5
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.2);
                 } else {
                     osc.frequency.setValueAtTime(300, ctx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.15);
                 }
-
                 gain.gain.setValueAtTime(0.15, ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
-
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-
                 osc.start();
                 osc.stop(ctx.currentTime + 0.3);
-            } catch (e) {
-                // Ignore audio restriction errors
-            }
+            } catch (e) {}
         }
 
-        // Initialize State from LocalStorage
         function loadSavedState() {
             try {
                 const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    completedTaskIds = new Set(parsed);
-                }
-            } catch (e) {
-                console.error('Error loading saved state:', e);
-            }
+                if (saved) completedTaskIds = new Set(JSON.parse(saved));
+            } catch (e) {}
         }
 
-        // Save State to LocalStorage
         function saveState() {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(completedTaskIds)));
-            } catch (e) {
-                console.error('Error saving state:', e);
-            }
+            } catch (e) {}
         }
 
-        // Toggle Task Completion
         function toggleTask(taskId) {
-            const isCompleted = completedTaskIds.has(taskId);
-            if (isCompleted) {
+            if (completedTaskIds.has(taskId)) {
                 completedTaskIds.delete(taskId);
                 playChimeSound(false);
             } else {
                 completedTaskIds.add(taskId);
                 playChimeSound(true);
             }
-
             saveState();
             updateUI();
-
-            // Trigger celebration confetti if 100% complete
-            if (completedTaskIds.size === TASKS.length) {
-                triggerConfetti();
+            if (completedTaskIds.size === TASKS.length && typeof confetti === 'function') {
+                confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
             }
         }
 
-        // Celebration Confetti
-        function triggerConfetti() {
-            if (typeof confetti === 'function') {
-                confetti({
-                    particleCount: 120,
-                    spread: 80,
-                    origin: { y: 0.6 }
-                });
-            }
-        }
-
-        // Update All UI Elements
         function updateUI() {
             renderOverallProgress();
             renderImageOverlay();
             renderDaysGrid();
         }
 
-        // Render Top Overall Progress Bar & Stats
         function renderOverallProgress() {
             const total = TASKS.length;
             const completed = completedTaskIds.size;
@@ -700,8 +399,8 @@
             document.getElementById('statsSummary').textContent = `${completed} من أصل ${total} مهمة مكتملة`;
             document.getElementById('mainProgressBar').style.width = `${percentage}%`;
             
-            const remaining = total - completed;
             const countBadge = document.getElementById('completedCountBadge');
+            const remaining = total - completed;
             if (remaining === 0) {
                 countBadge.textContent = '🎉 مكتمل بالكامل!';
                 countBadge.className = 'bg-emerald-500 text-white px-2 py-0.5 rounded-md font-extrabold text-xs shadow-md animate-bounce';
@@ -711,18 +410,14 @@
             }
         }
 
-        // Render Visual Interactive Overlays on the Schedule Poster
         function renderImageOverlay() {
             const container = document.getElementById('imageOverlayContainer');
             if (!container) return;
-
             if (!showOverlay) {
                 container.style.display = 'none';
                 return;
-            } else {
-                container.style.display = 'block';
             }
-
+            container.style.display = 'block';
             container.innerHTML = '';
 
             TASKS.forEach(task => {
@@ -731,33 +426,20 @@
 
                 const div = document.createElement('div');
                 div.className = `overlay-slot absolute rounded-lg flex items-center justify-center p-1 transition-all ${isDone ? 'completed shadow-lg' : ''}`;
-                
-                // Set relative percentage position over poster image
                 div.style.top = `${ov.top}%`;
                 div.style.height = `${ov.height}%`;
                 div.style.left = `${ov.left}%`;
                 div.style.width = `${ov.width}%`;
-
-                // Badge Tooltip text
-                div.title = `مهمة (${task.time}): ${task.text}`;
+                div.title = task.text;
 
                 if (isDone) {
                     div.innerHTML = `
                         <div class="bg-emerald-600 text-white rounded-full p-1 shadow-md flex items-center justify-center animate-pulse-slow">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                        </div>
-                    `;
-                } else {
-                    div.innerHTML = `
-                        <div class="opacity-0 hover:opacity-100 bg-sky-600/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow">
-                            انقر للإنجاز
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                         </div>
                     `;
                 }
 
-                // Click handler toggles task status
                 div.onclick = (e) => {
                     e.stopPropagation();
                     toggleTask(task.id);
@@ -767,18 +449,13 @@
             });
         }
 
-        // Render Days Cards Grid
         function renderDaysGrid() {
             const container = document.getElementById('daysGrid');
             if (!container) return;
-
             container.innerHTML = '';
 
             DAYS_DATA.forEach(day => {
-                // Filter day logic
-                if (activeDayFilter !== 'all' && activeDayFilter !== day.id) {
-                    return;
-                }
+                if (activeDayFilter !== 'all' && activeDayFilter !== day.id) return;
 
                 const dayTasks = TASKS.filter(t => t.dayId === day.id);
                 const dayCompletedCount = dayTasks.filter(t => completedTaskIds.has(t.id)).length;
@@ -788,7 +465,6 @@
                 const card = document.createElement('div');
                 card.className = `bg-white rounded-2xl shadow-md border ${dayCompletedCount === dayTotal ? 'border-emerald-300 ring-2 ring-emerald-500/20' : 'border-slate-200/90'} overflow-hidden flex flex-col transition-all`;
 
-                // Card Header Styling according to subject tone
                 let headerBg = 'bg-gradient-to-r from-slate-800 to-slate-900 text-white';
                 if (day.id === 'fri') headerBg = 'bg-gradient-to-r from-sky-800 to-slate-900 text-white';
                 if (day.id === 'sat') headerBg = 'bg-gradient-to-r from-teal-800 to-slate-900 text-white';
@@ -798,123 +474,79 @@
                 if (day.id === 'wed') headerBg = 'bg-gradient-to-r from-purple-800 to-slate-900 text-white';
 
                 let cardHTML = `
-                    <!-- Day Card Header -->
                     <div class="${headerBg} p-4 relative">
                         <div class="flex justify-between items-start">
                             <div>
-                                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-white/10 text-white/90 border border-white/20 inline-block mb-1">
-                                    ${day.date}
-                                </span>
+                                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-white/10 text-white/90 border border-white/20 inline-block mb-1">${day.date}</span>
                                 <h3 class="text-xl font-black text-white">${day.name}</h3>
                                 <p class="text-xs text-slate-200 font-medium mt-0.5">${day.subtitle}</p>
                             </div>
-                            
                             <div class="text-left">
-                                <span class="text-lg font-black ${dayCompletedCount === dayTotal ? 'text-emerald-400' : 'text-sky-300'}">
-                                    ${dayCompletedCount}/${dayTotal}
-                                </span>
+                                <span class="text-lg font-black ${dayCompletedCount === dayTotal ? 'text-emerald-400' : 'text-sky-300'}">${dayCompletedCount}/${dayTotal}</span>
                                 <div class="text-[10px] text-slate-300">مكتمل</div>
                             </div>
                         </div>
-
-                        <!-- Mini Day Badge -->
-                        <div class="mt-2 text-[11px] font-semibold text-amber-200 bg-black/20 px-2.5 py-1 rounded-lg inline-flex items-center gap-1 border border-white/10">
-                            <span>📌 ${day.badge}</span>
-                        </div>
-
-                        <!-- Day Mini Progress Bar -->
+                        <div class="mt-2 text-[11px] font-semibold text-amber-200 bg-black/20 px-2.5 py-1 rounded-lg inline-flex items-center gap-1 border border-white/10">📌 ${day.badge}</div>
                         <div class="w-full bg-black/30 h-1.5 rounded-full mt-3 overflow-hidden">
                             <div class="bg-emerald-400 h-full transition-all duration-300" style="width: ${dayPercent}%"></div>
                         </div>
                     </div>
-
-                    <!-- Tasks List for Day -->
                     <div class="p-4 flex-1 space-y-3 bg-slate-50/50">
                 `;
 
                 dayTasks.forEach(task => {
                     const isDone = completedTaskIds.has(task.id);
-
-                    // Task type custom tags
                     let typeBadge = '';
-                    if (task.type === 'red_center') {
-                        typeBadge = `<span class="bg-rose-100 text-rose-700 text-[10px] font-extrabold px-2 py-0.5 rounded border border-rose-200">🔴 درس سنتر</span>`;
-                    } else if (task.type === 'yellow_center') {
-                        typeBadge = `<span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded border border-amber-200">🟡 درس ثابت</span>`;
-                    } else {
-                        typeBadge = `<span class="bg-sky-100 text-sky-800 text-[10px] font-semibold px-2 py-0.5 rounded">🏠 ذاكر بالمنزل</span>`;
-                    }
+                    if (task.type === 'red_center') typeBadge = `<span class="bg-rose-100 text-rose-700 text-[10px] font-extrabold px-2 py-0.5 rounded border border-rose-200">🔴 درس سنتر</span>`;
+                    else if (task.type === 'yellow_center') typeBadge = `<span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded border border-amber-200">🟡 درس ثابت</span>`;
+                    else typeBadge = `<span class="bg-sky-100 text-sky-800 text-[10px] font-semibold px-2 py-0.5 rounded">🏠 ذاكر بالمنزل</span>`;
 
                     cardHTML += `
                         <div onclick="toggleTask(${task.id})" class="task-card p-3 rounded-xl border ${isDone ? 'bg-emerald-50/80 border-emerald-200' : 'bg-white border-slate-200'} shadow-sm flex items-start gap-3 cursor-pointer select-none">
                             <input type="checkbox" ${isDone ? 'checked' : ''} class="custom-checkbox mt-0.5" onclick="event.stopPropagation(); toggleTask(${task.id});">
-                            
                             <div class="flex-1 space-y-1">
                                 <div class="flex flex-wrap items-center justify-between gap-1">
-                                    <span class="text-xs font-extrabold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/80">
-                                        ⏰ ${task.time}
-                                    </span>
+                                    <span class="text-xs font-extrabold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/80">⏰ ${task.time}</span>
                                     ${typeBadge}
                                 </div>
-
-                                <p class="text-sm font-bold ${isDone ? 'line-through text-slate-400 font-normal' : 'text-slate-800'} leading-snug">
-                                    ${task.text}
-                                </p>
+                                <p class="text-sm font-bold ${isDone ? 'line-through text-slate-400 font-normal' : 'text-slate-800'} leading-snug">${task.text}</p>
                             </div>
                         </div>
                     `;
                 });
 
-                cardHTML += `
-                    </div>
-                `;
-
+                cardHTML += `</div>`;
                 card.innerHTML = cardHTML;
                 container.appendChild(card);
             });
         }
 
-        // Filter by Day
         function filterDay(dayId) {
             activeDayFilter = dayId;
-            
-            // Update active tab styles
-            document.querySelectorAll('.day-tab').forEach(btn => {
-                btn.className = 'day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap';
-            });
-
+            document.querySelectorAll('.day-tab').forEach(btn => btn.className = 'day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap');
             const activeBtn = document.getElementById(`tab-${dayId}`);
-            if (activeBtn) {
-                activeBtn.className = 'day-tab active px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-sky-600 text-white shadow-sm whitespace-nowrap';
-            }
-
+            if (activeBtn) activeBtn.className = 'day-tab active px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-sky-600 text-white shadow-sm whitespace-nowrap';
             renderDaysGrid();
         }
 
-        // Toggle Image Overlay Visibility
         function toggleOverlayVisibility() {
             showOverlay = !showOverlay;
             const thumb = document.getElementById('toggleOverlayThumb');
             const btn = document.getElementById('toggleOverlayBtn');
-
             if (showOverlay) {
-                btn.className = "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-emerald-600 transition-colors duration-200 ease-in-out focus:outline-none";
+                btn.className = "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-emerald-600 transition-colors duration-200 ease-in-out";
                 thumb.className = "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0";
             } else {
-                btn.className = "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-300 transition-colors duration-200 ease-in-out focus:outline-none";
+                btn.className = "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-300 transition-colors duration-200 ease-in-out";
                 thumb.className = "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out -translate-x-5";
             }
-
             renderImageOverlay();
         }
 
-        // Zoom Poster Modal Handlers
         function togglePosterModal() {
-            const modal = document.getElementById('posterModal');
-            modal.classList.toggle('hidden');
+            document.getElementById('posterModal').classList.toggle('hidden');
         }
 
-        // Reset Modal Handlers
         function openResetModal() {
             document.getElementById('resetModal').classList.remove('hidden');
         }
@@ -930,13 +562,11 @@
             closeResetModal();
         }
 
-        // Initialize App on DOM Load
         window.addEventListener('DOMContentLoaded', () => {
             loadSavedState();
             updateUI();
         });
 
-        // Recalculate overlays when window resizes
         window.addEventListener('resize', () => {
             renderImageOverlay();
         });
