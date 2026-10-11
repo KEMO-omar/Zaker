@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>جدول الإنقاذ اليومي - متابعة المذاكرة والدروس</title>
+    <title>جدول لم المتراكم في أربع أيام - متابعة المذاكرة</title>
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -46,8 +46,8 @@
     <style>
         body {
             font-family: 'Cairo', sans-serif;
-            background-color: #f8fafc;
-            color: #1e293b;
+            background-color: #0f172a;
+            color: #f8fafc;
         }
 
         ::-webkit-scrollbar {
@@ -55,25 +55,25 @@
             height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #f1f5f9;
+            background: #1e293b;
         }
         ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
+            background: #475569;
             border-radius: 4px;
         }
 
         .overlay-slot {
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
         }
         .overlay-slot:hover {
-            background-color: rgba(14, 165, 233, 0.22);
-            outline: 2px solid #0284c7;
+            background-color: rgba(56, 189, 248, 0.25);
+            outline: 2px solid #38bdf8;
         }
         .overlay-slot.completed {
-            background-color: rgba(34, 197, 94, 0.45);
+            background-color: rgba(34, 197, 94, 0.55);
             backdrop-filter: blur(1px);
-            border: 2px solid #16a34a;
+            border: 2px solid #22c55e;
         }
 
         .task-card {
@@ -88,7 +88,7 @@
             -webkit-appearance: none;
             width: 1.35rem;
             height: 1.35rem;
-            border: 2px solid #cbd5e1;
+            border: 2px solid #64748b;
             border-radius: 0.375rem;
             outline: none;
             transition: all 0.2s ease;
@@ -97,8 +97,8 @@
             flex-shrink: 0;
         }
         .custom-checkbox:checked {
-            background-color: #16a34a;
-            border-color: #16a34a;
+            background-color: #22c55e;
+            border-color: #22c55e;
         }
         .custom-checkbox:checked::after {
             content: '✓';
@@ -112,23 +112,23 @@
         }
     </style>
 </head>
-<body class="min-h-screen pb-16">
+<body class="min-h-screen pb-16 bg-slate-950 text-slate-100">
 
     <!-- Top Header -->
-    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-lg border-b border-slate-800">
+    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-xl border-b border-slate-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
             <div class="flex items-center space-x-3 space-x-reverse">
-                <div class="bg-gradient-to-tr from-sky-500 to-indigo-600 p-2.5 rounded-xl shadow-md">
+                <div class="bg-gradient-to-tr from-emerald-500 to-teal-600 p-2.5 rounded-xl shadow-md">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 022 2h2a2 2 0 022-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
                     </svg>
                 </div>
                 <div>
                     <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-                        <span>جدول الإنقاذ اليومي</span>
-                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">مطابق للصورة بالملي</span>
+                        <span>جدول لم المتراكم في أربع أيام</span>
+                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Week 1</span>
                     </h1>
-                    <p class="text-xs text-slate-400">تابع مواعيد دروسك ومهامك المتراكمة مع المزامنة التلقائية اللحظية</p>
+                    <p class="text-xs text-slate-400">"وَمَا نَفْسُ الْفَتَى إِلاَّ نَفَاسَةُ طَبْعِهِ ... إِذَا جَادَ بِالْمَعْرُوفِ وَالْخَيْرِ أَقْبَلاَ"</p>
                 </div>
             </div>
 
@@ -151,34 +151,32 @@
     </header>
 
     <!-- Overall Progress Banner -->
-    <div class="bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 border-b border-sky-900/40 text-white py-4 shadow-inner">
+    <div class="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border-b border-emerald-900/40 text-white py-4 shadow-inner">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="w-16 h-16 rounded-2xl bg-slate-800 border border-sky-500/30 flex items-center justify-center shadow-lg">
-                        <span id="overallPercentage" class="text-xl font-black text-sky-400">0%</span>
+                    <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-emerald-500/30 flex items-center justify-center shadow-lg">
+                        <span id="overallPercentage" class="text-xl font-black text-emerald-400">0%</span>
                     </div>
                     <div>
-                        <div class="text-sm font-medium text-slate-300">معدل الإنجاز العام</div>
-                        <div id="statsSummary" class="text-lg font-bold text-white">0 من أصل 20 مهمة مكتملة</div>
+                        <div class="text-sm font-medium text-slate-300">معدل إنجاز جدول الأربع أيام</div>
+                        <div id="statsSummary" class="text-lg font-bold text-white">0 من أصل 40 مهمة مكتملة</div>
                     </div>
                 </div>
 
                 <div class="flex-1 max-w-xl">
                     <div class="flex justify-between text-xs text-slate-300 mb-1.5">
                         <span class="font-medium">التقدم الإجمالي</span>
-                        <span id="completedCountBadge" class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-semibold border border-emerald-500/30">20 متبقي</span>
+                        <span id="completedCountBadge" class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-semibold border border-emerald-500/30">40 متبقي</span>
                     </div>
-                    <div class="w-full bg-slate-800 rounded-full h-3.5 p-0.5 border border-slate-700 shadow-inner">
-                        <div id="mainProgressBar" class="bg-gradient-to-r from-sky-500 to-emerald-500 h-2.5 rounded-full transition-all duration-500 ease-out w-0 shadow-md"></div>
+                    <div class="w-full bg-slate-900 rounded-full h-3.5 p-0.5 border border-slate-800 shadow-inner">
+                        <div id="mainProgressBar" class="bg-gradient-to-r from-teal-500 to-emerald-400 h-2.5 rounded-full transition-all duration-500 ease-out w-0 shadow-md"></div>
                     </div>
                 </div>
 
-                <div class="hidden xl:flex items-center gap-2 bg-slate-800/80 px-3.5 py-2 rounded-xl border border-slate-700/60 text-xs text-sky-200">
-                    <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 103.636 5.05l-.707.707a1 1 0 001.414 1.414l.707-.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1a1 1 0 00-2 0v1a1 1 0 002 0zM12 14a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM14.343 14.343a1 1 0 000 1.414l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 0z"></path>
-                    </svg>
-                    <span>استمر بالالتزام! كل مهمة تنجزها تقرّبك خطوة نحو الهدف.</span>
+                <div class="hidden xl:flex items-center gap-2 bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 text-xs text-emerald-200">
+                    <span class="text-base">🟢</span>
+                    <span>4 أيام فقط لإنهاء كل المتراكم! استعن بالله ولا تعجز.</span>
                 </div>
             </div>
         </div>
@@ -188,83 +186,81 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-8">
 
         <!-- Image Interactive Section -->
-        <section class="bg-white rounded-2xl shadow-md border border-slate-200/80 overflow-hidden">
-            <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3 bg-slate-50">
+        <section class="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-800 flex flex-wrap justify-between items-center gap-3 bg-slate-900/80">
                 <div class="flex items-center gap-2">
                     <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block animate-ping"></span>
-                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <span>صورة الجدول التفاعلية المباشرة</span>
-                        <span class="text-xs font-normal text-slate-500 hidden sm:inline">(اضغط مباشرة على أي مهمة في الصورة للتعليم عليها)</span>
+                    <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                        <span>صورة الجدول التفاعلية (43611.png)</span>
+                        <span class="text-xs font-normal text-slate-400 hidden sm:inline">(اضغط مباشرة على أي مهمة في الصورة للتحديد)</span>
                     </h2>
                 </div>
                 
                 <div class="flex items-center gap-2">
-                    <span class="text-xs font-medium text-slate-600">إظهار العلامات فوق الصورة:</span>
+                    <span class="text-xs font-medium text-slate-300">إظهار العلامات فوق الصورة:</span>
                     <button id="toggleOverlayBtn" onclick="toggleOverlayVisibility()" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-emerald-600 transition-colors duration-200 ease-in-out">
                         <span id="toggleOverlayThumb" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0"></span>
                     </button>
                 </div>
             </div>
 
-            <div class="relative w-full overflow-x-auto bg-slate-100 flex justify-center items-center p-2 sm:p-4">
-                <div id="posterWrapper" class="relative max-w-full min-w-[700px] md:min-w-0 shadow-2xl rounded-xl overflow-hidden border border-slate-300">
+            <div class="relative w-full overflow-x-auto bg-slate-950 flex justify-center items-center p-2 sm:p-4">
+                <div id="posterWrapper" class="relative max-w-full min-w-[750px] md:min-w-0 shadow-2xl rounded-xl overflow-hidden border border-slate-800">
                     <img id="schedulePoster" 
-                         src="42143.jpg" 
-                         alt="جدول الإنقاذ اليومي" 
+                         src="43611.png" 
+                         alt="جدول لم المتراكم في أربع أيام" 
                          class="w-full h-auto block object-cover rounded-xl"
-                         onerror="this.onerror=null; this.src='watermarked_img_1790035527206007880.jpg';" />
+                         onerror="this.onerror=null; this.src='https://placehold.co/1200x850/0f172a/ffffff?text=%D8%AC%D8%AF%D9%88%D9%84+%D9%84%D9%85+%D8%A7%D9%84%D9%85%D8%AA%D8%B1%D8%A7%D9%83%D9%85+%D9%81%D9%8A+%D8%A3%D8%B1%D8%A8%D8%B9+%D8%A3%D9%8A%D8%A7%D9%85';" />
 
                     <div id="imageOverlayContainer" class="absolute inset-0 w-full h-full pointer-events-auto"></div>
                 </div>
             </div>
             
-            <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
+            <div class="px-4 py-2.5 bg-slate-900 border-t border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
                 <div class="flex items-center gap-4">
-                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500/50 border border-emerald-600 inline-block"></span> مهمة مكتملة</span>
-                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-sky-500/10 border border-sky-400 inline-block"></span> مهمة قيد الانتظار</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500/60 border border-emerald-500 inline-block"></span> مهمة مكتملة</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-sky-500/20 border border-sky-400 inline-block"></span> قيد الانتظار</span>
                 </div>
-                <div class="text-slate-400">* تتطابق الإحداثيات المحددة تماماً مع خانات الصورة بالملي</div>
+                <div class="text-slate-400">* إحداثيات الـ 40 مهمة مربوطة ومطابقة بالملي للصورة أعلاه</div>
             </div>
         </section>
 
         <!-- Day Selector Filter -->
         <section class="space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-sm">
                 <div>
-                    <h3 class="text-base font-bold text-slate-800">قائمة المهام اليومية التفصيلية</h3>
-                    <p class="text-xs text-slate-500">اختر يوماً محدداً أو استعرض كافة أيام الأسبوع</p>
+                    <h3 class="text-base font-bold text-slate-100">قائمة المهام التفصيلية (40 مهمة)</h3>
+                    <p class="text-xs text-slate-400">استعرض مهام كل يوم على حدة أو الجدول كاملاً</p>
                 </div>
 
-                <div class="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                    <button onclick="filterDay('all')" id="tab-all" class="day-tab active px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-sky-600 text-white shadow-sm whitespace-nowrap">كافة الأيام (6)</button>
-                    <button onclick="filterDay('fri')" id="tab-fri" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">الجمعة</button>
-                    <button onclick="filterDay('sat')" id="tab-sat" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">السبت</button>
-                    <button onclick="filterDay('sun')" id="tab-sun" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">الأحد</button>
-                    <button onclick="filterDay('mon')" id="tab-mon" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">الإثنين</button>
-                    <button onclick="filterDay('tue')" id="tab-tue" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">الثلاثاء</button>
-                    <button onclick="filterDay('wed')" id="tab-wed" class="day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap">الأربعاء</button>
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                    <button onclick="filterDay('all')" id="tab-all" class="day-tab active px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all bg-emerald-600 text-white shadow-sm whitespace-nowrap">الكل (40)</button>
+                    <button onclick="filterDay('sun')" id="tab-sun" class="day-tab px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 whitespace-nowrap">الأحد (17)</button>
+                    <button onclick="filterDay('mon')" id="tab-mon" class="day-tab px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 whitespace-nowrap">الاثنين (6)</button>
+                    <button onclick="filterDay('tue')" id="tab-tue" class="day-tab px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 whitespace-nowrap">الثلاثاء (10)</button>
+                    <button onclick="filterDay('wed')" id="tab-wed" class="day-tab px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 whitespace-nowrap">الأربعاء (7)</button>
                 </div>
             </div>
         </section>
 
         <!-- Tasks Cards Grid -->
-        <section id="daysGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></section>
+        <section id="daysGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6"></section>
 
     </main>
 
-    <!-- Reset Confirmation Modal -->
-    <div id="resetModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-bounce-short">
-            <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+    <!-- Reset Modal -->
+    <div id="resetModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-800 space-y-4 animate-bounce-short">
+            <div class="w-12 h-12 rounded-full bg-rose-950/80 text-rose-500 flex items-center justify-center mx-auto border border-rose-800/50">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
             </div>
             <div class="text-center">
-                <h3 class="text-lg font-bold text-slate-900">إعادة تعيين كافة المهمات؟</h3>
-                <p class="text-sm text-slate-500 mt-1">هل أنت تأكد من أنك تريد إلغاء تحديد كل المهمات المكتملة؟</p>
+                <h3 class="text-lg font-bold text-slate-100">إعادة تعيين التقدم؟</h3>
+                <p class="text-sm text-slate-400 mt-1">هل أنت تأكد من إلغاء تحديد جميع المهام الـ 40؟</p>
             </div>
             <div class="flex items-center gap-3 pt-2">
                 <button onclick="confirmReset()" class="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md transition-all text-sm">نعم، مسح التقدم</button>
-                <button onclick="closeResetModal()" class="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all text-sm">إلغاء</button>
+                <button onclick="closeResetModal()" class="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition-all text-sm">إلغاء</button>
             </div>
         </div>
     </div>
@@ -276,58 +272,72 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 إغلاق الصورة
             </button>
-            <div class="overflow-auto max-h-[85vh] rounded-2xl shadow-2xl border border-slate-700 bg-slate-900">
-                <img src="42143.jpg" alt="جدول الإنقاذ اليومي المكبر" class="w-full h-auto object-contain">
+            <div class="overflow-auto max-h-[85vh] rounded-2xl shadow-2xl border border-slate-800 bg-slate-900">
+                <img src="43611.png" alt="جدول لم المتراكم المكبر" class="w-full h-auto object-contain">
             </div>
         </div>
     </div>
 
     <script>
         const DAYS_DATA = [
-            { id: 'fri', name: 'الجمعة', date: '9 أكتوبر', subtitle: 'طوارئ الفيزياء والبلاغة', badge: 'يوم منزلي بالكامل' },
-            { id: 'sat', name: 'السبت', date: '10 أكتوبر', subtitle: 'استغلال فراغ مستر محمد صلاح', badge: 'درس آخر 4:00 عصراً' },
-            { id: 'sun', name: 'الأحد', date: '11 أكتوبر', subtitle: 'فرم العربي والجديد', badge: 'نزول محاضرة فيزياء جديدة' },
-            { id: 'mon', name: 'الإثنين', date: '12 أكتوبر', subtitle: 'يوم السناتر المكثف', badge: 'تاريخ 1:00ظ / إنجليزي 7:00م' },
-            { id: 'tue', name: 'الثلاثاء', date: '13 أكتوبر', subtitle: 'التقفيل الأخير للعربي', badge: 'عندك درس 4:00 عصراً' },
-            { id: 'wed', name: 'الأربعاء', date: '14 أكتوبر', subtitle: 'التثبيت النهائي - ليلة الامتحان', badge: 'نزول محاضرة فيزياء جديدة' }
+            { id: 'sun', name: 'الأحد', subtitle: '17 مهمة مكثفة', badge: 'فيزياء + عربي + إنجليزي' },
+            { id: 'mon', name: 'الاثنين', subtitle: '6 مهام', badge: 'تاريخ + سناتر + ورشة' },
+            { id: 'tue', name: 'الثلاثاء', subtitle: '10 مهام', badge: 'عربي + أ/محمد عببود' },
+            { id: 'wed', name: 'الأربعاء', subtitle: '7 مهام', badge: 'أ/محمد عببود + نحو' }
         ];
 
-        // 20 Tasks with exact positioning matching 42143.jpg image proportions
+        // Exact 40 Tasks matching 43611.png layout coordinates millimeter-by-millimeter
         const TASKS = [
-            // الجمعة (3 tasks - Column 1 far right)
-            { id: 1, dayId: 'fri', time: '3:00 عصراً - 5:00 مساءً', text: 'حل واجب "عزم القوة" مباشرة (بما أنك مذاكره).', subject: 'فيزياء', type: 'home', overlay: { top: 38.5, height: 16.5, left: 80.3, width: 13.5 } },
-            { id: 2, dayId: 'fri', time: '6:00 مساءً - 9:00 مساءً', text: 'مذاكرة درس "اتزان القوى والقدرة والكفاءة" وحل واجبه فوراً.', subject: 'فيزياء', type: 'home', overlay: { top: 57.5, height: 16.5, left: 80.3, width: 13.5 } },
-            { id: 3, dayId: 'fri', time: '10:00 مساءً - 11:30 مساءً', text: 'تصفية نص درس "الأسلوب الإنشائي والإطناب" في العربي.', subject: 'عربي', type: 'home', overlay: { top: 76.5, height: 16.5, left: 80.3, width: 13.5 } },
+            // الأحد (17 tasks - Column 1 Right side)
+            { id: 1, dayId: 'sun', text: '1: حل واجب عزم القوة فيزياء (الواجب + امتحان)', type: 'normal', overlay: { top: 19.2, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 2, dayId: 'sun', text: '2: مذاكرة اتزان القوى وحل (الواجب + امتحان)', type: 'normal', overlay: { top: 23.3, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 3, dayId: 'sun', text: '3: مذاكرة القدرة و الكفاءة وحل (الواجب + امتحان)', type: 'normal', overlay: { top: 27.3, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 4, dayId: 'sun', text: '4: مذاكرة الجزء الثاني من الاسلوب الإنقائي والإطناب', type: 'normal', overlay: { top: 31.4, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 5, dayId: 'sun', text: '5: انهاء المحاضرة (2) ا محمد صلاح', type: 'normal', overlay: { top: 35.5, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 6, dayId: 'sun', text: '6: مذاكرة درس العلم نور', type: 'normal', overlay: { top: 39.5, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 7, dayId: 'sun', text: '7: حفظ كلمات الدرس الثاني الوحدة الاولى', type: 'normal', overlay: { top: 43.6, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 8, dayId: 'sun', text: '8: حفظ كلمات الدرس الثالث الوحدة الاولى', type: 'normal', overlay: { top: 47.7, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 9, dayId: 'sun', text: '9: حفظ كلمات الدرس الرابع الوحدة الاولى', type: 'normal', overlay: { top: 51.7, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 10, dayId: 'sun', text: '10: انهاء المحاضرة (3) ا محمد صلاح', type: 'normal', overlay: { top: 55.8, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 11, dayId: 'sun', text: '11: مذاكرة درس الخلق جوهر الفضيلة', type: 'normal', overlay: { top: 59.9, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 12, dayId: 'sun', text: '12: مذاكرة قصة حكايات الغريب', type: 'normal', overlay: { top: 63.9, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 13, dayId: 'sun', text: '13: مذاكرة قاعدة المشتقات', type: 'normal', overlay: { top: 68.0, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 14, dayId: 'sun', text: '14: حفظ كلمات الدرس الاول الوحدة الثانية', type: 'normal', overlay: { top: 72.1, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 15, dayId: 'sun', text: '15: حفظ كلمات الدرس الثاني الوحدة الثانية', type: 'normal', overlay: { top: 76.1, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 16, dayId: 'sun', text: '16: حفظ كلمات الدرس الثالث الوحدة الثانية', type: 'normal', overlay: { top: 80.2, height: 3.6, left: 73.2, width: 22.8 } },
+            { id: 17, dayId: 'sun', text: '17: حفظ كلمات الدرس الرابع الوحدة الثانية', type: 'normal', overlay: { top: 84.3, height: 3.6, left: 73.2, width: 22.8 } },
 
-            // السبت (4 tasks - Column 2)
-            { id: 4, dayId: 'sat', time: '10:00 صباحاً - 1:00 ظهراً', text: 'سماع ومذاكرة محاضرة الفيزياء المتراكمة "كمية التحرك والدفع".', subject: 'فيزياء', type: 'home', overlay: { top: 38.0, height: 12.0, left: 65.5, width: 13.5 } },
-            { id: 5, dayId: 'sat', time: '1:30 ظهراً - 3:30 عصراً', text: 'سماع المحاضرة (1) المتراكمة لصلاح + درس "العلم نور".', subject: 'عربي', type: 'home', overlay: { top: 51.5, height: 12.0, left: 65.5, width: 13.5 } },
-            { id: 6, dayId: 'sat', time: '4:00 عصراً - 6:30 مساءً', text: '🟡 نزولك للدرس الثاني الثابت.', subject: 'درس ثنائي', type: 'yellow_center', overlay: { top: 65.0, height: 12.0, left: 65.5, width: 13.5 } },
-            { id: 7, dayId: 'sat', time: '8:00 مساءً - 10:00 مساءً', text: 'حفظ كلمات الوحدة الأولى إنجليزي (الدروس 2، 3، 4).', subject: 'إنجليزي', type: 'home', overlay: { top: 78.5, height: 12.0, left: 65.5, width: 13.5 } },
+            // الاثنين (6 tasks - Column 2)
+            { id: 18, dayId: 'mon', text: '18: مذاكرة درس التحولات الكبرى في العصر الوسيط', type: 'normal', overlay: { top: 32.5, height: 8.5, left: 50.8, width: 21.2 } },
+            { id: 19, dayId: 'mon', text: '19: مذاكرة درس التحولات الكبرى في العصر الحديث', type: 'normal', overlay: { top: 42.5, height: 8.5, left: 50.8, width: 21.2 } },
+            { id: 20, dayId: 'mon', text: '20: 🔴 الذهاب لدرس التاريخ 1:00 ظهراً', type: 'red_center', overlay: { top: 52.5, height: 8.5, left: 50.8, width: 21.2 } },
+            { id: 21, dayId: 'mon', text: '21: مراجعة قاعدة (الأفعال التي يتبعها to + المصدر ، ing)', type: 'normal', overlay: { top: 62.5, height: 8.5, left: 50.8, width: 21.2 } },
+            { id: 22, dayId: 'mon', text: '22: 🔴 الذهاب لدرس الانجليزي 7:00 مساءً', type: 'red_center', overlay: { top: 72.5, height: 8.5, left: 50.8, width: 21.2 } },
+            { id: 23, dayId: 'mon', text: '23: سماع ورشة مستر محمد عبد المعبود', type: 'normal', overlay: { top: 82.5, height: 8.5, left: 50.8, width: 21.2 } },
 
-            // الأحد (3 tasks - Column 3)
-            { id: 8, dayId: 'sun', time: '11:00 صباحاً - 2:00 ظهراً', text: 'سماع محاضرة (2) صلاح + "الخلق جوهر الفضيلة" + "حكايات الغريب".', subject: 'عربي', type: 'home', overlay: { top: 38.5, height: 16.5, left: 50.8, width: 13.5 } },
-            { id: 9, dayId: 'sun', time: '3:00 عصراً - 5:30 مساءً', text: 'سماع ومذاكرة محاضرة الفيزياء الجديدة التي ستنزل اليوم.', subject: 'فيزياء', type: 'home', overlay: { top: 57.5, height: 16.5, left: 50.8, width: 13.5 } },
-            { id: 10, dayId: 'sun', time: '7:00 مساءً - 10:00 مساءً', text: 'مذاكرة قاعدة الإنجليزي "المشتقات" + كلمات الوحدة الثانية.', subject: 'إنجليزي', type: 'home', overlay: { top: 76.5, height: 16.5, left: 50.8, width: 13.5 } },
+            // الثلاثاء (10 tasks - Column 3)
+            { id: 24, dayId: 'tue', text: '24: إنهاء المحاضرة (4) أ محمد صلاح', type: 'normal', overlay: { top: 32.8, height: 5.2, left: 27.5, width: 22.5 } },
+            { id: 25, dayId: 'tue', text: '25: مذاكرة درس العلم بين القانون والضمير', type: 'normal', overlay: { top: 39.0, height: 5.2, left: 27.5, width: 22.5 } },
+            { id: 26, dayId: 'tue', text: '26: مذاكرة قصة عودة روح', type: 'normal', overlay: { top: 45.2, height: 5.2, left: 27.5, width: 22.5 } },
+            { id: 27, dayId: 'tue', text: '27: سماع المحاضرة (7) أ محمد عببود', type: 'normal', overlay: { top: 51.4, height: 5.2, left: 27.5, width: 22.5 } },
+            { id: 28, dayId: 'tue', text: '28: مذاكرة المحاضرة (7) أ محمد عببود', type: 'normal', overlay: { top: 57.6, height: 5.2, left: 27.5, width: 22.5 } },
+            { id: 29, dayId: 'tue', text: '29: حل واجب المحاضرة (7) أ محمد عببود', type: 'normal', overlay: { top: 63.8, height: 5.2, left: 27.5, width: 22.5 } },
+            { id: 30, dayId: 'tue', text: '30: سماع المحاضرة (8) أ محمد عببود', type: 'normal', overlay: { top: 70.0, height: 5.2, left: 27.5, width: 22.5 } },
+            { id: 31, dayId: 'tue', text: '31: مذاكرة المحاضرة (8) أ محمد عببود', type: 'normal', overlay: { top: 76.2, height: 5.2, left: 27.5, width: 22.5 } },
+            { id: 32, dayId: 'tue', text: '32: حل واجب المحاضرة (8) أ محمد عببود', type: 'normal', overlay: { top: 82.4, height: 5.2, left: 27.5, width: 22.5 } },
+            { id: 33, dayId: 'tue', text: '33: 🔴 الذهاب لدرس عربي 4:00 عصراً', type: 'red_center', overlay: { top: 88.6, height: 5.2, left: 27.5, width: 22.5 } },
 
-            // الإثنين (4 tasks - Column 4)
-            { id: 11, dayId: 'mon', time: '9:00 صباحاً - 12:00 ظهراً', text: 'ذاكر درسي التاريخ المتراكمين (العصر الوسيط + الحديث).', subject: 'تاريخ', type: 'home', overlay: { top: 38.0, height: 12.0, left: 36.0, width: 13.5 } },
-            { id: 12, dayId: 'mon', time: '1:00 ظهراً - 3:30 عصراً', text: '🔴 ذهابك لدرس التاريخ (الساعة 1).', subject: 'تاريخ', type: 'red_center', overlay: { top: 51.5, height: 12.0, left: 36.0, width: 13.5 } },
-            { id: 13, dayId: 'mon', time: '4:00 عصراً - 6:30 مساءً', text: 'مراجعة قاعدة الإنجليزي المتراكمة (Gerund & Infinitive).', subject: 'إنجليزي', type: 'home', overlay: { top: 65.0, height: 12.0, left: 36.0, width: 13.5 } },
-            { id: 14, dayId: 'mon', time: '7:00 مساءً - 9:30 مساءً', text: '🔴 ذهابك لدرس الإنجليزي (الساعة 7).', subject: 'إنجليزي', type: 'red_center', overlay: { top: 78.5, height: 12.0, left: 36.0, width: 13.5 } },
-
-            // الثلاثاء (3 tasks - Column 5)
-            { id: 15, dayId: 'tue', time: '10:00 صباحاً - 1:00 ظهراً', text: 'سماع المحاضرة (3) لصلاح + "العلم بين القانون والضمير" + "حكاية روح".', subject: 'عربي', type: 'home', overlay: { top: 38.5, height: 16.5, left: 21.3, width: 13.5 } },
-            { id: 16, dayId: 'tue', time: '1:30 ظهراً - 3:30 عصراً', text: 'سماع ومذاكرة آخر محاضرة فيزياء متراكمة "كمية التحرك والطاقة".', subject: 'فيزياء', type: 'home', overlay: { top: 57.5, height: 16.5, left: 21.3, width: 13.5 } },
-            { id: 17, dayId: 'tue', time: '4:00 عصراً - 6:30 مساءً', text: '🟡 نزولك للدرس الثاني الثابت.', subject: 'درس ثنائي', type: 'yellow_center', overlay: { top: 76.5, height: 16.5, left: 21.3, width: 13.5 } },
-
-            // الأربعاء (3 tasks - Column 6 far left)
-            { id: 18, dayId: 'wed', time: '11:00 صباحاً - 1:30 ظهراً', text: 'سماع ومذاكرة محاضرة الفيزياء الجديدة.', subject: 'فيزياء', type: 'home', overlay: { top: 38.5, height: 16.5, left: 6.5, width: 13.5 } },
-            { id: 19, dayId: 'wed', time: '2:30 عصراً - 5:00 مساءً', text: 'مذاكرة درس التاريخ المتراكم "سياسات الاحتلال بمصر".', subject: 'تاريخ', type: 'home', overlay: { top: 57.5, height: 16.5, left: 6.5, width: 13.5 } },
-            { id: 20, dayId: 'wed', time: '6:00 مساءً فصاعداً', text: 'مراجعة شاملة سريعة وحل الشيتات والواجبات، والنوم مبكراً.', subject: 'مراجعة عامة', type: 'home', overlay: { top: 76.5, height: 16.5, left: 6.5, width: 13.5 } }
+            // الأربعاء (7 tasks - Column 4 Far Left)
+            { id: 34, dayId: 'wed', text: '34: سماع المحاضرة (9) أ محمد عببود', type: 'normal', overlay: { top: 32.8, height: 7.2, left: 4.2, width: 22.5 } },
+            { id: 35, dayId: 'wed', text: '35: مذاكرة المحاضرة (9) أ محمد عببود', type: 'normal', overlay: { top: 41.0, height: 7.2, left: 4.2, width: 22.5 } },
+            { id: 36, dayId: 'wed', text: '36: حل واجب المحاضرة (9) أ محمد عببود', type: 'normal', overlay: { top: 49.2, height: 7.2, left: 4.2, width: 22.5 } },
+            { id: 37, dayId: 'wed', text: '37: سماع المحاضرة (10) أ محمد عببود', type: 'normal', overlay: { top: 57.4, height: 7.2, left: 4.2, width: 22.5 } },
+            { id: 38, dayId: 'wed', text: '38: مذاكرة المحاضرة (10) أ محمد عببود', type: 'normal', overlay: { top: 65.6, height: 7.2, left: 4.2, width: 22.5 } },
+            { id: 39, dayId: 'wed', text: '39: حل واجب المحاضرة (10) أ محمد عببود', type: 'normal', overlay: { top: 73.8, height: 7.2, left: 4.2, width: 22.5 } },
+            { id: 40, dayId: 'wed', text: '40: مذاكرة الهمزات و التاءات و الياءات', type: 'normal', overlay: { top: 82.0, height: 7.2, left: 4.2, width: 22.5 } }
         ];
 
-        const STORAGE_KEY = 'rescue_schedule_tasks_exact_v2';
+        const STORAGE_KEY = 'backlog_4days_tasks_v1';
         let completedTaskIds = new Set();
         let activeDayFilter = 'all';
         let showOverlay = true;
@@ -380,7 +390,7 @@
             saveState();
             updateUI();
             if (completedTaskIds.size === TASKS.length && typeof confetti === 'function') {
-                confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+                confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
             }
         }
 
@@ -402,7 +412,7 @@
             const countBadge = document.getElementById('completedCountBadge');
             const remaining = total - completed;
             if (remaining === 0) {
-                countBadge.textContent = '🎉 مكتمل بالكامل!';
+                countBadge.textContent = '🎉 أنجزت الجدول بالكامل!';
                 countBadge.className = 'bg-emerald-500 text-white px-2 py-0.5 rounded-md font-extrabold text-xs shadow-md animate-bounce';
             } else {
                 countBadge.textContent = `${remaining} متبقي`;
@@ -425,7 +435,7 @@
                 const ov = task.overlay;
 
                 const div = document.createElement('div');
-                div.className = `overlay-slot absolute rounded-lg flex items-center justify-center p-1 transition-all ${isDone ? 'completed shadow-lg' : ''}`;
+                div.className = `overlay-slot absolute rounded-md flex items-center justify-center transition-all ${isDone ? 'completed shadow-lg' : ''}`;
                 div.style.top = `${ov.top}%`;
                 div.style.height = `${ov.height}%`;
                 div.style.left = `${ov.left}%`;
@@ -434,8 +444,8 @@
 
                 if (isDone) {
                     div.innerHTML = `
-                        <div class="bg-emerald-600 text-white rounded-full p-1 shadow-md flex items-center justify-center animate-pulse-slow">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                        <div class="bg-emerald-600 text-white rounded-full p-0.5 shadow flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                         </div>
                     `;
                 }
@@ -463,53 +473,47 @@
                 const dayPercent = Math.round((dayCompletedCount / dayTotal) * 100);
 
                 const card = document.createElement('div');
-                card.className = `bg-white rounded-2xl shadow-md border ${dayCompletedCount === dayTotal ? 'border-emerald-300 ring-2 ring-emerald-500/20' : 'border-slate-200/90'} overflow-hidden flex flex-col transition-all`;
+                card.className = `bg-slate-900 rounded-2xl shadow-lg border ${dayCompletedCount === dayTotal ? 'border-emerald-500/80 ring-2 ring-emerald-500/20' : 'border-slate-800'} overflow-hidden flex flex-col transition-all`;
 
                 let headerBg = 'bg-gradient-to-r from-slate-800 to-slate-900 text-white';
-                if (day.id === 'fri') headerBg = 'bg-gradient-to-r from-sky-800 to-slate-900 text-white';
-                if (day.id === 'sat') headerBg = 'bg-gradient-to-r from-teal-800 to-slate-900 text-white';
-                if (day.id === 'sun') headerBg = 'bg-gradient-to-r from-emerald-800 to-slate-900 text-white';
-                if (day.id === 'mon') headerBg = 'bg-gradient-to-r from-amber-800 to-slate-900 text-white';
-                if (day.id === 'tue') headerBg = 'bg-gradient-to-r from-indigo-800 to-slate-900 text-white';
-                if (day.id === 'wed') headerBg = 'bg-gradient-to-r from-purple-800 to-slate-900 text-white';
+                if (day.id === 'sun') headerBg = 'bg-gradient-to-r from-emerald-900 to-slate-900 text-white';
+                if (day.id === 'mon') headerBg = 'bg-gradient-to-r from-amber-900 to-slate-900 text-white';
+                if (day.id === 'tue') headerBg = 'bg-gradient-to-r from-teal-900 to-slate-900 text-white';
+                if (day.id === 'wed') headerBg = 'bg-gradient-to-r from-cyan-900 to-slate-900 text-white';
 
                 let cardHTML = `
-                    <div class="${headerBg} p-4 relative">
+                    <div class="${headerBg} p-4 relative border-b border-slate-800">
                         <div class="flex justify-between items-start">
                             <div>
-                                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-white/10 text-white/90 border border-white/20 inline-block mb-1">${day.date}</span>
                                 <h3 class="text-xl font-black text-white">${day.name}</h3>
-                                <p class="text-xs text-slate-200 font-medium mt-0.5">${day.subtitle}</p>
+                                <p class="text-xs text-slate-300 font-medium mt-0.5">${day.subtitle}</p>
                             </div>
                             <div class="text-left">
-                                <span class="text-lg font-black ${dayCompletedCount === dayTotal ? 'text-emerald-400' : 'text-sky-300'}">${dayCompletedCount}/${dayTotal}</span>
-                                <div class="text-[10px] text-slate-300">مكتمل</div>
+                                <span class="text-lg font-black ${dayCompletedCount === dayTotal ? 'text-emerald-400' : 'text-teal-300'}">${dayCompletedCount}/${dayTotal}</span>
+                                <div class="text-[10px] text-slate-400">مكتمل</div>
                             </div>
                         </div>
-                        <div class="mt-2 text-[11px] font-semibold text-amber-200 bg-black/20 px-2.5 py-1 rounded-lg inline-flex items-center gap-1 border border-white/10">📌 ${day.badge}</div>
-                        <div class="w-full bg-black/30 h-1.5 rounded-full mt-3 overflow-hidden">
+                        <div class="mt-2 text-[11px] font-semibold text-emerald-200 bg-black/30 px-2.5 py-1 rounded-lg inline-flex items-center gap-1 border border-white/10">📌 ${day.badge}</div>
+                        <div class="w-full bg-black/40 h-1.5 rounded-full mt-3 overflow-hidden">
                             <div class="bg-emerald-400 h-full transition-all duration-300" style="width: ${dayPercent}%"></div>
                         </div>
                     </div>
-                    <div class="p-4 flex-1 space-y-3 bg-slate-50/50">
+                    <div class="p-3.5 flex-1 space-y-2.5 bg-slate-950/60">
                 `;
 
                 dayTasks.forEach(task => {
                     const isDone = completedTaskIds.has(task.id);
                     let typeBadge = '';
-                    if (task.type === 'red_center') typeBadge = `<span class="bg-rose-100 text-rose-700 text-[10px] font-extrabold px-2 py-0.5 rounded border border-rose-200">🔴 درس سنتر</span>`;
-                    else if (task.type === 'yellow_center') typeBadge = `<span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded border border-amber-200">🟡 درس ثابت</span>`;
-                    else typeBadge = `<span class="bg-sky-100 text-sky-800 text-[10px] font-semibold px-2 py-0.5 rounded">🏠 ذاكر بالمنزل</span>`;
+                    if (task.type === 'red_center') typeBadge = `<span class="bg-rose-950/80 text-rose-300 text-[10px] font-extrabold px-2 py-0.5 rounded border border-rose-800/60">🔴 سنتر</span>`;
 
                     cardHTML += `
-                        <div onclick="toggleTask(${task.id})" class="task-card p-3 rounded-xl border ${isDone ? 'bg-emerald-50/80 border-emerald-200' : 'bg-white border-slate-200'} shadow-sm flex items-start gap-3 cursor-pointer select-none">
+                        <div onclick="toggleTask(${task.id})" class="task-card p-2.5 rounded-xl border ${isDone ? 'bg-emerald-950/30 border-emerald-800/60' : 'bg-slate-900 border-slate-800'} shadow-sm flex items-start gap-2.5 cursor-pointer select-none">
                             <input type="checkbox" ${isDone ? 'checked' : ''} class="custom-checkbox mt-0.5" onclick="event.stopPropagation(); toggleTask(${task.id});">
                             <div class="flex-1 space-y-1">
-                                <div class="flex flex-wrap items-center justify-between gap-1">
-                                    <span class="text-xs font-extrabold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/80">⏰ ${task.time}</span>
+                                <div class="flex items-center justify-between gap-1">
                                     ${typeBadge}
                                 </div>
-                                <p class="text-sm font-bold ${isDone ? 'line-through text-slate-400 font-normal' : 'text-slate-800'} leading-snug">${task.text}</p>
+                                <p class="text-xs font-bold ${isDone ? 'line-through text-slate-500 font-normal' : 'text-slate-200'} leading-snug">${task.text}</p>
                             </div>
                         </div>
                     `;
@@ -523,9 +527,9 @@
 
         function filterDay(dayId) {
             activeDayFilter = dayId;
-            document.querySelectorAll('.day-tab').forEach(btn => btn.className = 'day-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap');
+            document.querySelectorAll('.day-tab').forEach(btn => btn.className = 'day-tab px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all bg-slate-800 text-slate-300 hover:bg-slate-700 whitespace-nowrap');
             const activeBtn = document.getElementById(`tab-${dayId}`);
-            if (activeBtn) activeBtn.className = 'day-tab active px-3 py-1.5 text-xs font-bold rounded-lg transition-all bg-sky-600 text-white shadow-sm whitespace-nowrap';
+            if (activeBtn) activeBtn.className = 'day-tab active px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all bg-emerald-600 text-white shadow-sm whitespace-nowrap';
             renderDaysGrid();
         }
 
@@ -537,7 +541,7 @@
                 btn.className = "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-emerald-600 transition-colors duration-200 ease-in-out";
                 thumb.className = "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0";
             } else {
-                btn.className = "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-300 transition-colors duration-200 ease-in-out";
+                btn.className = "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-700 transition-colors duration-200 ease-in-out";
                 thumb.className = "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out -translate-x-5";
             }
             renderImageOverlay();
