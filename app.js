@@ -388,39 +388,119 @@ const DEFAULT_LECTURES = [
   }
 ];
 
+// --- PERSISTENCE ENGINE & STORAGE KEYS (v5 Unified) ---
+const STORAGE_KEYS = {
+  TASKS: 'kareem_weekly_tasks_v5',
+  COMPLETED: 'kareem_completed_task_ids_v5',
+  LECTURES: 'kareem_lectures_v5'
+};
+
+function normalizeTaskId(id) {
+  const num = Number(id);
+  return (!isNaN(num) && String(num) === String(id).trim()) ? num : id;
+}
+
 function loadSavedWeeklyTasks() {
-  const saved = localStorage.getItem('kareem_weekly_tasks_v3');
-  if (saved) {
-    try { return JSON.parse(saved); } catch(e) {}
+  try {
+    const v5 = localStorage.getItem(STORAGE_KEYS.TASKS);
+    if (v5) {
+      const parsed = JSON.parse(v5);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+    const v3 = localStorage.getItem('kareem_weekly_tasks_v3');
+    if (v3) {
+      const parsed = JSON.parse(v3);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+    const v2 = localStorage.getItem('kareem_weekly_tasks_v2');
+    if (v2) {
+      const parsed = JSON.parse(v2);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch(e) {
+    console.error('Error loading weekly tasks:', e);
   }
-  return DEFAULT_WEEKLY_TASKS;
+  return JSON.parse(JSON.stringify(DEFAULT_WEEKLY_TASKS));
 }
 
 function loadSavedCompletedTaskIds() {
-  const legacy = localStorage.getItem('backlog_4days_tasks_v1');
-  const v2 = localStorage.getItem('kareem_completed_task_ids_v2');
   const set = new Set();
-  if (legacy) {
-    try { JSON.parse(legacy).forEach(id => set.add(id)); } catch(e) {}
-  }
-  if (v2) {
-    try { JSON.parse(v2).forEach(id => set.add(id)); } catch(e) {}
+  try {
+    const v5 = localStorage.getItem(STORAGE_KEYS.COMPLETED);
+    if (v5) {
+      const parsed = JSON.parse(v5);
+      if (Array.isArray(parsed)) {
+        parsed.forEach(id => set.add(normalizeTaskId(id)));
+        return set;
+      }
+    }
+    const v3 = localStorage.getItem('kareem_completed_task_ids_v3');
+    if (v3) {
+      const parsed = JSON.parse(v3);
+      if (Array.isArray(parsed)) {
+        parsed.forEach(id => set.add(normalizeTaskId(id)));
+        return set;
+      }
+    }
+    const v2 = localStorage.getItem('kareem_completed_task_ids_v2');
+    if (v2) {
+      const parsed = JSON.parse(v2);
+      if (Array.isArray(parsed)) {
+        parsed.forEach(id => set.add(normalizeTaskId(id)));
+        return set;
+      }
+    }
+    const legacy = localStorage.getItem('backlog_4days_tasks_v1');
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      if (Array.isArray(parsed)) {
+        parsed.forEach(id => set.add(normalizeTaskId(id)));
+      }
+    }
+  } catch(e) {
+    console.error('Error loading completed tasks:', e);
   }
   return set;
 }
 
 function loadSavedLectures() {
-  const saved = localStorage.getItem('kareem_lectures_v2');
-  if (saved) {
-    try { return JSON.parse(saved); } catch(e) {}
+  try {
+    const v5 = localStorage.getItem(STORAGE_KEYS.LECTURES);
+    if (v5) {
+      const parsed = JSON.parse(v5);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+    const v2 = localStorage.getItem('kareem_lectures_v2');
+    if (v2) {
+      const parsed = JSON.parse(v2);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // If v2 already has the full set of physics & arabic items
+        const hasAllPhysics = DEFAULT_LECTURES.every(dl => parsed.some(pl => pl.id === dl.id));
+        if (hasAllPhysics) return parsed;
+        // Merge user completion statuses and custom lectures into DEFAULT_LECTURES
+        const customItems = parsed.filter(p => p.id && String(p.id).startsWith('cust-'));
+        const completionMap = new Map(parsed.map(p => [p.id, p.isDone]));
+        const merged = DEFAULT_LECTURES.map(dl => ({
+          ...dl,
+          isDone: completionMap.has(dl.id) ? completionMap.get(dl.id) : dl.isDone
+        }));
+        return [...merged, ...customItems];
+      }
+    }
+  } catch(e) {
+    console.error('Error loading lectures:', e);
   }
-  return DEFAULT_LECTURES;
+  return JSON.parse(JSON.stringify(DEFAULT_LECTURES));
 }
 
 function persistLectures() {
   try {
-    localStorage.setItem('kareem_lectures_v2', JSON.stringify(state.lectures));
-  } catch(e) {}
+    const json = JSON.stringify(state.lectures);
+    localStorage.setItem(STORAGE_KEYS.LECTURES, json);
+    localStorage.setItem('kareem_lectures_v2', json);
+  } catch(e) {
+    console.error('Error persisting lectures:', e);
+  }
 }
 
 // App State
@@ -858,7 +938,7 @@ function drawMainVisualizer() {
     flameGrad.addColorStop(1, 'transparent');
     ctx.fillStyle = flameGrad;
     ctx.beginPath();
-    ctx.arc(cx, cy, flameBaseR, 0, Math.PI * 2);
+    ctx.arc(cx, cy, Math.max(1, flameBaseR), 0, Math.PI * 2);
     ctx.fill();
 
     // Rising Flame Curves
@@ -900,7 +980,7 @@ function drawMainVisualizer() {
 
     // Outer Reticle Ring
     ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.arc(cx, cy, Math.max(1, r), 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(86, 194, 166, 0.25)';
     ctx.lineWidth = 2 * (window.devicePixelRatio || 1);
     ctx.stroke();
@@ -1032,10 +1112,23 @@ function getTodayDayId() {
 
 function persistWeeklyTasks() {
   try {
-    localStorage.setItem('kareem_weekly_tasks_v2', JSON.stringify(state.weeklyTasks));
-    localStorage.setItem('kareem_completed_task_ids_v2', JSON.stringify(Array.from(state.completedTaskIds)));
-    localStorage.setItem('backlog_4days_tasks_v1', JSON.stringify(Array.from(state.completedTaskIds)));
-  } catch(e) {}
+    const tasksJson = JSON.stringify(state.weeklyTasks);
+    const completedArr = Array.from(state.completedTaskIds).map(normalizeTaskId);
+    const completedJson = JSON.stringify(completedArr);
+
+    localStorage.setItem(STORAGE_KEYS.TASKS, tasksJson);
+    localStorage.setItem('kareem_weekly_tasks_v4', tasksJson);
+    localStorage.setItem('kareem_weekly_tasks_v3', tasksJson);
+    localStorage.setItem('kareem_weekly_tasks_v2', tasksJson);
+
+    localStorage.setItem(STORAGE_KEYS.COMPLETED, completedJson);
+    localStorage.setItem('kareem_completed_task_ids_v4', completedJson);
+    localStorage.setItem('kareem_completed_task_ids_v3', completedJson);
+    localStorage.setItem('kareem_completed_task_ids_v2', completedJson);
+    localStorage.setItem('backlog_4days_tasks_v1', completedJson);
+  } catch(e) {
+    console.error('Error persisting weekly tasks:', e);
+  }
 }
 
 // --- RENDER APPLICATION VIEWS ---
@@ -1422,18 +1515,22 @@ function renderWeeklyPlannerUI() {
 }
 
 // Global actions exposed for event bindings
-window.toggleTaskCompletion = function(taskId) {
-  const wasDone = state.completedTaskIds.has(taskId);
+window.toggleTaskCompletion = function(rawId) {
+  const id = normalizeTaskId(rawId);
+  const wasDone = state.completedTaskIds.has(id);
   if (wasDone) {
-    state.completedTaskIds.delete(taskId);
+    state.completedTaskIds.delete(id);
+    state.completedTaskIds.delete(String(id));
+    state.completedTaskIds.delete(Number(id));
     playChimeSound(false);
   } else {
-    state.completedTaskIds.add(taskId);
+    state.completedTaskIds.add(id);
     playChimeSound(true);
   }
 
   persistWeeklyTasks();
   renderWeeklyPlannerUI();
+  renderVisualTimetableBoard();
 
   if (!wasDone && state.completedTaskIds.size === state.weeklyTasks.length) {
     triggerConfetti();
@@ -1443,30 +1540,37 @@ window.toggleTaskCompletion = function(taskId) {
   }
 };
 
-window.moveTaskToDay = function(taskId, newDayId) {
-  const t = state.weeklyTasks.find(x => x.id === taskId);
+window.moveTaskToDay = function(rawId, newDayId) {
+  const id = normalizeTaskId(rawId);
+  const t = state.weeklyTasks.find(x => normalizeTaskId(x.id) === id);
   if (!t) return;
   t.dayId = newDayId;
   persistWeeklyTasks();
   renderWeeklyPlannerUI();
+  renderVisualTimetableBoard();
   const dayName = (DAYS_CONFIG.find(d => d.id === newDayId) || {}).name || newDayId;
   toast(`تم نقل المهمة بنجاح إلى: ${dayName}`, 'refresh');
 };
 
-window.launchTaskIntoFocus = function(taskId) {
-  const t = state.weeklyTasks.find(x => x.id === taskId);
+window.launchTaskIntoFocus = function(rawId) {
+  const id = normalizeTaskId(rawId);
+  const t = state.weeklyTasks.find(x => normalizeTaskId(x.id) === id);
   if (!t) return;
   startNewSession(t.subjId, t.text);
   showView('focusView');
   toast(`بدأت جلسة المذاكرة للمهمة: ${t.text.substring(0, 30)}...`, 'flame');
 };
 
-window.deleteWeeklyTask = function(taskId) {
-  state.weeklyTasks = state.weeklyTasks.filter(t => t.id !== taskId);
-  state.completedTaskIds.delete(taskId);
+window.deleteWeeklyTask = function(rawId) {
+  const id = normalizeTaskId(rawId);
+  state.weeklyTasks = state.weeklyTasks.filter(t => normalizeTaskId(t.id) !== id);
+  state.completedTaskIds.delete(id);
+  state.completedTaskIds.delete(String(id));
+  state.completedTaskIds.delete(Number(id));
   persistWeeklyTasks();
   renderWeeklyPlannerUI();
-  toast('تم حذف المهمة من الجدول', 'trash');
+  renderVisualTimetableBoard();
+  toast('تم حذف المهمة من الجدول بنجاح', 'trash');
 };
 
 window.filterTasksByDay = function(dayId) {
@@ -1496,7 +1600,8 @@ window.carryOverUnfinishedTasks = function(targetDayId) {
   const actualTarget = targetDayId === 'today' ? getTodayDayId() : targetDayId;
   let count = 0;
   state.weeklyTasks.forEach(t => {
-    if (!state.completedTaskIds.has(t.id) && t.dayId !== actualTarget && t.dayId !== 'backlog') {
+    const id = normalizeTaskId(t.id);
+    if (!state.completedTaskIds.has(id) && t.dayId !== actualTarget && t.dayId !== 'backlog') {
       t.dayId = actualTarget;
       t.isRolled = true;
       count++;
@@ -1506,6 +1611,7 @@ window.carryOverUnfinishedTasks = function(targetDayId) {
   if (count > 0) {
     persistWeeklyTasks();
     renderWeeklyPlannerUI();
+    renderVisualTimetableBoard();
     const dayName = (DAYS_CONFIG.find(d => d.id === actualTarget) || {}).name || actualTarget;
     toast(`تم ترحيل ${count} مهمة غير مكتملة بنجاح إلى ${dayName}! استعن بالله ⚡`, 'refresh');
   } else {
@@ -1524,6 +1630,7 @@ window.resetTasksProgress = function(mode) {
   }
   persistWeeklyTasks();
   renderWeeklyPlannerUI();
+  renderVisualTimetableBoard();
 };
 
 // --- DYNAMIC VISUAL TIMETABLE BOARD ---
@@ -1683,8 +1790,8 @@ function renderLecturesUI() {
 
       return `
         <div class="lecture-item-card ${isDone ? 'completed' : ''}" data-lec-id="${lec.id}">
-          <div class="lecture-item-left">
-            <input type="checkbox" ${isDone ? 'checked' : ''} onchange="window.toggleLectureDone('${lec.id}')" style="accent-color:var(--accent-primary); width:18px; height:18px; cursor:pointer;" title="تحديد كمنتهية">
+          <div class="lecture-item-left" style="cursor:pointer;" onclick="window.toggleLectureDone('${lec.id}')" title="اضغط للتحديد كمنتهية">
+            <input type="checkbox" ${isDone ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleLectureDone('${lec.id}')" style="accent-color:var(--accent-primary); width:18px; height:18px; cursor:pointer;" title="تحديد كمنتهية">
             <div class="lecture-num-badge" style="border:1px solid ${sub.color}44; color:${sub.color};">
               ${lec.code || 'محاضرة'}
             </div>
@@ -1705,14 +1812,14 @@ function renderLecturesUI() {
           </div>
 
           <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-            <button class="btn btn-sm" onclick="window.launchLectureIntoFocus('${lec.id}')" title="بدء جلسة مذاكرة في غرفة التركيز لهذه المحاضرة" style="font-size:11px; padding:5px 10px; color:var(--accent-primary); border-color:var(--border-active);">
+            <button class="btn btn-sm" onclick="event.stopPropagation(); window.launchLectureIntoFocus('${lec.id}')" title="بدء جلسة مذاكرة في غرفة التركيز لهذه المحاضرة" style="font-size:11px; padding:5px 10px; color:var(--accent-primary); border-color:var(--border-active);">
               🚀 ذاكرها الآن
             </button>
-            <button class="btn btn-sm" onclick="window.addLectureTasksToWeekly('${lec.id}')" title="إدراج مهام المحاضرة في جدول الأسبوع" style="font-size:11px; padding:5px 10px;">
+            <button class="btn btn-sm" onclick="event.stopPropagation(); window.addLectureTasksToWeekly('${lec.id}')" title="إدراج مهام المحاضرة في جدول الأسبوع" style="font-size:11px; padding:5px 10px;">
               📅 أضف للجدول
             </button>
-            ${lec.id.startsWith('cust-') ? `
-              <button class="btn btn-sm btn-icon" onclick="window.deleteLecture('${lec.id}')" title="حذف المحاضرة" style="color:var(--danger);">
+            ${String(lec.id).startsWith('cust-') ? `
+              <button class="btn btn-sm btn-icon" onclick="event.stopPropagation(); window.deleteLecture('${lec.id}')" title="حذف المحاضرة" style="color:var(--danger);">
                 ${getSvgIcon('trash', 14)}
               </button>
             ` : ''}
@@ -1746,8 +1853,12 @@ function renderLecturesUI() {
 }
 
 window.toggleLectureDone = function(lecId) {
-  const lec = state.lectures.find(l => l.id === lecId);
-  if (!lec) return;
+  const cleanId = String(lecId).trim();
+  const lec = state.lectures.find(l => String(l.id).trim() === cleanId);
+  if (!lec) {
+    console.warn('Lecture not found:', lecId);
+    return;
+  }
   lec.isDone = !lec.isDone;
   persistLectures();
   renderLecturesUI();
@@ -1830,6 +1941,7 @@ window.saveNewLecture = function() {
     });
     persistWeeklyTasks();
     renderWeeklyPlannerUI();
+    renderVisualTimetableBoard();
   }
 
   renderLecturesUI();
@@ -1838,14 +1950,16 @@ window.saveNewLecture = function() {
 };
 
 window.deleteLecture = function(lecId) {
-  state.lectures = state.lectures.filter(l => l.id !== lecId);
+  const cleanId = String(lecId).trim();
+  state.lectures = state.lectures.filter(l => String(l.id).trim() !== cleanId);
   persistLectures();
   renderLecturesUI();
   toast('تم حذف المحاضرة من السجل', 'trash');
 };
 
 window.launchLectureIntoFocus = function(lecId) {
-  const lec = state.lectures.find(l => l.id === lecId);
+  const cleanId = String(lecId).trim();
+  const lec = state.lectures.find(l => String(l.id).trim() === cleanId);
   if (!lec) return;
   startNewSession(lec.subjId, `مذاكرة: ${lec.title}`);
   showView('focusView');
@@ -1853,7 +1967,8 @@ window.launchLectureIntoFocus = function(lecId) {
 };
 
 window.addLectureTasksToWeekly = function(lecId) {
-  const lec = state.lectures.find(l => l.id === lecId);
+  const cleanId = String(lecId).trim();
+  const lec = state.lectures.find(l => String(l.id).trim() === cleanId);
   if (!lec) return;
 
   let targetDay = 'sat';
@@ -1873,6 +1988,7 @@ window.addLectureTasksToWeekly = function(lecId) {
 
   persistWeeklyTasks();
   renderWeeklyPlannerUI();
+  renderVisualTimetableBoard();
   const dayName = (DAYS_CONFIG.find(d => d.id === targetDay) || {}).name || targetDay;
   toast(`تمت إضافة مهمة المحاضرة بنجاح إلى جدول يوم ${dayName}! ⚡`, 'check');
 };
@@ -2632,6 +2748,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.weeklyTasks.push(newTask);
       persistWeeklyTasks();
       renderWeeklyPlannerUI();
+      renderVisualTimetableBoard();
       document.getElementById('newWeeklyTaskModal').classList.remove('show');
       toast('تمت إضافة المهمة بنجاح إلى جدول الأسبوع! ⚡', 'check');
     });
