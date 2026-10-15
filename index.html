@@ -246,6 +246,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/><path d="M6 14h6"/></svg>
         محاضرات المنصات والسناتر
       </button>
+      <button class="tab-btn" data-tab="examsView">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        درجات الامتحانات والتقييم
+      </button>
       <button class="tab-btn" data-tab="focusView">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         غرفة التركيز
@@ -448,6 +452,28 @@
         <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px; font-size:12px; color:var(--text-muted);">
           <span>💡 كل عمود يعبر عن ساعات المذاكرة الصافية في ذلك اليوم.</span>
           <span id="chartWeeklyTotalSummary" style="color:var(--accent-primary); font-weight:700;">إجمالي الأسبوع: 0h 00m</span>
+        </div>
+      </div>
+
+      <!-- Quick Exam Tracker Card in Dashboard -->
+      <div class="card" style="margin-top:24px;">
+        <div class="card-header" style="flex-wrap:wrap; gap:12px;">
+          <div class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            أحدث درجات الامتحانات والتقييمات
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="window.openExamModal()">
+              ➕ تسجيل درجة امتحان جديد
+            </button>
+            <button class="btn btn-sm" onclick="showView('examsView')">
+              📊 فتح السجل والتحليلات كاملة
+            </button>
+          </div>
+        </div>
+
+        <div id="dashExamsSummaryContainer">
+          <!-- Populated dynamically with overall avg + latest exams -->
         </div>
       </div>
     </section>
@@ -689,6 +715,148 @@
       </div>
     </section>
 
+    <!-- ================= VIEW: EXAMS & ASSESSMENTS HUB ================= -->
+    <section id="examsView" class="view-panel">
+      <!-- Calm Exams Header Banner -->
+      <div class="weekly-header-banner">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+          <div>
+            <div style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; padding:3px 10px; border-radius:var(--radius-full); background:rgba(86, 194, 166, 0.15); color:var(--accent-primary); margin-bottom:8px;">
+              🎯 نظام متابعة الدرجات والتقييمات التحليلي
+            </div>
+            <h2 style="font-size:22px; font-weight:900; color:var(--text-main); line-height:1.2;">
+              سجل درجات الامتحانات والتقييم والنسب المئوية
+            </h2>
+            <p style="font-size:13px; color:var(--text-muted); margin-top:6px; max-width:680px;">
+              سجل درجاتك في المواد الأربعة (فيزياء، عربي، تاريخ، إنجليزي)، اعرف نسبتك المئوية، تقييمك التلقائي، ومين كان المدرس والامتحان كان على إيه مع إحصائيات دقيقة لكل مادة!
+            </p>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="window.openExamModal()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              ➕ تسجيل درجة امتحان جديد
+            </button>
+            <button class="btn" onclick="window.printExamReport()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              🖨️ طباعة تقرير الدرجات
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Top KPI Stat Summary Cards -->
+        <div class="weekly-stats-bar" style="margin-top:20px;">
+          <div class="weekly-stat-box exam-kpi-box">
+            <div style="font-size:11px; color:var(--text-muted); font-weight:700;">📊 المعدل العام التراكمي</div>
+            <div id="statExamOverallAvg" class="tabular" style="font-size:26px; font-weight:900; color:var(--accent-primary); margin:4px 0;">0%</div>
+            <div id="statExamOverallBadge" style="font-size:11px; font-weight:700; color:var(--text-main);">-</div>
+            <div class="stat-progress-bar">
+              <div id="statExamOverallBar" class="stat-progress-fill" style="width:0%; background:var(--accent-primary);"></div>
+            </div>
+          </div>
+
+          <div class="weekly-stat-box exam-kpi-box">
+            <div style="font-size:11px; color:var(--text-muted); font-weight:700;">📝 إجمالي الامتحانات</div>
+            <div id="statExamTotalCount" class="tabular" style="font-size:26px; font-weight:900; color:var(--accent-secondary); margin:4px 0;">0</div>
+            <div id="statExamTotalSubtext" style="font-size:11px; color:var(--text-muted);">في الـ 4 مواد المعتمدة</div>
+            <div class="stat-progress-bar">
+              <div class="stat-progress-fill" style="width:100%; background:var(--accent-secondary);"></div>
+            </div>
+          </div>
+
+          <div class="weekly-stat-box exam-kpi-box">
+            <div style="font-size:11px; color:var(--text-muted); font-weight:700;">🏆 أعلى درجة ونسبة</div>
+            <div id="statExamHighestScore" class="tabular" style="font-size:24px; font-weight:900; color:#10b981; margin:4px 0;">-</div>
+            <div id="statExamHighestSubject" style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">-</div>
+            <div class="stat-progress-bar">
+              <div class="stat-progress-fill" style="width:100%; background:#10b981;"></div>
+            </div>
+          </div>
+
+          <div class="weekly-stat-box exam-kpi-box">
+            <div style="font-size:11px; color:var(--text-muted); font-weight:700;">⭐ المادة الأقوى أداءً</div>
+            <div id="statExamBestSubjectName" class="tabular" style="font-size:20px; font-weight:900; color:var(--warning); margin:4px 0;">-</div>
+            <div id="statExamBestSubjectAvg" style="font-size:11px; color:var(--text-muted);">-</div>
+            <div class="stat-progress-bar">
+              <div id="statExamBestSubjectBar" class="stat-progress-fill" style="width:0%; background:var(--warning);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 Subjects Cards Breakdown (Strictly 4 Subjects) -->
+      <div style="margin: 24px 0 16px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <div>
+            <h3 style="font-size:17px; font-weight:800; color:var(--text-main);">تحليل وتقييم المواد الأربعة (حصرياً)</h3>
+            <p style="font-size:12px; color:var(--text-muted);">متوسط الدرجات، أعلى درجة، أحدث امتحان، والتقييم في كل مادة من موادك الأربعة</p>
+          </div>
+        </div>
+
+        <div class="exam-subjects-grid" id="examSubjectsCardsGrid">
+          <!-- Populated dynamically with Physics, Arabic, History, English cards -->
+        </div>
+      </div>
+
+      <!-- Visual Performance & Score Progression Chart -->
+      <div class="chart-container-card" style="margin-bottom:24px;">
+        <div class="chart-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <h3 style="font-size:15px; font-weight:800; color:var(--text-main);">مخطط تتبع تطور ونسب درجات الامتحانات</h3>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted);">
+            تتبع أداءك في كل اختبار خضته ونسبتك المئوية
+          </div>
+        </div>
+
+        <div class="exam-trend-chart-wrap" id="examTrendChartContainer">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px; font-size:12px; color:var(--text-muted); flex-wrap:wrap; gap:8px;">
+          <span>💡 انقر على أي عمود لمعاينة وتعديل تفاصيل الامتحان مباشرة.</span>
+          <span style="font-size:11px; color:var(--text-muted);">التقييم الذكي يحسب أداءك تلقائياً بناءً على النسبة المئوية.</span>
+        </div>
+      </div>
+
+      <!-- Exams Toolbar (Filters, Search, Sorting) -->
+      <div class="tasks-control-bar" style="margin-bottom:18px;">
+        <div class="day-filter-pills" id="examSubjFilterPills">
+          <button class="pill-btn active" data-exam-subj="all" onclick="window.filterExamsBySubject('all', this)">الكل (4 مواد)</button>
+          <button class="pill-btn" data-exam-subj="physics" onclick="window.filterExamsBySubject('physics', this)">⚛️ فيزياء</button>
+          <button class="pill-btn" data-exam-subj="arabic" onclick="window.filterExamsBySubject('arabic', this)">📖 لغة عربية</button>
+          <button class="pill-btn" data-exam-subj="history" onclick="window.filterExamsBySubject('history', this)">🏛️ تاريخ</button>
+          <button class="pill-btn" data-exam-subj="english" onclick="window.filterExamsBySubject('english', this)">🌐 لغة إنجليزية</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <input type="text" id="examSearchInput" class="input-field" placeholder="🔍 ابحث بالموضوع أو المدرس..." style="width:200px; padding:6px 12px; font-size:12px;" oninput="window.handleExamSearch(this.value)" />
+          
+          <select id="examRatingFilterSelect" class="btn btn-sm" style="font-size:12px;" onchange="window.handleExamRatingFilter(this.value)">
+            <option value="all">كل التقييمات</option>
+            <option value="excellent_high">🏆 ممتاز مرتفع (95%+)</option>
+            <option value="excellent">🌟 ممتاز (85% - 94%)</option>
+            <option value="very_good">👏 جيد جداً (75% - 84%)</option>
+            <option value="good">👍 جيد (65% - 74%)</option>
+            <option value="needs_work">⚠️ يحتاج تحسين (&lt;65%)</option>
+          </select>
+
+          <select id="examSortSelect" class="btn btn-sm" style="font-size:12px;" onchange="window.handleExamSort(this.value)">
+            <option value="newest">📅 الأحدث تاريخاً</option>
+            <option value="oldest">📅 الأقدم أولاً</option>
+            <option value="highest_pct">🔝 أعلى نسبة مئوية</option>
+            <option value="lowest_pct">📉 أقل نسبة مئوية</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Exam Cards Container -->
+      <div id="examsListContainer" class="exams-list-grid">
+        <!-- Populated dynamically -->
+      </div>
+    </section>
+
     <!-- ================= VIEW 3: FOCUS ROOM ================= -->
     <section id="focusView" class="view-panel">
       <div class="card focus-view">
@@ -900,16 +1068,12 @@
 
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
         <div>
-          <label style="font-size:12px; color:var(--text-muted);">المادة الدراسية:</label>
+          <label style="font-size:12px; color:var(--text-muted);">المادة الدراسية (4 مواد فقط):</label>
           <select id="newTaskSubjSelect" class="input-field">
-            <option value="physics">فيزياء</option>
-            <option value="arabic">لغة عربية</option>
-            <option value="english">لغة إنجليزية</option>
-            <option value="history">تاريخ</option>
-            <option value="math">رياضيات</option>
-            <option value="chemistry">كيمياء</option>
-            <option value="biology">أحياء</option>
-            <option value="general">عام / أخرى</option>
+            <option value="physics">فيزياء ⚛️</option>
+            <option value="arabic">لغة عربية 📖</option>
+            <option value="history">تاريخ 🏛️</option>
+            <option value="english">لغة إنجليزية 🌐</option>
           </select>
         </div>
 
@@ -1012,13 +1176,12 @@
 
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
         <div>
-          <label style="font-size:12px; color:var(--text-muted);">المادة الدراسية:</label>
+          <label style="font-size:12px; color:var(--text-muted);">المادة الدراسية (4 مواد فقط):</label>
           <select id="newLectureSubjSelect" class="input-field">
-            <option value="physics">فيزياء منصة</option>
-            <option value="arabic">لغة عربية</option>
-            <option value="history">تاريخ</option>
-            <option value="english">لغة إنجليزية</option>
-            <option value="other">مادة أخرى</option>
+            <option value="physics">فيزياء منصة ⚛️</option>
+            <option value="arabic">لغة عربية 📖</option>
+            <option value="history">تاريخ 🏛️</option>
+            <option value="english">لغة إنجليزية 🌐</option>
           </select>
         </div>
 
@@ -1067,6 +1230,115 @@
       <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
         <button class="btn modal-close">إلغاء</button>
         <button id="saveNewLectureBtn" class="btn btn-primary" onclick="window.saveNewLecture()">حفظ المحاضرة في المنصة ⚡</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New / Edit Exam Modal -->
+  <div id="examModal" class="modal-overlay">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          <span id="examModalTitleText">تسجيل درجة امتحان جديد</span>
+        </div>
+        <button class="btn btn-sm modal-close" onclick="window.closeExamModal()" style="padding:4px 8px;">✕</button>
+      </div>
+
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
+        أدخل تفاصيل الامتحان، درجتك، المدرس، وموضوع الاختبار لحساب النسبة المئوية والتقييم فورياً:
+      </p>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+        <div>
+          <label style="font-size:12px; color:var(--text-muted);">المادة الدراسية (4 مواد فقط):</label>
+          <select id="examSubjInput" class="input-field" onchange="window.updateTeacherSuggestions()">
+            <option value="physics">فيزياء ⚛️</option>
+            <option value="arabic">لغة عربية 📖</option>
+            <option value="history">تاريخ 🏛️</option>
+            <option value="english">لغة إنجليزية 🌐</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size:12px; color:var(--text-muted);">عند مين؟ (المدرس / السنتر / المنصة):</label>
+          <input type="text" id="examTeacherInput" class="input-field" list="examTeacherDatalist" placeholder="مثال: أ. محمد عبد المعبود..." />
+          <datalist id="examTeacherDatalist">
+            <option value="أ. محمد عبد المعبود (فيزياء منصة)">
+            <option value="أ. محمد صلاح (عربي منصة/سنتر)">
+            <option value="أستاذ التاريخ (سنتر 1:00 ظهراً)">
+            <option value="أستاذ الإنجليزي (7:00 مساءً)">
+          </datalist>
+        </div>
+      </div>
+
+      <label style="font-size:12px; color:var(--text-muted); margin-top:8px;">الامتحان كان على إيه؟ (الموضوع / الفصل / الدرس):</label>
+      <input type="text" id="examTopicInput" class="input-field" placeholder="مثال: الفصل الأول - التيار وقانون أوم، أو النحو: كان وأخواتها...">
+
+      <!-- Score Inputs: جبت كام من كام -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:4px;">
+        <div>
+          <label style="font-size:12px; font-weight:700; color:var(--accent-primary);">🎯 جبت كام؟ (درجتك المحققة):</label>
+          <input type="number" step="0.25" min="0" id="examScoreInput" class="input-field" placeholder="مثال: 48.5" style="font-size:16px; font-weight:800; color:var(--text-main);" />
+        </div>
+
+        <div>
+          <label style="font-size:12px; font-weight:700; color:var(--text-muted);">🏁 من كام؟ (الدرجة النهائية):</label>
+          <input type="number" step="0.5" min="1" id="examTotalInput" class="input-field" placeholder="مثال: 50" style="font-size:16px; font-weight:800; color:var(--text-main);" />
+        </div>
+      </div>
+
+      <!-- Real-time Automatic Calculation Box -->
+      <div id="examLiveCalcBox" class="exam-live-calc-box">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:11px; color:var(--text-muted);">النسبة المئوية المحسوبة:</div>
+            <div id="liveCalcPercentage" class="tabular" style="font-size:24px; font-weight:900; color:var(--accent-primary);">--%</div>
+          </div>
+          <div style="text-align:left;">
+            <div style="font-size:11px; color:var(--text-muted);">التقييم التقديري:</div>
+            <div id="liveCalcRatingBadge" style="font-size:13px; font-weight:800; padding:4px 10px; border-radius:var(--radius-full); background:var(--bg-elevated); color:var(--text-main); display:inline-block;">في انتظار الدرجة</div>
+          </div>
+        </div>
+        <div class="stat-progress-bar" style="margin-top:8px;">
+          <div id="liveCalcProgressBar" class="stat-progress-fill" style="width:0%; background:var(--accent-primary);"></div>
+        </div>
+        <div id="liveCalcDifferenceText" style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+          اكتب درجتك والدرجة النهائية وسيتم احتساب النسبة والمستوى فورياً
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:8px;">
+        <div>
+          <label style="font-size:12px; color:var(--text-muted);">نوع الامتحان:</label>
+          <select id="examTypeInput" class="input-field">
+            <option value="كويز حصة أسبوعي">كويز حصة أسبوعي</option>
+            <option value="كويز منصة">كويز منصة</option>
+            <option value="امتحان شهر">امتحان شهر دوري</option>
+            <option value="امتحان شامل">امتحان شامل على فصل/وحدة</option>
+            <option value="امتحان تجريبي">اختبار تجريبي</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size:12px; color:var(--text-muted);">تاريخ الامتحان:</label>
+          <input type="date" id="examDateInput" class="input-field" />
+        </div>
+      </div>
+
+      <label style="font-size:12px; color:var(--text-muted); margin-top:8px;">أخطائي أو ملاحظات للمراجعة (اختياري):</label>
+      <textarea id="examNotesInput" class="input-field" rows="2" style="resize:vertical;" placeholder="سؤال كيرشوف محتاج إعادة فهم، نسيت إعراب كذا..."></textarea>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+        <button id="deleteExamModalBtn" type="button" class="btn" style="color:var(--danger); display:none;" onclick="window.confirmDeleteExamFromModal()">
+          🗑️ حذف الامتحان
+        </button>
+        <div style="display:flex; gap:10px; margin-right:auto;">
+          <button type="button" class="btn modal-close" onclick="window.closeExamModal()">إلغاء</button>
+          <button type="button" id="saveExamBtn" class="btn btn-primary" onclick="window.saveExamRecord()">
+            💾 حفظ درجة الامتحان
+          </button>
+        </div>
       </div>
     </div>
   </div>

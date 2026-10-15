@@ -392,7 +392,8 @@ const DEFAULT_LECTURES = [
 const STORAGE_KEYS = {
   TASKS: 'kareem_weekly_tasks_v5',
   COMPLETED: 'kareem_completed_task_ids_v5',
-  LECTURES: 'kareem_lectures_v5'
+  LECTURES: 'kareem_lectures_v5',
+  EXAMS: 'kareem_exams_v1'
 };
 
 function normalizeTaskId(id) {
@@ -503,9 +504,89 @@ function persistLectures() {
   }
 }
 
+// --- STRICT 4 SUBJECTS ENFORCEMENT & EXAM DATA MANAGEMENT ---
+const FOUR_SUBJECT_IDS = ['physics', 'arabic', 'history', 'english'];
+
+function loadSanitizedSubjects() {
+  const saved = JSON.parse(localStorage.getItem('kareem_subjects') || 'null');
+  if (Array.isArray(saved) && saved.length > 0) {
+    const filtered = saved.filter(s => FOUR_SUBJECT_IDS.includes(s.id));
+    if (filtered.length === 4) return filtered;
+  }
+  return DEFAULT_SUBJECTS;
+}
+
+const DEFAULT_EXAMS = [
+  {
+    id: 'exam_seed_1',
+    subjId: 'physics',
+    teacher: 'أ. محمد عبد المعبود (فيزياء منصة)',
+    topic: 'الفصل الأول: التيار الكهربي وقانون أوم وقانونا كيرشوف',
+    score: 48,
+    total: 50,
+    examType: 'امتحان شامل',
+    date: '2026-10-11',
+    notes: 'أداء ممتاز جداً! راجع فقط حساب الإشارات في مسارات كيرشوف المغلقة'
+  },
+  {
+    id: 'exam_seed_2',
+    subjId: 'arabic',
+    teacher: 'أ. محمد صلاح (عربي منصة/سنتر)',
+    topic: 'الوحدة الأولى نحو (همزة الوصل والقطع) + البلاغة المحسنات البديعية',
+    score: 57,
+    total: 60,
+    examType: 'امتحان شهر',
+    date: '2026-10-09',
+    notes: 'مراجعة إعراب المستثنى بغير وسوى وإعراب ما بعد خلا وعدا وحاشا'
+  },
+  {
+    id: 'exam_seed_3',
+    subjId: 'history',
+    teacher: 'أستاذ التاريخ (سنتر 1:00 ظهراً)',
+    topic: 'الفصل الأول: أحوال المجتمع المصري قبل الحملة وثورة القاهرة الأولى',
+    score: 47,
+    total: 50,
+    examType: 'كويز حصة أسبوعي',
+    date: '2026-10-06',
+    notes: 'إجابات نموذجية في الربط بين موقعة أبي قير وتدهور التجارة'
+  },
+  {
+    id: 'exam_seed_4',
+    subjId: 'english',
+    teacher: 'أستاذ الإنجليزي (7:00 مساءً)',
+    topic: 'Unit 1 & Unit 2: Past Simple, Past Continuous & Vocabulary Check',
+    score: 46,
+    total: 50,
+    examType: 'كويز حصة أسبوعي',
+    date: '2026-10-03',
+    notes: 'مراجعة حروف الجر الخاصة بالكلمات والمترادفات والمتلازمات اللفظية'
+  }
+];
+
+function loadSavedExams() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.EXAMS);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch(e) {
+    console.error('Error loading saved exams:', e);
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_EXAMS));
+}
+
+function persistExams() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify(state.exams));
+  } catch(e) {
+    console.error('Error persisting exams:', e);
+  }
+}
+
 // App State
 const state = {
-  subjects: JSON.parse(localStorage.getItem('kareem_subjects') || 'null') || DEFAULT_SUBJECTS,
+  subjects: loadSanitizedSubjects(),
   sessions: loadInitialSessions(),
   lessonExemptions: JSON.parse(localStorage.getItem('kareem_exemptions_today') || '[]'),
   weeklyTasks: loadSavedWeeklyTasks(),
@@ -523,7 +604,14 @@ const state = {
   currentQuoteIdx: 0,
   quoteTimer: null,
   rainAudio: null,
-  isRainPlaying: false
+  isRainPlaying: false,
+  // Exams & Grades State
+  exams: loadSavedExams(),
+  activeExamSubjectFilter: 'all',
+  activeExamRatingFilter: 'all',
+  examSearchQuery: '',
+  examSortBy: 'newest',
+  editingExamId: null
 };
 
 // --- SESSION STORAGE & REFRESH RECOVERY ---
@@ -1237,6 +1325,7 @@ function renderUI() {
   renderWeeklyPlannerUI();
   renderVisualTimetableBoard();
   renderLecturesUI();
+  renderExamsTrackerUI();
 }
 
 function renderDashboardMetrics() {
@@ -2566,6 +2655,765 @@ function toast(msg, iconName = 'sparkles') {
   setTimeout(() => el.classList.remove('show'), 3200);
 }
 
+// ==========================================================
+// EXAM GRADES & ANALYTICS MODULE (درجات الامتحانات والتقييم)
+// ==========================================================
+
+function getExamSubjectInfo(subjId) {
+  const map = {
+    physics: { id: 'physics', name: 'فيزياء', color: '#818cf8', icon: 'atom', badge: '⚛️ فيزياء' },
+    arabic: { id: 'arabic', name: 'لغة عربية', color: '#f59e0b', icon: 'feather', badge: '📖 لغة عربية' },
+    history: { id: 'history', name: 'تاريخ', color: '#10b981', icon: 'book-open', badge: '🏛️ تاريخ' },
+    english: { id: 'english', name: 'لغة إنجليزية', color: '#38bdf8', icon: 'globe', badge: '🌐 لغة إنجليزية' }
+  };
+  return map[subjId] || map.physics;
+}
+
+function getExamPercentage(score, total) {
+  const s = parseFloat(score);
+  const t = parseFloat(total);
+  if (isNaN(s) || isNaN(t) || t <= 0) return 0;
+  return Math.round(((s / t) * 100) * 10) / 10;
+}
+
+function getExamRating(pct) {
+  if (pct >= 95) {
+    return { label: '🏆 ممتاز مرتفع', class: 'rating-excellent-high', color: '#10b981', grade: 'A+' };
+  } else if (pct >= 85) {
+    return { label: '🌟 ممتاز', class: 'rating-excellent', color: '#34d399', grade: 'A' };
+  } else if (pct >= 75) {
+    return { label: '👏 جيد جداً', class: 'rating-very-good', color: '#38bdf8', grade: 'B+' };
+  } else if (pct >= 65) {
+    return { label: '👍 جيد', class: 'rating-good', color: '#f59e0b', grade: 'B' };
+  } else if (pct >= 50) {
+    return { label: '⚠️ مقبول', class: 'rating-fair', color: '#fb923c', grade: 'C' };
+  } else {
+    return { label: '🚨 دون المستوى', class: 'rating-needs-work', color: '#ef5350', grade: 'F' };
+  }
+}
+
+function calculateExamStats() {
+  const exams = state.exams || [];
+  const count = exams.length;
+
+  const subStats = {
+    physics: { count: 0, pctSum: 0, highest: null, lowest: null, latest: null },
+    arabic: { count: 0, pctSum: 0, highest: null, lowest: null, latest: null },
+    history: { count: 0, pctSum: 0, highest: null, lowest: null, latest: null },
+    english: { count: 0, pctSum: 0, highest: null, lowest: null, latest: null }
+  };
+
+  if (count === 0) {
+    return {
+      overallAvg: 0,
+      totalCount: 0,
+      highestExam: null,
+      lowestExam: null,
+      bestSubject: null,
+      subjectBreakdown: subStats
+    };
+  }
+
+  let totalPctSum = 0;
+  let highestExam = exams[0];
+  let lowestExam = exams[0];
+
+  exams.forEach(ex => {
+    const pct = getExamPercentage(ex.score, ex.total);
+    totalPctSum += pct;
+
+    const highestPct = getExamPercentage(highestExam.score, highestExam.total);
+    const lowestPct = getExamPercentage(lowestExam.score, lowestExam.total);
+
+    if (pct > highestPct) highestExam = ex;
+    if (pct < lowestPct) lowestExam = ex;
+
+    const s = subStats[ex.subjId] || subStats.physics;
+    s.count++;
+    s.pctSum += pct;
+
+    const curHighestPct = s.highest ? getExamPercentage(s.highest.score, s.highest.total) : -1;
+    if (pct > curHighestPct) s.highest = ex;
+
+    const curLowestPct = s.lowest ? getExamPercentage(s.lowest.score, s.lowest.total) : 999;
+    if (pct < curLowestPct) s.lowest = ex;
+
+    if (!s.latest || new Date(ex.date) >= new Date(s.latest.date)) {
+      s.latest = ex;
+    }
+  });
+
+  const overallAvg = Math.round((totalPctSum / count) * 10) / 10;
+
+  // Best subject
+  let bestSubjId = 'physics';
+  let bestSubjAvg = -1;
+  FOUR_SUBJECT_IDS.forEach(id => {
+    const s = subStats[id];
+    if (s && s.count > 0) {
+      const avg = s.pctSum / s.count;
+      if (avg > bestSubjAvg) {
+        bestSubjAvg = avg;
+        bestSubjId = id;
+      }
+    }
+  });
+
+  return {
+    overallAvg,
+    totalCount: count,
+    highestExam,
+    lowestExam,
+    bestSubject: bestSubjAvg >= 0 ? { id: bestSubjId, avg: Math.round(bestSubjAvg * 10) / 10 } : null,
+    subjectBreakdown: subStats
+  };
+}
+
+function renderExamsTrackerUI() {
+  const exams = state.exams || [];
+  const stats = calculateExamStats();
+
+  // 1. Top KPI Summary in Exams View
+  const overallAvgElem = document.getElementById('statExamOverallAvg');
+  const overallBadgeElem = document.getElementById('statExamOverallBadge');
+  const overallBarElem = document.getElementById('statExamOverallBar');
+  if (overallAvgElem) {
+    overallAvgElem.textContent = `${stats.overallAvg}%`;
+    const rating = getExamRating(stats.overallAvg);
+    if (overallBadgeElem) {
+      overallBadgeElem.textContent = rating.label;
+      overallBadgeElem.style.color = rating.color;
+    }
+    if (overallBarElem) {
+      overallBarElem.style.width = `${Math.min(100, stats.overallAvg)}%`;
+      overallBarElem.style.background = rating.color;
+    }
+  }
+
+  const totalCountElem = document.getElementById('statExamTotalCount');
+  const totalSubtextElem = document.getElementById('statExamTotalSubtext');
+  if (totalCountElem) {
+    totalCountElem.textContent = stats.totalCount;
+    if (totalSubtextElem) {
+      totalSubtextElem.textContent = stats.totalCount === 1 ? 'امتحان واحد مسجل' : `${stats.totalCount} امتحانات في الـ 4 مواد`;
+    }
+  }
+
+  const highestScoreElem = document.getElementById('statExamHighestScore');
+  const highestSubjElem = document.getElementById('statExamHighestSubject');
+  if (highestScoreElem) {
+    if (stats.highestExam) {
+      const pct = getExamPercentage(stats.highestExam.score, stats.highestExam.total);
+      highestScoreElem.textContent = `${stats.highestExam.score}/${stats.highestExam.total} (${pct}%)`;
+      const subInfo = getExamSubjectInfo(stats.highestExam.subjId);
+      if (highestSubjElem) {
+        highestSubjElem.textContent = `${subInfo.name} - ${stats.highestExam.teacher || ''}`;
+      }
+    } else {
+      highestScoreElem.textContent = '-';
+      if (highestSubjElem) highestSubjElem.textContent = 'لا توجد امتحانات بعد';
+    }
+  }
+
+  const bestSubjNameElem = document.getElementById('statExamBestSubjectName');
+  const bestSubjAvgElem = document.getElementById('statExamBestSubjectAvg');
+  const bestSubjBarElem = document.getElementById('statExamBestSubjectBar');
+  if (bestSubjNameElem) {
+    if (stats.bestSubject) {
+      const subInfo = getExamSubjectInfo(stats.bestSubject.id);
+      bestSubjNameElem.textContent = subInfo.name;
+      bestSubjNameElem.style.color = subInfo.color;
+      if (bestSubjAvgElem) bestSubjAvgElem.textContent = `متوسط درجاتها: ${stats.bestSubject.avg}%`;
+      if (bestSubjBarElem) {
+        bestSubjBarElem.style.width = `${Math.min(100, stats.bestSubject.avg)}%`;
+        bestSubjBarElem.style.background = subInfo.color;
+      }
+    } else {
+      bestSubjNameElem.textContent = '-';
+      if (bestSubjAvgElem) bestSubjAvgElem.textContent = 'في انتظار أول امتحان';
+      if (bestSubjBarElem) bestSubjBarElem.style.width = '0%';
+    }
+  }
+
+  // 2. 4 Subjects Breakdown Cards Grid (Strictly 4 Subjects)
+  const subjectsGrid = document.getElementById('examSubjectsCardsGrid');
+  if (subjectsGrid) {
+    subjectsGrid.innerHTML = FOUR_SUBJECT_IDS.map(subjId => {
+      const sub = getExamSubjectInfo(subjId);
+      const subStat = stats.subjectBreakdown[subjId] || { count: 0, pctSum: 0, highest: null, latest: null };
+      const avg = subStat.count > 0 ? Math.round((subStat.pctSum / subStat.count) * 10) / 10 : 0;
+      const rating = getExamRating(avg);
+
+      const highestDisplay = subStat.highest
+        ? `${subStat.highest.score} من ${subStat.highest.total} (${getExamPercentage(subStat.highest.score, subStat.highest.total)}%)`
+        : 'لم يُسجل بعد';
+
+      const latestDisplay = subStat.latest
+        ? `${subStat.latest.score}/${subStat.latest.total} (${subStat.latest.date})`
+        : 'لا يوجد';
+
+      return `
+        <div class="exam-subject-card" style="--card-color:${sub.color};">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:32px; height:32px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.06); color:${sub.color}; display:flex; align-items:center; justify-content:center;">
+                  ${getSvgIcon(sub.icon, 18)}
+                </div>
+                <div>
+                  <div style="font-size:15px; font-weight:800; color:var(--text-main);">${sub.name}</div>
+                  <div style="font-size:11px; color:var(--text-muted);">${subStat.count} امتحانات مسجلة</div>
+                </div>
+              </div>
+              <span class="rating-badge ${rating.class}" style="font-size:10px;">${rating.grade}</span>
+            </div>
+
+            <div style="margin: 12px 0;">
+              <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                <span style="font-size:11px; color:var(--text-muted);">المتوسط العام:</span>
+                <span class="tabular" style="font-size:22px; font-weight:900; color:${sub.color};">${avg}%</span>
+              </div>
+              <div class="stat-progress-bar" style="margin-top:4px;">
+                <div class="stat-progress-fill" style="width:${Math.min(100, avg)}%; background:${sub.color};"></div>
+              </div>
+              <div style="font-size:11px; color:${rating.color}; font-weight:700; margin-top:4px;">
+                ${subStat.count > 0 ? rating.label : 'في انتظار أول امتحان'}
+              </div>
+            </div>
+
+            <div style="font-size:11px; color:var(--text-muted); display:flex; flex-direction:column; gap:4px; border-top:1px dashed var(--border-subtle); padding-top:8px;">
+              <div style="display:flex; justify-content:space-between;">
+                <span>🔝 أعلى نتيجة:</span>
+                <strong style="color:var(--text-main);" class="tabular">${highestDisplay}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span>🕒 أحدث اختبار:</span>
+                <strong style="color:var(--text-main);" class="tabular">${latestDisplay}</strong>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-sm" style="width:100%; justify-content:center; gap:6px; font-size:11px; margin-top:6px;" onclick="window.openExamModal(null, '${sub.id}')">
+            <span>➕ تسجيل امتحان ${sub.name}</span>
+          </button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // 3. Visual Timeline / Performance Chart
+  renderExamTrendChart();
+
+  // 4. Exams List with Filtering & Sorting
+  renderExamsList();
+
+  // 5. Dashboard Quick Card
+  renderDashboardExamsSummary(stats);
+}
+
+function renderExamTrendChart() {
+  const container = document.getElementById('examTrendChartContainer');
+  if (!container) return;
+
+  const exams = [...state.exams].sort((a, b) => new Date(a.date) - new Date(b.date));
+  if (exams.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:30px 10px; color:var(--text-muted); width:100%;">
+        <div style="font-size:28px; margin-bottom:6px;">📈</div>
+        <div style="font-size:13px; font-weight:700;">لا توجد درجات كافية لرسم المنحنى البياني بعد</div>
+        <div style="font-size:11px; margin-top:4px;">اضغط على "تسجيل درجة امتحان جديد" وسيبدأ المخطط بالرسم تلقائياً!</div>
+      </div>
+    `;
+    return;
+  }
+
+  // Take the most recent 14 exams for the timeline chart
+  const recentExams = exams.slice(-14);
+
+  container.innerHTML = recentExams.map(ex => {
+    const pct = getExamPercentage(ex.score, ex.total);
+    const sub = getExamSubjectInfo(ex.subjId);
+    const rating = getExamRating(pct);
+    const heightPx = Math.max(12, Math.round((pct / 100) * 110));
+
+    return `
+      <div class="trend-col" onclick="window.openExamModal('${ex.id}')" title="${sub.name}: ${ex.score}/${ex.total} (${pct}%)\nالمدرس: ${ex.teacher || 'غير محدد'}\nالموضوع: ${ex.topic}">
+        <span class="trend-pct-label" style="color:${rating.color};">${pct}%</span>
+        <div class="trend-bar-track">
+          <div class="trend-bar-fill" style="height:${heightPx}px; background:${sub.color}; --bar-glow:${sub.color}66;"></div>
+        </div>
+        <span class="trend-info-label" style="color:${sub.color}; font-weight:700;">${sub.name}</span>
+        <span class="trend-info-label" style="font-size:9px;">${ex.date ? ex.date.slice(5) : ''}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderExamsList() {
+  const container = document.getElementById('examsListContainer');
+  if (!container) return;
+
+  let list = [...(state.exams || [])];
+
+  // Subject filter
+  if (state.activeExamSubjectFilter && state.activeExamSubjectFilter !== 'all') {
+    list = list.filter(ex => ex.subjId === state.activeExamSubjectFilter);
+  }
+
+  // Rating filter
+  if (state.activeExamRatingFilter && state.activeExamRatingFilter !== 'all') {
+    list = list.filter(ex => {
+      const pct = getExamPercentage(ex.score, ex.total);
+      if (state.activeExamRatingFilter === 'excellent_high') return pct >= 95;
+      if (state.activeExamRatingFilter === 'excellent') return pct >= 85 && pct < 95;
+      if (state.activeExamRatingFilter === 'very_good') return pct >= 75 && pct < 85;
+      if (state.activeExamRatingFilter === 'good') return pct >= 65 && pct < 75;
+      if (state.activeExamRatingFilter === 'needs_work') return pct < 65;
+      return true;
+    });
+  }
+
+  // Search filter (topic or teacher)
+  if (state.examSearchQuery) {
+    const q = state.examSearchQuery.toLowerCase();
+    list = list.filter(ex =>
+      (ex.topic && ex.topic.toLowerCase().includes(q)) ||
+      (ex.teacher && ex.teacher.toLowerCase().includes(q)) ||
+      (ex.notes && ex.notes.toLowerCase().includes(q))
+    );
+  }
+
+  // Sorting
+  list.sort((a, b) => {
+    if (state.examSortBy === 'oldest') {
+      return new Date(a.date) - new Date(b.date);
+    } else if (state.examSortBy === 'highest_pct') {
+      return getExamPercentage(b.score, b.total) - getExamPercentage(a.score, a.total);
+    } else if (state.examSortBy === 'lowest_pct') {
+      return getExamPercentage(a.score, a.total) - getExamPercentage(b.score, b.total);
+    } else {
+      // newest
+      return new Date(b.date) - new Date(a.date);
+    }
+  });
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1/-1; text-align:center; padding:48px 16px; background:var(--bg-surface); border-radius:var(--radius-md); border:1px dashed var(--border-subtle);">
+        <div style="font-size:36px; margin-bottom:8px;">🔍</div>
+        <div style="font-size:16px; font-weight:800; color:var(--text-main);">لم يتم العثور على امتحانات مطابقة</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">جرّب تغيير خيارات البحث أو تصفية المواد، أو أضف امتحان جديد الآن!</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:16px;" onclick="window.openExamModal()">
+          ➕ إضافة امتحان جديد
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list.map(ex => {
+    const pct = getExamPercentage(ex.score, ex.total);
+    const sub = getExamSubjectInfo(ex.subjId);
+    const rating = getExamRating(pct);
+    const lostPoints = Math.round((ex.total - ex.score) * 10) / 10;
+    const diffText = lostPoints <= 0 
+      ? '🏆 الدرجة النهائية الكاملة بدون أي أخطاء!' 
+      : `فقدت: ${lostPoints} درجة فقط من أصل ${ex.total}`;
+
+    return `
+      <div class="exam-record-card" style="border-right: 4px solid ${sub.color};">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+              <span style="font-size:11px; font-weight:800; padding:3px 9px; border-radius:var(--radius-full); background:${sub.color}22; color:${sub.color};">
+                ${sub.name}
+              </span>
+              <span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:var(--radius-full); background:var(--bg-elevated); color:var(--text-muted);">
+                ${ex.examType || 'امتحان'}
+              </span>
+              <span style="font-size:11px; color:var(--text-muted); font-family:var(--font-nums);">
+                ${ex.date || ''}
+              </span>
+            </div>
+
+            <div style="font-size:15px; font-weight:800; color:var(--text-main); line-height:1.4;">
+              ${ex.topic || 'اختبار تقييمي'}
+            </div>
+
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); margin-top:4px;">
+              <span>👨‍🏫 عند:</span>
+              <strong style="color:var(--text-main);">${ex.teacher || 'المدرس/السنتر'}</strong>
+            </div>
+          </div>
+
+          <span class="rating-badge ${rating.class}" style="white-space:nowrap;">
+            ${rating.label}
+          </span>
+        </div>
+
+        <!-- Score Badge Display -->
+        <div class="exam-score-badge-wrap">
+          <div>
+            <div style="font-size:11px; color:var(--text-muted);">الدرجة المحققة:</div>
+            <div style="font-size:22px; font-weight:900; color:var(--text-main);">
+              <span class="tabular" style="color:${sub.color}; font-size:26px;">${ex.score}</span>
+              <span style="font-size:14px; color:var(--text-muted);"> / ${ex.total}</span>
+            </div>
+          </div>
+
+          <div style="text-align:left;">
+            <div style="font-size:11px; color:var(--text-muted);">النسبة المئوية:</div>
+            <div class="tabular" style="font-size:26px; font-weight:900; color:${rating.color};">
+              ${pct}%
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--text-muted);">
+          <span>${diffText}</span>
+          <span style="font-weight:700; color:${rating.color};">${rating.grade}</span>
+        </div>
+
+        ${ex.notes ? `
+          <div style="font-size:11px; color:var(--text-muted); background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:var(--radius-sm); border:1px dashed var(--border-subtle); line-height:1.5;">
+            <strong style="color:var(--warning);">📌 نقاط للمراجعة:</strong> ${ex.notes}
+          </div>
+        ` : ''}
+
+        <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--border-subtle); padding-top:10px; margin-top:2px;">
+          <button class="btn btn-sm" style="font-size:11px; padding:4px 10px;" onclick="window.openExamModal('${ex.id}')">
+            ✏️ تعديل
+          </button>
+          <button class="btn btn-sm" style="font-size:11px; padding:4px 10px; color:var(--danger);" onclick="window.deleteExamRecord('${ex.id}')">
+            🗑️ حذف
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderDashboardExamsSummary(stats) {
+  const container = document.getElementById('dashExamsSummaryContainer');
+  if (!container) return;
+
+  const exams = [...(state.exams || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const latest2 = exams.slice(0, 2);
+  const rating = getExamRating(stats.overallAvg);
+
+  container.innerHTML = `
+    <div style="display:grid; grid-template-columns: 240px 1fr; gap:20px; align-items:center;">
+      <div style="background:var(--bg-elevated); padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-subtle); text-align:center;">
+        <div style="font-size:11px; color:var(--text-muted); font-weight:700;">المعدل العام للامتحانات</div>
+        <div class="tabular" style="font-size:32px; font-weight:900; color:var(--accent-primary); margin:4px 0;">
+          ${stats.overallAvg}%
+        </div>
+        <span class="rating-badge ${rating.class}" style="font-size:11px;">
+          ${rating.label}
+        </span>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:8px;">
+          ${stats.totalCount} امتحانات في الـ 4 مواد
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:8px;">
+          🕒 أحدث نتائج امتحانات مسجلة:
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">
+          ${latest2.length > 0 ? latest2.map(ex => {
+            const pct = getExamPercentage(ex.score, ex.total);
+            const sub = getExamSubjectInfo(ex.subjId);
+            return `
+              <div style="background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:10px 12px; cursor:pointer;" onclick="showView('examsView')">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-size:11px; font-weight:800; color:${sub.color};">${sub.name}</span>
+                  <span class="tabular" style="font-size:14px; font-weight:900; color:var(--text-main);">${ex.score}/${ex.total} (${pct}%)</span>
+                </div>
+                <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px;">
+                  ${ex.topic}
+                </div>
+              </div>
+            `;
+          }).join('') : `
+            <div style="font-size:12px; color:var(--text-muted);">لم يتم تسجيل امتحانات بعد.</div>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function openExamModal(examId = null, preselectedSubjId = null) {
+  state.editingExamId = examId;
+  const modal = document.getElementById('examModal');
+  const titleText = document.getElementById('examModalTitleText');
+  const deleteBtn = document.getElementById('deleteExamModalBtn');
+  const subjInput = document.getElementById('examSubjInput');
+  const teacherInput = document.getElementById('examTeacherInput');
+  const topicInput = document.getElementById('examTopicInput');
+  const scoreInput = document.getElementById('examScoreInput');
+  const totalInput = document.getElementById('examTotalInput');
+  const typeInput = document.getElementById('examTypeInput');
+  const dateInput = document.getElementById('examDateInput');
+  const notesInput = document.getElementById('examNotesInput');
+
+  if (examId) {
+    const ex = state.exams.find(e => e.id === examId);
+    if (!ex) return;
+    if (titleText) titleText.textContent = 'تعديل درجة الامتحان';
+    if (deleteBtn) deleteBtn.style.display = 'inline-block';
+    if (subjInput) subjInput.value = ex.subjId;
+    if (teacherInput) teacherInput.value = ex.teacher || '';
+    if (topicInput) topicInput.value = ex.topic || '';
+    if (scoreInput) scoreInput.value = ex.score;
+    if (totalInput) totalInput.value = ex.total;
+    if (typeInput) typeInput.value = ex.examType || 'كويز حصة أسبوعي';
+    if (dateInput) dateInput.value = ex.date || '';
+    if (notesInput) notesInput.value = ex.notes || '';
+  } else {
+    if (titleText) titleText.textContent = 'تسجيل درجة امتحان جديد';
+    if (deleteBtn) deleteBtn.style.display = 'none';
+    if (subjInput) subjInput.value = preselectedSubjId || 'physics';
+    if (teacherInput) teacherInput.value = '';
+    if (topicInput) topicInput.value = '';
+    if (scoreInput) scoreInput.value = '';
+    if (totalInput) totalInput.value = '50';
+    if (typeInput) typeInput.value = 'كويز حصة أسبوعي';
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+    if (notesInput) notesInput.value = '';
+  }
+
+  updateTeacherSuggestions();
+  updateExamModalLiveCalc();
+  if (modal) modal.classList.add('show');
+}
+
+function closeExamModal() {
+  const modal = document.getElementById('examModal');
+  if (modal) modal.classList.remove('show');
+  state.editingExamId = null;
+}
+
+function updateTeacherSuggestions() {
+  const subjInput = document.getElementById('examSubjInput');
+  const datalist = document.getElementById('examTeacherDatalist');
+  if (!subjInput || !datalist) return;
+
+  const currentSubj = subjInput.value;
+  const presets = {
+    physics: [
+      'أ. محمد عبد المعبود (فيزياء منصة)',
+      'سنتر الفيزياء',
+      'منصة الفيزياء'
+    ],
+    arabic: [
+      'أ. محمد صلاح (عربي منصة/سنتر)',
+      'سنتر اللغة العربية',
+      'مستر العربي'
+    ],
+    history: [
+      'أستاذ التاريخ (سنتر 1:00 ظهراً)',
+      'سنتر التاريخ',
+      'مستر التاريخ'
+    ],
+    english: [
+      'أستاذ الإنجليزي (7:00 مساءً)',
+      'درس اللغة الإنجليزية',
+      'مستر الإنجليزي'
+    ]
+  };
+
+  const list = presets[currentSubj] || presets.physics;
+  datalist.innerHTML = list.map(item => `<option value="${item}">`).join('');
+}
+
+function updateExamModalLiveCalc() {
+  const scoreInput = document.getElementById('examScoreInput');
+  const totalInput = document.getElementById('examTotalInput');
+  const pctElem = document.getElementById('liveCalcPercentage');
+  const ratingBadge = document.getElementById('liveCalcRatingBadge');
+  const barElem = document.getElementById('liveCalcProgressBar');
+  const diffElem = document.getElementById('liveCalcDifferenceText');
+
+  if (!scoreInput || !totalInput) return;
+
+  const score = parseFloat(scoreInput.value);
+  const total = parseFloat(totalInput.value);
+
+  if (isNaN(score) || isNaN(total) || total <= 0) {
+    if (pctElem) pctElem.textContent = '--%';
+    if (ratingBadge) {
+      ratingBadge.textContent = 'في انتظار إدخال الدرجة';
+      ratingBadge.className = 'rating-badge';
+      ratingBadge.style.background = 'var(--bg-elevated)';
+      ratingBadge.style.color = 'var(--text-main)';
+    }
+    if (barElem) barElem.style.width = '0%';
+    if (diffElem) diffElem.textContent = 'اكتب درجتك والدرجة النهائية وسيتم احتساب النسبة والمستوى فورياً';
+    return;
+  }
+
+  const pct = Math.round(((score / total) * 100) * 10) / 10;
+  const rating = getExamRating(pct);
+  const lost = Math.round((total - score) * 10) / 10;
+
+  if (pctElem) {
+    pctElem.textContent = `${pct}%`;
+    pctElem.style.color = rating.color;
+  }
+  if (ratingBadge) {
+    ratingBadge.textContent = `${rating.label} (${rating.grade})`;
+    ratingBadge.className = `rating-badge ${rating.class}`;
+  }
+  if (barElem) {
+    barElem.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+    barElem.style.background = rating.color;
+  }
+  if (diffElem) {
+    if (lost <= 0) {
+      diffElem.innerHTML = `<strong style="color:#10b981;">🏆 أداء كامل ممتاز! حققت الدرجة النهائية بدون أي أخطاء (ناقص 0 درجة).</strong>`;
+    } else {
+      diffElem.innerHTML = `فقدت: <strong style="color:var(--text-main);">${lost}</strong> درجة من ${total} (فارق ${(100 - pct).toFixed(1)}% عن الدرجة النهائية)`;
+    }
+  }
+}
+
+function saveExamRecord() {
+  const subjInput = document.getElementById('examSubjInput');
+  const teacherInput = document.getElementById('examTeacherInput');
+  const topicInput = document.getElementById('examTopicInput');
+  const scoreInput = document.getElementById('examScoreInput');
+  const totalInput = document.getElementById('examTotalInput');
+  const typeInput = document.getElementById('examTypeInput');
+  const dateInput = document.getElementById('examDateInput');
+  const notesInput = document.getElementById('examNotesInput');
+
+  const subjId = subjInput.value;
+  const teacher = (teacherInput.value || '').trim() || 'المدرس/السنتر';
+  const topic = (topicInput.value || '').trim();
+  const score = parseFloat(scoreInput.value);
+  const total = parseFloat(totalInput.value);
+  const examType = typeInput.value;
+  const date = dateInput.value || new Date().toISOString().split('T')[0];
+  const notes = (notesInput.value || '').trim();
+
+  if (!topic) {
+    toast('يرجى كتابة موضوع أو محتوى الامتحان (الامتحان كان على إيه)', 'alert-triangle');
+    topicInput.focus();
+    return;
+  }
+
+  if (isNaN(score) || score < 0) {
+    toast('يرجى إدخال درجتك المحققة في الامتحان', 'alert-triangle');
+    scoreInput.focus();
+    return;
+  }
+
+  if (isNaN(total) || total <= 0) {
+    toast('يرجى إدخال الدرجة النهائية للامتحان', 'alert-triangle');
+    totalInput.focus();
+    return;
+  }
+
+  if (score > total) {
+    toast('تنبيه: الدرجة المحققة أكبر من الدرجة الكلية!', 'alert-triangle');
+  }
+
+  if (state.editingExamId) {
+    const idx = state.exams.findIndex(e => e.id === state.editingExamId);
+    if (idx !== -1) {
+      state.exams[idx] = {
+        ...state.exams[idx],
+        subjId,
+        teacher,
+        topic,
+        score,
+        total,
+        examType,
+        date,
+        notes
+      };
+      toast('تم تحديث درجة الامتحان بنجاح ⚡', 'check');
+    }
+  } else {
+    const newExam = {
+      id: 'exam_' + Date.now(),
+      subjId,
+      teacher,
+      topic,
+      score,
+      total,
+      examType,
+      date,
+      notes
+    };
+    state.exams.unshift(newExam);
+    const pct = getExamPercentage(score, total);
+    const rating = getExamRating(pct);
+    toast(`تم تسجيل درجة الامتحان: ${score}/${total} (${pct}%) ${rating.label}`, 'sparkles');
+  }
+
+  persistExams();
+  closeExamModal();
+  renderUI();
+}
+
+function deleteExamRecord(id) {
+  if (!confirm('هل أنت متأكد من حذف درجة هذا الامتحان من السجل؟')) return;
+  state.exams = state.exams.filter(e => e.id !== id);
+  persistExams();
+  toast('تم حذف الامتحان من السجل', 'trash');
+  renderUI();
+}
+
+function confirmDeleteExamFromModal() {
+  if (state.editingExamId) {
+    deleteExamRecord(state.editingExamId);
+    closeExamModal();
+  }
+}
+
+function filterExamsBySubject(subjId, btn) {
+  state.activeExamSubjectFilter = subjId;
+  document.querySelectorAll('#examSubjFilterPills .pill-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderExamsList();
+}
+
+function handleExamRatingFilter(rating) {
+  state.activeExamRatingFilter = rating;
+  renderExamsList();
+}
+
+function handleExamSearch(query) {
+  state.examSearchQuery = (query || '').trim().toLowerCase();
+  renderExamsList();
+}
+
+function handleExamSort(sortBy) {
+  state.examSortBy = sortBy;
+  renderExamsList();
+}
+
+function printExamReport() {
+  window.print();
+}
+
+// Window global bindings for inline HTML handlers
+window.openExamModal = openExamModal;
+window.closeExamModal = closeExamModal;
+window.updateTeacherSuggestions = updateTeacherSuggestions;
+window.updateExamModalLiveCalc = updateExamModalLiveCalc;
+window.saveExamRecord = saveExamRecord;
+window.deleteExamRecord = deleteExamRecord;
+window.confirmDeleteExamFromModal = confirmDeleteExamFromModal;
+window.filterExamsBySubject = filterExamsBySubject;
+window.handleExamRatingFilter = handleExamRatingFilter;
+window.handleExamSearch = handleExamSearch;
+window.handleExamSort = handleExamSort;
+window.printExamReport = printExamReport;
+
 // View Navigation
 function showView(viewId) {
   document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
@@ -2803,6 +3651,16 @@ document.addEventListener('DOMContentLoaded', () => {
       window.filterTasksByDay(btn.dataset.filter);
     });
   });
+
+  // Exam Score Inputs Real-time Calculation
+  const examScoreInput = document.getElementById('examScoreInput');
+  const examTotalInput = document.getElementById('examTotalInput');
+  if (examScoreInput) {
+    examScoreInput.addEventListener('input', updateExamModalLiveCalc);
+  }
+  if (examTotalInput) {
+    examTotalInput.addEventListener('input', updateExamModalLiveCalc);
+  }
 
   // Load quotes and start render loops
   initFirebase();
