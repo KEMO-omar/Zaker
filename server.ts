@@ -3,13 +3,13 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
+const isProd = process.env.NODE_ENV === 'production';
 
 // Middleware
 app.use(express.json({ limit: '20mb' }));
@@ -43,15 +43,15 @@ if (!fs.existsSync(DB_FILE)) {
 }
 
 // In-Memory AI Cache with 1-Hour TTL to minimize API calls
-const aiCache = new Map();
+const aiCache = new Map<string, { value: string; timestamp: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-function getCacheKey(prefix, data) {
+function getCacheKey(prefix: string, data: any) {
   const hash = crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex').substring(0, 16);
   return `${prefix}_${hash}`;
 }
 
-function getFromCache(key) {
+function getFromCache(key: string) {
   const item = aiCache.get(key);
   if (!item) return null;
   if (Date.now() - item.timestamp > CACHE_TTL_MS) {
@@ -61,19 +61,18 @@ function getFromCache(key) {
   return item.value;
 }
 
-function setInCache(key, value) {
+function setInCache(key: string, value: string) {
   aiCache.set(key, { value, timestamp: Date.now() });
-  // Evict older entries if cache grows past 200 items
   if (aiCache.size > 200) {
     const oldestKey = aiCache.keys().next().value;
-    aiCache.delete(oldestKey);
+    if (oldestKey) aiCache.delete(oldestKey);
   }
 }
 
-// Gemini AI Client & Direct API Caller with gemini-2.5-flash / gemini-2.5-pro
+// Gemini AI Client & Direct API Caller with gemini-2.5-flash / gemini-2.5-pro / gemini-1.5-flash
 const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash'];
 
-async function callGeminiAPI(promptText) {
+async function callGeminiAPI(promptText: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.warn('[AI Supervisor] No GEMINI_API_KEY provided; using local intelligence engine.');
@@ -96,26 +95,25 @@ async function callGeminiAPI(promptText) {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data: any = await res.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text && text.trim().length > 0) {
           return text.trim();
         }
       } else {
-        const errJson = await res.json().catch(() => ({}));
+        const errJson: any = await res.json().catch(() => ({}));
         console.warn(`[AI Supervisor] Model ${model} returned ${res.status}:`, errJson.error?.message || '');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn(`[AI Supervisor] Attempt with ${model} note:`, err.message);
     }
   }
 
-  // Resilient High-Intelligence Local Fallback if network/API is completely unreachable
   console.warn('[AI Supervisor] Using resilient local academic intelligence fallback due to temporary API unavailability');
   return generateLocalSupervisorResponse(promptText);
 }
 
-function generateLocalSupervisorResponse(promptText) {
+function generateLocalSupervisorResponse(promptText: string) {
   return `### ⚡ تقرير وملاحظات المراقب الأكاديمي الحصري (لكريم عمر)
 
 > "يا كريم.. مجموع تانية ثانوي مدمج مع تالتة ثانوي، مفيش ثانية ولا درجة مسموح بتضييعها. حلم كلية الطب وأوائل الجمهورية بيتصنع في أيام المذاكرة الصعبة دي!"
@@ -132,29 +130,17 @@ function generateLocalSupervisorResponse(promptText) {
 **القرار الآن:** اقفل أي تشتت، استعن بالله، وابدأ جلسة تركيز فورية لمدة 50 دقيقة! 🦁`;
 }
 
-// Explicit service worker headers (prevent aggressive browser caching of sw.js)
-app.get(['/sw.js', '/service-worker.js'], (req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-  res.sendFile(path.join(__dirname, 'sw.js'));
-});
-
-// Explicit manifest headers
-app.get(['/manifest.webmanifest', '/manifest.json'], (req, res) => {
-  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
-  res.sendFile(path.join(__dirname, 'manifest.webmanifest'));
-});
-
 // Explicit routing for quotes file with UTF-8 support
 const quotesPath = path.join(__dirname, 'تحفيز.json');
 app.get(['/تحفيز.json', encodeURI('/تحفيز.json')], (req, res) => {
-  res.sendFile(quotesPath);
+  if (fs.existsSync(quotesPath)) {
+    res.sendFile(quotesPath);
+  } else {
+    res.json([]);
+  }
 });
 
-// ----------------------------------------------------
-// DATABASE SYNC API (Offline-ready, Minimal Calls)
-// ----------------------------------------------------
-
+// DEFAULT SUBJECTS
 const DEFAULT_SERVER_SUBJECTS = [
   { id: 'history', name: 'تاريخ', color: '#10b981', targetMinutes: 120, icon: 'book-open' },
   { id: 'arabic', name: 'لغة عربية', color: '#f59e0b', targetMinutes: 150, icon: 'feather' },
@@ -162,17 +148,15 @@ const DEFAULT_SERVER_SUBJECTS = [
   { id: 'physics', name: 'فيزياء', color: '#818cf8', targetMinutes: 180, icon: 'atom' }
 ];
 
-// Robust array normalizer for Firebase RTDB collections (which can be arrays or object maps)
-function toArray(val) {
+function toArray(val: any): any[] {
   if (!val) return [];
   if (Array.isArray(val)) return val.filter(Boolean);
   if (typeof val === 'object') return Object.values(val).filter(Boolean);
   return [];
 }
 
-// Helper for non-destructive two-way union merge of records by key
-function mergeItemLists(existingList = [], incomingList = [], keyFn) {
-  const map = new Map();
+function mergeItemLists(existingList: any[] = [], incomingList: any[] = [], keyFn: (item: any) => string | null) {
+  const map = new Map<string, any>();
   toArray(existingList).forEach(item => {
     if (!item) return;
     const k = keyFn(item);
@@ -197,31 +181,31 @@ async function pullFromFirebaseRTDB() {
     if (res.ok) {
       return await res.json();
     }
-  } catch (err) {
+  } catch (err: any) {
     console.warn('[Firebase RTDB] Pull warning:', err.message);
   }
   return null;
 }
 
-async function pushToFirebaseRTDB(data) {
+async function pushToFirebaseRTDB(data: any) {
   try {
-    const examsObj = {};
-    toArray(data.exams).forEach(e => { if (e && e.id) examsObj[e.id] = e; });
+    const examsObj: any = {};
+    toArray(data.exams).forEach((e: any) => { if (e && e.id) examsObj[e.id] = e; });
 
-    const tasksObj = {};
-    toArray(data.weeklyTasks).forEach(t => { if (t && (t.id !== undefined)) tasksObj[t.id] = t; });
+    const tasksObj: any = {};
+    toArray(data.weeklyTasks).forEach((t: any) => { if (t && (t.id !== undefined)) tasksObj[t.id] = t; });
 
-    const lecturesObj = {};
-    toArray(data.lectures).forEach(l => { if (l && l.id) lecturesObj[l.id] = l; });
+    const lecturesObj: any = {};
+    toArray(data.lectures).forEach((l: any) => { if (l && l.id) lecturesObj[l.id] = l; });
 
-    const sessionsObj = {};
-    toArray(data.sessions).forEach(s => {
+    const sessionsObj: any = {};
+    toArray(data.sessions).forEach((s: any) => {
       const k = s.fbKey || s.id || (s.tsStart ? `ts_${s.tsStart}` : null);
       if (k) sessionsObj[k] = s;
     });
 
-    const exemptionsObj = {};
-    toArray(data.exemptions).forEach(x => {
+    const exemptionsObj: any = {};
+    toArray(data.exemptions).forEach((x: any) => {
       const k = x.fbKey || x.id || (x.timestamp ? `exm_${x.timestamp}` : null);
       if (k) exemptionsObj[k] = x;
     });
@@ -243,27 +227,25 @@ async function pushToFirebaseRTDB(data) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-  } catch (err) {
+  } catch (err: any) {
     console.warn('[Firebase RTDB] Push warning:', err.message);
   }
 }
 
-// GET /api/db/sync - Pull latest cloud snapshot (Firebase + local)
+// GET /api/db/sync
 app.get('/api/db/sync', async (req, res) => {
   try {
-    let currentDb = { version: 1, lastUpdated: Date.now(), data: {} };
+    let currentDb = { version: 1, lastUpdated: Date.now(), data: {} as any };
     if (fs.existsSync(DB_FILE)) {
       try {
         currentDb = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
       } catch (e) {}
     }
 
-    // Pull real-time state from Firebase RTDB
-    const fbData = await pullFromFirebaseRTDB();
+    const fbData: any = await pullFromFirebaseRTDB();
     if (fbData) {
       const prevData = currentDb.data || {};
 
-      // 1. Sessions from Firebase
       if (fbData.sessions) {
         const sessMap = new Map();
         toArray(prevData.sessions).forEach(s => sessMap.set(s.id || s.fbKey || s.tsStart, s));
@@ -276,7 +258,6 @@ app.get('/api/db/sync', async (req, res) => {
         prevData.sessions = Array.from(sessMap.values()).sort((a,b) => (b.tsStart||0) - (a.tsStart||0));
       }
 
-      // 2. Exemptions from Firebase
       if (fbData.exemptions) {
         const exmMap = new Map();
         toArray(prevData.exemptions).forEach(x => exmMap.set(x.id || x.fbKey, x));
@@ -289,7 +270,6 @@ app.get('/api/db/sync', async (req, res) => {
         prevData.exemptions = Array.from(exmMap.values()).sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
       }
 
-      // 3. Weekly tasks from Firebase
       if (fbData.weeklyTasks) {
         const taskMap = new Map();
         toArray(prevData.weeklyTasks).forEach(t => taskMap.set(String(t.id), t));
@@ -299,22 +279,19 @@ app.get('/api/db/sync', async (req, res) => {
         prevData.weeklyTasks = Array.from(taskMap.values());
       }
 
-      // 4. Exams from Firebase
       if (fbData.exams) {
         const examMap = new Map();
         toArray(prevData.exams).forEach(e => examMap.set(String(e.id), e));
         toArray(fbData.exams).forEach(e => {
           if (e && e.id) examMap.set(String(e.id), e);
         });
-        prevData.exams = Array.from(examMap.values()).sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+        prevData.exams = Array.from(examMap.values()).sort((a,b) => new Date(b.date||0).getTime() - new Date(a.date||0).getTime());
       }
 
-      // 5. Completed task IDs
       if (fbData.completedTaskIds) {
         prevData.completedTaskIds = Array.from(new Set([...toArray(prevData.completedTaskIds), ...toArray(fbData.completedTaskIds)]));
       }
 
-      // 6. Lectures
       if (fbData.lectures) {
         const lecMap = new Map();
         toArray(prevData.lectures).forEach(l => lecMap.set(String(l.id), l));
@@ -324,7 +301,6 @@ app.get('/api/db/sync', async (req, res) => {
         prevData.lectures = Array.from(lecMap.values());
       }
 
-      // 7. Instructions
       if (fbData.customAiInstructions) {
         prevData.customAiInstructions = fbData.customAiInstructions;
       }
@@ -344,7 +320,7 @@ app.get('/api/db/sync', async (req, res) => {
   }
 });
 
-// POST /api/db/sync - Push local state to cloud database atomically with smart union merge
+// POST /api/db/sync
 app.post('/api/db/sync', (req, res) => {
   try {
     const payload = req.body;
@@ -353,7 +329,7 @@ app.post('/api/db/sync', (req, res) => {
     }
 
     const currentTimestamp = Date.now();
-    let currentDb = { version: 1, lastUpdated: currentTimestamp, data: {} };
+    let currentDb = { version: 1, lastUpdated: currentTimestamp, data: {} as any };
 
     if (fs.existsSync(DB_FILE)) {
       try {
@@ -366,7 +342,6 @@ app.post('/api/db/sync', (req, res) => {
     const incomingData = payload.data || payload;
     const prevData = currentDb.data || {};
 
-    // 1. Smart merge exams (never overwrite, union by id / key)
     const rawMergedExams = mergeItemLists(
       prevData.exams,
       incomingData.exams,
@@ -389,48 +364,41 @@ app.post('/api/db/sync', (req, res) => {
         date: ex.date || new Date().toISOString().split('T')[0],
         notes: ex.notes || ''
       };
-    }).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    }).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
-    // 2. Smart merge weekly tasks (preserve all tasks)
     const mergedTasks = mergeItemLists(
       prevData.weeklyTasks,
       incomingData.weeklyTasks,
       (t) => (t.id !== undefined && t.id !== null) ? String(t.id) : `task_${t.dayId}_${t.text}`
     );
 
-    // 3. Union completed task IDs
     const mergedCompleted = Array.from(new Set([
       ...(Array.isArray(prevData.completedTaskIds) ? prevData.completedTaskIds : []),
       ...(Array.isArray(incomingData.completedTaskIds) ? incomingData.completedTaskIds : [])
     ]));
 
-    // 4. Smart merge study sessions
     const mergedSessions = mergeItemLists(
       prevData.sessions,
       incomingData.sessions,
       (s) => s.id ? String(s.id) : (s.tsStart ? `ts_${s.tsStart}` : `sess_${s.subjId}_${s.minutes}_${s.date || ''}`)
     ).sort((a, b) => (b.tsStart || 0) - (a.tsStart || 0));
 
-    // 5. Smart merge exemptions
     const mergedExemptions = mergeItemLists(
       prevData.exemptions,
       incomingData.exemptions,
       (x) => x.id ? String(x.id) : `exm_${x.subjId}_${x.dayId}_${x.date || x.timestamp || ''}`
     );
 
-    // 6. Smart merge lectures
     const mergedLectures = mergeItemLists(
       prevData.lectures,
       incomingData.lectures,
       (l) => l.id ? String(l.id) : `lec_${l.code}_${l.title}`
     );
 
-    // 7. Custom AI instructions
     const mergedInstructions = (incomingData.customAiInstructions && incomingData.customAiInstructions.trim()) ||
       (prevData.customAiInstructions && prevData.customAiInstructions.trim()) ||
       '';
 
-    // 8. Core Subjects (Always guarantee 4 subjects)
     const mergedSubjects = (Array.isArray(incomingData.subjects) && incomingData.subjects.length >= 4)
       ? incomingData.subjects
       : (Array.isArray(prevData.subjects) && prevData.subjects.length >= 4)
@@ -457,13 +425,11 @@ app.post('/api/db/sync', (req, res) => {
       data: updatedData
     };
 
-    // Atomic write with backup
     if (fs.existsSync(DB_FILE)) {
       fs.copyFileSync(DB_FILE, DB_BAK);
     }
     fs.writeFileSync(DB_FILE, JSON.stringify(newRecord, null, 2), 'utf-8');
 
-    // Asynchronously push updated data to Firebase RTDB in background
     pushToFirebaseRTDB(updatedData).catch(err => console.warn('[Firebase RTDB] Async push error:', err.message));
 
     res.json({
@@ -471,7 +437,7 @@ app.post('/api/db/sync', (req, res) => {
       lastUpdated: newRecord.lastUpdated,
       version: newRecord.version,
       data: updatedData,
-      message: 'تم دمج وحفظ كافة البيانات من وإلى قاعدة البيانات بنجاح ⚡'
+      message: 'تم دمج وحفظ كافة البيانات بنجاح ⚡'
     });
   } catch (err) {
     console.error('Error saving to database:', err);
@@ -479,21 +445,7 @@ app.post('/api/db/sync', (req, res) => {
   }
 });
 
-// ----------------------------------------------------
-// AI TIME MANAGEMENT & STUDY SUPERVISOR PROXY
-// ----------------------------------------------------
-
-// Load Karim's Academic Profile & Syllabus
-let kareemProfile = null;
-const PROFILE_FILE = path.join(__dirname, 'kareem_profile.json');
-try {
-  if (fs.existsSync(PROFILE_FILE)) {
-    kareemProfile = JSON.parse(fs.readFileSync(PROFILE_FILE, 'utf-8'));
-  }
-} catch (e) {
-  console.warn('Could not read kareem_profile.json:', e.message);
-}
-
+// AI System Prompt & Academic Supervisor
 const KAREEM_BASE_SYSTEM_PROMPT = `أنت "المراقب الأكاديمي الحصري وخبير إدارة الوقت والمذاكرة" للطالب "كريم عمر سيد".
 بيانات الطالب وسياقه الحاسم:
 - الطالب: كريم عمر سيد - الصف الثاني الثانوي (تانية ثانوي مسار علمي علوم - طب وحياة)، من سدس / الفشن بمحافظة بني سويف.
@@ -504,11 +456,11 @@ const KAREEM_BASE_SYSTEM_PROMPT = `أنت "المراقب الأكاديمي ا�
      - أ. محمد صلاح (منصة أونلاين): تنزل المحاضرة كل سبت، والحل والكويز كل ثلاثاء.
      - مس تقوى أحمد (سنتر): حضور سبت وثلاثاء الساعة 4:00 عصراً.
   2) فيزياء:
-     - أ. محمد عبد المعبود (منصة أونلاين): تنزل المحاضرات كل أحد وأربعاء. (ميكانيكا، حركة مقذوفات، حركة اهتزازية، أمواج، غازات، كهرستاتيكا، تيار، مغناطيسية).
+     - أ. محمد عبد المعبود (منصة أونلاين): تنزل المحاضرات كل أحد وأربعاء.
   3) لغة إنجليزية:
-     - مستر أيمن عبد العاطي (سنتر): حضور إثنين وخميس الساعة 7:00 مساءً. (وحدات Living Well, Leisure Time, Echoes of the Past, Power of Choice, Greenhouse Effect).
+     - مستر أيمن عبد العاطي (سنتر): حضور إثنين وخميس الساعة 7:00 مساءً.
   4) تاريخ:
-     - مستر أحمد سمير (سنتر الفشن): حضور إثنين وخميس الساعة 1:00 ظهراً. (بناء الدولة المصرية، ثورة 1952، التحرر العربي والإفريقي، الحربين العالميتين، القضية الفلسطينية).
+     - مستر أحمد سمير (سنتر الفشن): حضور إثنين وخميس الساعة 1:00 ظهراً.
 
 قواعد المراقبة والمحاسبة الصارمة:
 1. مراقبة الوقت والفاقد: راقب ساعات المذاكرة الصافية والوقت الضائع لحظة بلحظة. إذا ضيع وقتاً عاتبه بعتاب صادق ومؤثر يحرك ضميره. وإذا لم يذاكر شيئاً، اسأله بصدمة وعتاب: "مزاكرتش ليه ليه لحد دلوقتي يا كريم؟! الساعات بتضيع من حلمك وتعب أهلك!".
@@ -519,7 +471,7 @@ const KAREEM_BASE_SYSTEM_PROMPT = `أنت "المراقب الأكاديمي ا�
    - إذا نزلت الدرجة عن 80%: دق جرس إنذار أحمر طارئ ووقفة حاسمة.
 3. التحدث بلهجة مصرية ذكية، وقورة، محفزة، حاسمة، وأخوية صادقة.`;
 
-function getKareemSystemPrompt(customInstructions) {
+function getKareemSystemPrompt(customInstructions?: string) {
   let instructionsText = customInstructions;
   if (!instructionsText && fs.existsSync(DB_FILE)) {
     try {
@@ -536,13 +488,7 @@ function getKareemSystemPrompt(customInstructions) {
 (ملاحظة مهمة: نفذ كل حرف طلبه كريم في هذه التعليمات وطبقه على أسلوبك ونبرتك فوراً).`;
 }
 
-// ----------------------------------------------------
-// AI TIME MANAGEMENT & STUDY SUPERVISOR PROXY
-// ----------------------------------------------------
-
-const AI_MODEL = 'gemini-3.8-flash';
-
-// POST /api/ai/monitor - AI Study Supervisor & Time Watchdog
+// POST /api/ai/monitor
 app.post('/api/ai/monitor', async (req, res) => {
   try {
     const { studyData, forceFresh, customInstructions } = req.body || {};
@@ -550,7 +496,6 @@ app.post('/api/ai/monitor', async (req, res) => {
       return res.status(400).json({ success: false, error: 'بيانات المذاكرة مطلوبة للتحليل' });
     }
 
-    // Check cache unless forced fresh
     const cacheKey = getCacheKey('monitor', {
       tasksPending: studyData.pendingTasksCount,
       completedToday: studyData.completedTodayCount,
@@ -582,16 +527,16 @@ ${JSON.stringify(studyData, null, 2)}
     setInCache(cacheKey, analysisText);
 
     res.json({ success: true, fromCache: false, analysis: analysisText });
-  } catch (err) {
+  } catch (err: any) {
     console.error('AI Monitor error:', err);
     res.status(500).json({ success: false, error: err.message || 'فشل استدعاء المراقب الذكي' });
   }
 });
 
-// POST /api/ai/exam-reaction - AI Exam Instant Reaction & Coaching
+// POST /api/ai/exam-reaction
 app.post('/api/ai/exam-reaction', async (req, res) => {
   try {
-    const { exam, currentAvg } = req.body || {};
+    const { exam, currentAvg, customInstructions } = req.body || {};
     if (!exam) {
       return res.status(400).json({ success: false, error: 'بيانات الامتحان مطلوبة' });
     }
@@ -601,7 +546,7 @@ app.post('/api/ai/exam-reaction', async (req, res) => {
     const pct = Math.round((score / total) * 100);
     const lostPoints = total - score;
 
-    const systemPrompt = getKareemSystemPrompt(req.body.customInstructions);
+    const systemPrompt = getKareemSystemPrompt(customInstructions);
     const prompt = `${systemPrompt}
 
 سجل كريم للتو نتيجة امتحان جديد:
@@ -622,13 +567,13 @@ app.post('/api/ai/exam-reaction', async (req, res) => {
 
     const reactionText = await callGeminiAPI(prompt);
     res.json({ success: true, reaction: reactionText, pct });
-  } catch (err) {
+  } catch (err: any) {
     console.error('AI Exam Reaction error:', err);
     res.status(500).json({ success: false, error: err.message || 'فشل تحليل الامتحان' });
   }
 });
 
-// POST /api/ai/schedule - AI Smart Daily Time Scheduler
+// POST /api/ai/schedule
 app.post('/api/ai/schedule', async (req, res) => {
   try {
     const { availableHours, bedtime, focusLevel, pendingTasks, examStats, customInstructions } = req.body || {};
@@ -658,22 +603,22 @@ app.post('/api/ai/schedule', async (req, res) => {
 - إحصائيات الامتحانات الأخيرة: ${JSON.stringify(examStats || {})}
 
 المطلوب:
-اصنع جدولاً زمنياً دقيقاً بالدقائق (مثال: 16:00 - 17:15 مذاكرة كذا، 17:15 - 17:30 راحة ذكية...)، يوزع الوقت بذكاء ويعطي الأولوية للمادة الأضعف والمهام الحرجة، مع فترات راحة بومودورو مدروسة. أجب بتنسيق منظم باللغة العربية.`;
+اصنع جدولاً زمنياً دقيقاً بالدقائق، يوزع الوقت بذكاء ويعطي الأولوية للمادة الأضعف والمهام الحرجة، مع فترات راحة بومودورو مدروسة. أجب بتنسيق منظم باللغة العربية.`;
 
     const scheduleText = await callGeminiAPI(prompt);
     setInCache(cacheKey, scheduleText);
 
     res.json({ success: true, fromCache: false, schedule: scheduleText });
-  } catch (err) {
+  } catch (err: any) {
     console.error('AI Schedule error:', err);
     res.status(500).json({ success: false, error: err.message || 'فشل توليد جدول إدارة الوقت' });
   }
 });
 
-// POST /api/ai/exam-audit - AI Exam Diagnostic & Weakness Fixer
+// POST /api/ai/exam-audit
 app.post('/api/ai/exam-audit', async (req, res) => {
   try {
-    const { exams, subjects, customInstructions } = req.body || {};
+    const { exams, customInstructions } = req.body || {};
     if (!exams || !Array.isArray(exams)) {
       return res.status(400).json({ success: false, error: 'قائمة الامتحانات مطلوبة' });
     }
@@ -692,21 +637,20 @@ ${JSON.stringify(exams, null, 2)}
 
 المطلوب:
 1. تشخيص دقيق للدرجات ونسب النجاح في كل مادة ومقارنتها بشرط الـ 95%.
-2. كشف الثغرات ونقاط النزيف التي يخسر فيها درجات (حسب الملاحظات والمدرسين).
-3. خطة إنقاذ محددة لرفع النسبة المئوية في الامتحانات القادمة وتقفيل الـ 100%.
-4. روشتة مذاكرة سريعة قبل الامتحان القادم.`;
+2. كشف الثغرات ونقاط النزيف التي يخسر فيها درجات.
+3. خطة إنقاذ محددة لرفع النسبة المئوية في الامتحانات القادمة وتقفيل الـ 100%.`;
 
     const text = await callGeminiAPI(prompt);
     setInCache(cacheKey, text);
 
     res.json({ success: true, fromCache: false, diagnostic: text });
-  } catch (err) {
+  } catch (err: any) {
     console.error('AI Exam Audit error:', err);
     res.status(500).json({ success: false, error: err.message || 'فشل تحليل الامتحانات' });
   }
 });
 
-// POST /api/ai/chat - Interactive AI Supervisor Consultation
+// POST /api/ai/chat
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { message, context, customInstructions } = req.body || {};
@@ -727,20 +671,34 @@ ${JSON.stringify(context || {}, null, 2)}
 
     const reply = await callGeminiAPI(prompt);
     res.json({ success: true, reply });
-  } catch (err) {
+  } catch (err: any) {
     console.error('AI Chat error:', err);
     res.status(500).json({ success: false, error: err.message || 'فشل الرد من المراقب' });
   }
 });
 
-// Serve static assets from project root
+// Static assets from root (images, icons)
 app.use(express.static(__dirname));
 
-// Single-page fallback
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+// Mount Vite or dist
+async function startServer() {
+  if (!isProd) {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    app.use(express.static(path.join(__dirname, 'dist')));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    });
+  }
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Zaker Shapap app listening on http://0.0.0.0:${PORT}`);
-});
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Zaker React App listening on http://0.0.0.0:${PORT}`);
+  });
+}
+
+startServer();
