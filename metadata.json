@@ -1,4 +1,7 @@
 {
   "name": "SHAPAP | Kareem Edition ⚡",
-  "description": "Study tracker and focus app with spiral clock, 4 subjects progress, exams and grades tracker with percentage calculation, and schedule management."
+  "description": "منصة كريم للمذاكرة وإدارة الوقت بالذكاء الاصطناعي مع المراقب الأكاديمي الصارم وحساب الوقت الضائع ومتابعة الامتحانات",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

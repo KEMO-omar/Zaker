@@ -7,6 +7,109 @@
   <meta name="description" content="منصة متطورة لمتابعة المذاكرة والتركيز مع عدادات حلزونية دقيقة وحساب ذكي للوقت الضائع والدروس.">
   <meta property="og:title" content="SHAPAP | Kareem Workspace ⚡">
   <meta property="og:description" content="منصة متطورة لمتابعة المذاكرة والتركيز مع عدادات حلزونية دقيقة وحساب ذكي للوقت الضائع والدروس.">
+  
+  <!-- Progressive Web App (PWA) Standards -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <meta name="theme-color" content="#0f1416">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SHAPAP">
+  <meta name="application-name" content="SHAPAP">
+  <script>
+    // Bulletproof Early Global Dispatcher for all inline onclick handlers
+    (function() {
+      const g = (typeof window !== 'undefined' ? window : globalThis);
+      g._shapapPendingCalls = [];
+
+      function createSafeStub(fnName, immediateFallback) {
+        g[fnName] = function(...args) {
+          const impl = g['_' + fnName + 'Impl'] || g['__real_' + fnName];
+          if (typeof impl === 'function') {
+            return impl.apply(this, args);
+          }
+          if (typeof immediateFallback === 'function') {
+            return immediateFallback.apply(this, args);
+          }
+          console.log('[SHAPAP Early Stub] Queuing call to ' + fnName);
+          g._shapapPendingCalls.push({ fnName, args, self: this });
+        };
+      }
+
+      // Early handlers
+      createSafeStub('triggerEmergencySyncAndCall', function() {
+        console.log('[SHAPAP] Emergency sync invoked early...');
+        fetch('/api/db/sync', { credentials: 'same-origin' }).catch(() => {});
+        const btn = document.getElementById('emergencySyncHeaderBtn');
+        if (btn) btn.disabled = true;
+        setTimeout(() => {
+          if (typeof g._triggerEmergencySyncAndCallImpl === 'function') {
+            g._triggerEmergencySyncAndCallImpl();
+          }
+        }, 150);
+      });
+
+      createSafeStub('triggerManualSync', function() {
+        fetch('/api/db/sync', { credentials: 'same-origin' }).catch(() => {});
+      });
+
+      createSafeStub('speakCurrentAiMessage');
+      createSafeStub('speakExamReactionSpeech');
+      createSafeStub('closeExamAiReactionModal', function() {
+        const m = document.getElementById('examAiReactionModal');
+        if (m) m.classList.remove('show');
+      });
+      createSafeStub('openExamModal', function() {
+        const m = document.getElementById('examModal');
+        if (m) m.classList.add('show');
+      });
+      createSafeStub('closeExamModal', function() {
+        const m = document.getElementById('examModal');
+        if (m) m.classList.remove('show');
+      });
+      createSafeStub('saveExamRecord');
+      createSafeStub('confirmDeleteExamFromModal');
+      createSafeStub('printExamReport');
+      createSafeStub('openNewLectureModal', function() {
+        const m = document.getElementById('newLectureModal');
+        if (m) m.classList.add('show');
+      });
+      createSafeStub('closeNewLectureModal', function() {
+        const m = document.getElementById('newLectureModal');
+        if (m) m.classList.remove('show');
+      });
+      createSafeStub('saveNewLecture');
+      createSafeStub('filterLectures');
+      createSafeStub('filterExamsBySubject');
+      createSafeStub('openAiScheduleModal');
+      createSafeStub('closeAiScheduleModal');
+      createSafeStub('generateAndShowScheduleImage');
+      createSafeStub('getAiFocusIntervention');
+      createSafeStub('triggerAiSupervisorAudit');
+      createSafeStub('triggerAiExamAudit');
+      createSafeStub('clearAiChat');
+      createSafeStub('installPwaApp');
+      createSafeStub('closePwaModal', function() {
+        const m = document.getElementById('pwaInstallModal');
+        if (m) m.classList.remove('show');
+      });
+      createSafeStub('triggerPwaPrompt');
+      createSafeStub('showView', function(viewId) {
+        document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+        const target = document.getElementById(viewId);
+        if (target) target.classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          if (btn.dataset.tab === viewId) btn.classList.add('active');
+          else btn.classList.remove('active');
+        });
+      });
+      createSafeStub('togglePosterSection');
+      createSafeStub('saveCustomAiInstructions');
+    })();
+  </script>
+
   <link rel="stylesheet" href="./styles.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap');
@@ -204,17 +307,39 @@
       </div>
       <div>
         <div class="brand-title">SHAPAP <span style="font-weight:400; opacity:0.7;">| مساحة كريم</span></div>
-        <div style="display:flex; align-items:center; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span class="brand-sub">نظام التركيز والإنتاجية الدراسي</span>
-          <span id="cloudStatusIndicator" style="display:inline-flex; align-items:center; gap:4px; font-size:10px; padding:2px 8px; border-radius:12px; background:rgba(16,185,129,0.12); color:#10b981; font-weight:700;">
+          <button id="cloudStatusIndicator" class="sync-badge-btn" onclick="window.triggerManualSync()" title="اضغط للمزامنة الفورية مع قاعدة البيانات السحابية" style="display:inline-flex; align-items:center; gap:4px; font-size:10px; padding:2px 8px; border-radius:12px; background:rgba(16,185,129,0.12); color:#10b981; font-weight:700;">
             <span style="width:6px; height:6px; border-radius:50%; background:#10b981; display:inline-block;"></span>
-            سحابي (Firebase)
+            <span id="cloudStatusText">متصل بالسحابة</span>
+          </button>
+          <span id="syncHourlyTimerBadge" class="sync-timer-badge" title="تحديث دوري كل 60 دقيقة لقاعدة البيانات لحفظ كافة التعديلات، أو اضغط الزر الطارئ للإرسال فوراً">
+            <span>⏱️ القادمة:</span>
+            <strong id="syncNextCountdown" class="tabular">59:59</strong>
           </span>
         </div>
       </div>
     </div>
 
     <div class="header-actions">
+      <!-- Emergency Sync & Call Button -->
+      <button id="emergencySyncHeaderBtn" class="btn btn-sm btn-emergency-pulse" onclick="window.triggerEmergencySyncAndCall()" title="إرسال فوري للبيانات واستدعاء طارئ للمراقب (تلقائياً كل ساعة)">
+        <span class="emergency-pulse-dot"></span>
+        <span>🚨 إرسال واستدعاء طارئ</span>
+      </button>
+
+      <!-- PWA Install Button -->
+      <button id="pwaInstallHeaderBtn" class="btn btn-sm pwa-header-btn" onclick="window.installPwaApp()" title="تثبيت التطبيق على الكمبيوتر أو الموبايل للعمل بدون نت">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>📲 تثبيت التطبيق</span>
+      </button>
+
+      <!-- AI Study Watchdog Header Quick Action with Live Mood Badge -->
+      <button id="aiSupervisorHeaderBtn" class="btn btn-sm ai-header-mood-btn" onclick="window.showView('aiSupervisorView')" title="المراقب الأكاديمي وإدارة الوقت">
+        <span id="headerMoodIcon" style="font-size:14px;">🦁</span>
+        <span>المراقب: <strong id="headerMoodLabel" style="color:var(--accent-primary);">أسطوري</strong></span>
+      </button>
+
       <!-- All-Time Metric Badge -->
       <div id="headerAllTimeBadge" style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; background:var(--bg-elevated); border:1px solid var(--border-subtle); padding:6px 14px; border-radius:var(--radius-sm); color:var(--accent-primary);">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20"/></svg>
@@ -237,6 +362,10 @@
       <button class="tab-btn active" data-tab="dashView">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         لوحة المذاكرة
+      </button>
+      <button class="tab-btn" data-tab="aiSupervisorView">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 19.07 1.41-1.41"/><path d="m17.66 6.34 1.41-1.41"/></svg>
+        المراقب وإدارة الوقت ⚡
       </button>
       <button class="tab-btn" data-tab="weeklyView">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg>
@@ -273,7 +402,7 @@
           <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">الوقت المنقضي: <span id="bannerSecNum" class="tabular" style="font-weight:700; color:var(--text-main);"></span></div>
         </div>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="showView('focusView')">
+      <button class="btn btn-primary btn-sm" onclick="window.showView('focusView')">
         الانتقال إلى غرفة التركيز
       </button>
     </div>
@@ -329,6 +458,108 @@
             <div id="metricScoreBar" class="stat-progress-fill" style="width:85%; background:linear-gradient(90deg, #f59e0b, #10b981);"></div>
           </div>
         </div>
+      </div> <!-- Closes stats-banner-grid properly -->
+
+      <!-- ================= AI STUDY SUPERVISOR & DYNAMIC MOOD WATCHDOG ================= -->
+      <div class="ai-supervisor-card" id="aiSupervisorDashboardCard">
+        <div class="ai-card-top-row">
+          <div class="ai-identity-block">
+            <div class="ai-mood-badge-wrap">
+              <div id="aiMoodAvatarIcon" class="ai-mood-avatar">🦁</div>
+              <div>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <span id="aiSupervisorMoodBadge" class="ai-mood-pill">🦁 أسطوري وفخور</span>
+                  <span id="aiMoodScoreBadge" class="ai-mood-score tabular">رضا المراقب: 85%</span>
+                  <span id="aiCacheStatusBadge" style="font-size:11px; color:var(--text-muted); font-weight:600;">⚡ رصد حي</span>
+                </div>
+                <div id="aiMoodReasonText" class="ai-mood-reason">يراقب كل ثانية، يعاتب عند تضييع الوقت، ويتابع قفل الامتحانات الـ 4</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ai-card-actions">
+            <button id="aiVoiceSpeakBtn" class="btn btn-sm btn-speak" onclick="window.speakCurrentAiMessage()" title="استمع إلى صوت المراقب الأكاديمي">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+              <span>🔊 استمع للمراقب</span>
+            </button>
+            <button id="aiAuditTriggerBtn" class="btn btn-primary btn-sm" onclick="window.triggerAiSupervisorAudit()" style="font-weight:700;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>⚡ تحليل المراقبة الفوري</span>
+            </button>
+            <button class="btn btn-sm" onclick="window.openAiScheduleModal()" style="border-color:rgba(56, 189, 248, 0.4); color:var(--accent-secondary); font-weight:700;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>⏱️ جدول الساعات المتبقية</span>
+            </button>
+            <button class="btn btn-sm" onclick="window.showView('aiSupervisorView')" style="font-weight:600;">
+              <span>مركز التحكم ↗</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Live AI Emotional Speech Box (كلام مؤثر يعاتب ويشجع) -->
+        <div class="ai-speech-bubble" id="aiLiveSpeechBubble">
+          <div class="speech-quote-icon">❝</div>
+          <div id="aiLiveSpeechText" class="speech-text">
+            جاري فحص مؤشرات يومك وتحديد مود المراقب...
+          </div>
+        </div>
+
+        <!-- Live Observer HUD Summary -->
+        <div class="ai-hud-grid">
+          <div class="ai-hud-item">
+            <span class="ai-hud-label">📡 حالة اليوم الحالية والمود</span>
+            <span class="ai-hud-val" id="aiHudStatusText" style="color:var(--accent-primary); font-size:14px;">قيد التقييم...</span>
+          </div>
+          <div class="ai-hud-item">
+            <span class="ai-hud-label">⏳ الوقت الضائع المرصود</span>
+            <span class="ai-hud-val tabular" id="aiHudWastedText" style="color:var(--danger);">0 دقيقة</span>
+          </div>
+          <div class="ai-hud-item">
+            <span class="ai-hud-label">📚 المادة الأكثر احتياجاً للمذاكرة</span>
+            <span class="ai-hud-val" id="aiHudPrioritySubj" style="color:var(--warning); font-size:14px;">جاري الفحص...</span>
+          </div>
+          <div class="ai-hud-item">
+            <span class="ai-hud-label">🎯 متوسط درجات الامتحانات (شرط الـ 95%)</span>
+            <span class="ai-hud-val tabular" id="aiHudExamsAvg" style="color:var(--accent-secondary);">0%</span>
+          </div>
+        </div>
+
+        <!-- Karim's Directives to AI Supervisor ("يشتغل باللي أنا كاتبهوله") -->
+        <div class="kareem-directives-card">
+          <div class="kareem-directives-header">
+            <div class="kareem-directives-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <span>تعليمات وقواعد كريم الصريحة للمراقب الذكي (تتحكم في أسلوبه وموده فوراً):</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span id="directivesSaveStatus" style="font-size:11px; color:var(--accent-primary); font-weight:700;">✅ المراقب ملتزم بتعليماتك</span>
+              <button class="btn btn-sm btn-primary" onclick="window.saveCustomAiInstructions()" style="padding:4px 12px; font-size:12px;">
+                <span>💾 حفظ وإلزام المراقب فوراً</span>
+              </button>
+            </div>
+          </div>
+          <textarea id="kareemDirectivesInput" class="kareem-directives-textarea" placeholder="اكتب للمراقب كيف يعاتبك، كيف يراقب وقتك وامتحاناتك، وبأي لهجة يتكلم..."></textarea>
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:11px; color:var(--text-muted);">
+            <span>💡 أي تعديل تكتبه هنا يتم ربطه وحفظه في قاعدة البيانات، ويطبقه المراقب حرفياً في كل كلامه وموده.</span>
+            <span style="color:#f59e0b; font-weight:700;">قاعدة الـ 95% ومراقبة الوقت الضائع مفعلة</span>
+          </div>
+        </div>
+
+        <!-- 1-Hour Database Sync & Emergency Action Banner -->
+        <div style="background:rgba(15,20,22,0.5); border:1px dashed var(--border-subtle); border-radius:var(--radius-sm); padding:10px 14px; margin:10px 0 14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+          <div style="display:flex; align-items:center; gap:8px; font-size:12px;">
+            <span style="color:#10b981;">🛡️ قاعدة البيانات:</span>
+            <span style="color:var(--text-muted);">حفظ تلقائي كل 1 ساعة (دورية) لتقليل الاستدعاءات، أو اضغط الزر الطارئ للإرسال فوراً:</span>
+            <strong id="syncCountdownDashboard" class="tabular" style="color:var(--accent-secondary); background:rgba(56,189,248,0.1); padding:2px 6px; border-radius:4px;">59:59</strong>
+          </div>
+          <button class="btn btn-sm btn-emergency-pulse" onclick="window.triggerEmergencySyncAndCall()" title="إرسال فوري لكافة الجلسات والامتحانات والمهام واستدعاء المراقب للتدقيق">
+            <span class="emergency-pulse-dot"></span>
+            <span>🚨 إرسال فوري واستدعاء طارئ الآن</span>
+          </button>
+        </div>
+
+        <!-- Dynamic Output Container for AI Supervisor Advice -->
+        <div id="aiSupervisorOutputContainer" style="display:none;"></div>
       </div>
 
       <div class="dash-grid">
@@ -391,7 +622,7 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 الوقت الضائع من اليوم
               </div>
-              <button class="btn btn-sm" onclick="showView('wastedView')">إدارة الدروس</button>
+              <button class="btn btn-sm" onclick="window.showView('wastedView')">إدارة الدروس</button>
             </div>
 
             <div class="wasted-value tabular" id="wastedValueNum">0 س و 00 د</div>
@@ -466,7 +697,7 @@
             <button class="btn btn-primary btn-sm" onclick="window.openExamModal()">
               ➕ تسجيل درجة امتحان جديد
             </button>
-            <button class="btn btn-sm" onclick="showView('examsView')">
+            <button class="btn btn-sm" onclick="window.showView('examsView')">
               📊 فتح السجل والتحليلات كاملة
             </button>
           </div>
@@ -476,6 +707,153 @@
           <!-- Populated dynamically with overall avg + latest exams -->
         </div>
       </div>
+    </section>
+
+    <!-- ================= VIEW: AI STUDY SUPERVISOR & TIME MANAGEMENT HUB ================= -->
+    <section id="aiSupervisorView" class="view-panel">
+      <!-- Hub Header Banner -->
+      <div class="weekly-header-banner" style="background: linear-gradient(135deg, rgba(21, 29, 32, 0.95), rgba(27, 38, 42, 0.95)); border: 1px solid rgba(86, 194, 166, 0.35);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+          <div>
+            <div style="display:inline-flex; align-items:center; gap:8px; font-size:11px; font-weight:800; padding:4px 12px; border-radius:var(--radius-full); background:rgba(86, 194, 166, 0.15); color:var(--accent-primary); margin-bottom:8px;">
+              <span class="pulse-dot-ai"></span>
+              <span>المراقب الأكاديمي الحصري للثانوية العامة (4 مواد فقط)</span>
+            </div>
+            <h2 style="font-size:24px; font-weight:900; color:var(--text-main); line-height:1.2;">
+              مركز قيادة المراقب الذكي وإدارة الوقت ⚡
+            </h2>
+            <p style="font-size:13.5px; color:var(--text-muted); margin-top:6px; max-width:700px;">
+              لست مجرد أداة دردشة، بل أنا رادارك الأكاديمي الصارم والمشجع: أحسب ساعاتك، أمنع تسريب الدقائق، أوزع مهامك على الساعات المتبقية، وأحلل أين ضاعت درجاتك في الفيزياء والعربي والتاريخ والإنجليزي.
+            </p>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="window.triggerAiSupervisorAudit()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>⚡ تقرير المراقبة اللحظي</span>
+            </button>
+            <button class="btn" onclick="window.triggerAiExamAudit()" style="border-color:rgba(56, 189, 248, 0.4); color:var(--accent-secondary);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span>🎯 تشخيص نقاط ضعف الامتحانات</span>
+            </button>
+          </div>
+      </div>
+
+      <!-- Karim's Directives & Rules Console (Full View) -->
+      <div class="kareem-directives-card" style="margin-top:20px; border-color:var(--accent-primary);">
+        <div class="kareem-directives-header">
+          <div class="kareem-directives-title" style="font-size:15px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <span>أوامر وقواعد كريم الصريحة للمراقب الأكاديمي (الذكاء الاصطناعي يعمل بها حرفياً ⚡):</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="btn btn-sm btn-primary" onclick="window.saveCustomAiInstructions()">
+              <span>💾 حفظ التعليمات وإلزام المراقب فوراً ⚡</span>
+            </button>
+          </div>
+        </div>
+        <textarea id="kareemDirectivesInputHub" class="kareem-directives-textarea" style="min-height:95px;" placeholder="اكتب للمراقب كيف يعاتبك، كيف يراقب وقتك وامتحاناتك، وبأي لهجة يتكلم..."></textarea>
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:12px; color:var(--text-muted);">
+          <span>💡 هذه الأوامر لها الأولوية القصوى المطلقة لدى الذكاء الاصطناعي في المراقبة، وتحديد المود، وتحليل الامتحانات والوقت.</span>
+          <span style="color:var(--accent-primary); font-weight:700;">مربوطة بقاعدة البيانات السحابية ⚡</span>
+        </div>
+      </div>
+
+      <!-- Grid: Smart Day Planner & Chat Consultation -->
+      <div class="dash-grid" style="margin-top:20px;">
+        <!-- Left: Smart Daily Schedule Generator -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              مخطط إدارة الوقت الذكي لليوم (بالدقائق)
+            </div>
+            <span style="font-size:11px; color:var(--text-muted);">تحسين بومودورو مخصص</span>
+          </div>
+
+          <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+            حدد معطيات يومك، والذكاء الاصطناعي هيولدلك جدول ساعات دقيق متوافق مع مهامك المعلقة وامتحاناتك الضعيفة.
+          </p>
+
+          <form id="aiScheduleForm" onsubmit="event.preventDefault(); window.generateSmartSchedule();" style="display:flex; flex-direction:column; gap:14px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div>
+                <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">الساعات المتاحة للمذاكرة اليوم:</label>
+                <input type="number" id="aiSchedHoursInput" class="input-field" min="1" max="16" step="0.5" value="4" required />
+              </div>
+              <div>
+                <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">موعد النوم المستهدف:</label>
+                <input type="time" id="aiSchedBedtimeInput" class="input-field" value="23:30" required />
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div>
+                <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">مستوى الطاقة والتركيز:</label>
+                <select id="aiSchedEnergySelect" class="input-field">
+                  <option value="high">⚡ طاقة قصوى (جلسات 60-75 دقيقة مركزة)</option>
+                  <option value="balanced" selected>🌿 متوازن قياسي (جلسات 45 دقيقة مع راحة 10)</option>
+                  <option value="light">☕ مراجعة خفيفة (جلسات 30 دقيقة حل سريع)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">تركيز أولوية على مادة معينة:</label>
+                <select id="aiSchedPrioritySubjSelect" class="input-field">
+                  <option value="auto">🤖 توزيع ذكي تلقائي (الأولوية للأضعف)</option>
+                  <option value="physics">⚛️ تركيز فيزياء</option>
+                  <option value="arabic">📖 تركيز لغة عربية</option>
+                  <option value="history">🏛️ تركيز تاريخ</option>
+                  <option value="english">🌐 تركيز لغة إنجليزية</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" id="aiGenerateSchedBtn" class="btn btn-primary" style="margin-top:6px; justify-content:center; padding:10px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>ولّد جدول المذاكرة وإدارة الوقت الذكي ⚡</span>
+            </button>
+          </form>
+
+          <!-- Generated Schedule Display Container -->
+          <div id="aiScheduleResultContainer" style="display:none; margin-top:20px;"></div>
+        </div>
+
+        <!-- Right: AI Supervisor Chat & Quick Consultation -->
+        <div class="card" style="display:flex; flex-direction:column;">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="pulse-dot-ai"></span>
+              استشارة فورية مع المراقب الذكي
+            </div>
+            <button class="btn btn-sm" onclick="window.clearAiChat()" style="font-size:11px;">مسح المحادثة</button>
+          </div>
+
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">
+            المراقب يعرف كل تفاصيل يومك (ساعاتك، امتحاناتك بالـ 4 مواد، ومهامك). اسأله عن أي تنظيم أو مشكلة تسويف تواجهك!
+          </p>
+
+          <!-- Chat Box -->
+          <div class="ai-chat-container">
+            <div class="ai-chat-messages" id="aiChatMessagesList">
+              <div class="ai-msg ai">
+                <strong>👁️ المراقب الذكي:</strong><br/>
+                أهلاً يا كريم! أنا مراقبك المخلص.. راداري بيسجل كل ثانية في موادك الأربعة (فيزياء، عربي، تاريخ، إنجليزي). قولي إيه اللي معطلك أو عايز توزع وقتك إزاي دلوقتي؟
+              </div>
+            </div>
+
+            <form class="ai-chat-input-bar" onsubmit="event.preventDefault(); window.sendAiChatMessage();">
+              <input type="text" id="aiChatTextInput" class="input-field" placeholder="اسأل المراقب عن تنظيم الوقت أو مادة معينة..." style="flex:1;" />
+              <button type="submit" id="aiChatSendBtn" class="btn btn-primary btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                <span>إرسال</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Diagnostic Container (for Exam Weakness Audit) -->
+      <div id="aiExamDiagnosticHubContainer" class="card" style="display:none; margin-top:24px;"></div>
     </section>
 
     <!-- ================= VIEW 2: WEEKLY TASKS & BACKLOG MATRIX ================= -->
@@ -737,12 +1115,19 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               ➕ تسجيل درجة امتحان جديد
             </button>
+            <button class="btn" onclick="window.triggerAiExamAudit()" style="border-color:rgba(86, 194, 166, 0.4); color:var(--accent-primary); font-weight:700;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M12 2v2"/><path d="M12 20v2"/></svg>
+              🧠 تحليل وروشتة الذكاء الاصطناعي
+            </button>
             <button class="btn" onclick="window.printExamReport()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               🖨️ طباعة تقرير الدرجات
             </button>
           </div>
         </div>
+
+        <!-- AI Exam Diagnostic Result Container -->
+        <div id="aiExamAuditResultContainer" style="display:none; margin-top:16px;"></div>
 
         <!-- 4 Top KPI Stat Summary Cards -->
         <div class="weekly-stats-bar" style="margin-top:20px;">
@@ -890,6 +1275,25 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
             إنهاء الجلسة وحفظها
           </button>
+        </div>
+
+        <!-- AI Focus Room Watchdog HUD -->
+        <div id="aiFocusWatchdogCard" style="margin-top:20px; padding:16px 20px; border-radius:var(--radius-md); background:var(--bg-elevated); border:1px solid rgba(86,194,166,0.3); width:100%; max-width:560px; text-align:right;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="pulse-dot-ai"></span>
+              <strong style="font-size:13px; color:var(--accent-primary);">عين المراقب أثناء الجلسة 👁️</strong>
+            </div>
+            <span id="aiFocusWatchdogStatus" style="font-size:11px; color:var(--text-muted); font-weight:700;">المراقب يرصد تركيزك</span>
+          </div>
+          <p id="aiFocusWatchdogTip" style="font-size:12.5px; color:var(--text-main); margin-bottom:10px; line-height:1.6;">
+            "أنت الآن داخل جلسة تركيز صافية. اقفل أي مشتت، وركز 100% في المادة.. كل دقيقة بتخلصها دلوقتي بتبني مستقبلك!"
+          </p>
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button class="btn btn-sm" onclick="window.getAiFocusIntervention()" style="font-size:11px; padding:4px 10px; border-color:var(--accent-primary); color:var(--accent-primary);">
+              ⚡ شحنة تركيز فورية من المراقب
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -1371,6 +1775,143 @@
             💾 تحميل الصورة (PNG)
           </a>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Daily Schedule Modal -->
+  <div id="aiScheduleModal" class="modal-overlay">
+    <div class="modal-box" style="max-width:620px;">
+      <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>توليد جدول ساعات اليوم بالذكاء الاصطناعي ⏱️</span>
+        </div>
+        <button class="btn btn-sm modal-close" onclick="window.closeAiScheduleModal()" style="padding:4px 8px;">✕</button>
+      </div>
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
+        المراقب الذكي هيوزع ساعاتك المتبقية بدقة على موادك الـ 4، مع التركيز على المهام المتأخرة:
+      </p>
+
+      <form id="aiModalScheduleForm" onsubmit="event.preventDefault(); window.generateSmartScheduleFromModal();" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div>
+            <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">ساعات المذاكرة المتاحة:</label>
+            <input type="number" id="aiModalHoursInput" class="input-field" min="1" max="16" step="0.5" value="4" required />
+          </div>
+          <div>
+            <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">موعد النوم:</label>
+            <input type="time" id="aiModalBedtimeInput" class="input-field" value="23:30" required />
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">نمط الجلسات والتركيز:</label>
+          <select id="aiModalEnergySelect" class="input-field">
+            <option value="high">⚡ جلسات طويلة دسمة (60-75 دقيقة)</option>
+            <option value="balanced" selected>🌿 جلسات متوازنة بومودورو (45 دقيقة)</option>
+            <option value="light">☕ مراجعة خفيفة وسريعة (30 دقيقة)</option>
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+          <button type="button" class="btn modal-close" onclick="window.closeAiScheduleModal()">إلغاء</button>
+          <button type="submit" id="aiModalSubmitBtn" class="btn btn-primary">
+            ⚡ توليد الجدول الفوري
+          </button>
+        </div>
+      </form>
+
+      <div id="aiModalScheduleResult" style="display:none; margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- PWA Install Guide Modal -->
+  <div id="pwaInstallModal" class="modal-overlay">
+    <div class="modal-box" style="max-width:520px;">
+      <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>تثبيت تطبيق SHAPAP على جهازك 📲</span>
+        </div>
+        <button class="btn btn-sm modal-close" onclick="window.closePwaModal()" style="padding:4px 8px;">✕</button>
+      </div>
+
+      <div style="margin:16px 0; font-size:13px; line-height:1.7; color:var(--text-main);">
+        <p style="margin-bottom:12px;">
+          بإمكانك تثبيت منصة <strong>SHAPAP</strong> كتطبيق أصلي ومستقل على جهازك بدون الحاجة لمتصفح، وتعمل <strong>بدون إنترنت (Offline)</strong> بالكامل حتى أثناء تشغيل المؤقت!
+        </p>
+        
+        <div style="background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:14px; margin-bottom:14px;">
+          <h4 style="font-size:13px; font-weight:700; color:var(--accent-primary); margin-bottom:6px;">💻 على الكمبيوتر (Chrome أو Edge):</h4>
+          <p style="font-size:12px; color:var(--text-muted);">
+            اضغط على زر <strong>"تثبيت التطبيق الآن"</strong> بالأسفل أو اضغط على أيقونة التثبيت (⊕) الموجودة في شريط العنوان أعلى المتصفح.
+          </p>
+        </div>
+
+        <div style="background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:14px;">
+          <h4 style="font-size:13px; font-weight:700; color:var(--accent-secondary); margin-bottom:6px;">📱 على الموبايل (iPhone أو Android):</h4>
+          <p style="font-size:12px; color:var(--text-muted);">
+            في Safari اضغط زر <strong>مشاركة (Share)</strong> ثم اختر <strong>"إضافة إلى الشاشة الرئيسية (Add to Home Screen)"</strong>.<br/>
+            في Chrome اضغط على الثلاث نقاط (⋮) ثم <strong>"تثبيت التطبيق"</strong>.
+          </p>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
+        <button class="btn modal-close" onclick="window.closePwaModal()">حسناً، فهمت</button>
+        <button id="pwaModalInstallActionBtn" class="btn btn-primary" onclick="window.triggerPwaPrompt()">
+          📲 تثبيت التطبيق الآن
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Exam Reaction & 95% Accountability Modal -->
+  <div id="examAiReactionModal" class="modal-overlay">
+    <div class="modal-box ai-reaction-modal-box">
+      <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="examAiReactionAvatar" style="font-size:26px;">🦁</span>
+          <div>
+            <span id="examAiReactionTitle" style="font-size:16px; font-weight:800; display:block;">حكم المراقب الأكاديمي الصارم</span>
+            <span style="font-size:11px; color:var(--text-muted);">تحليل فوري وتطبيق شرط الـ 95% الحاسم</span>
+          </div>
+        </div>
+        <button class="btn btn-sm modal-close" onclick="window.closeExamAiReactionModal()" style="padding:4px 8px;">✕</button>
+      </div>
+
+      <div class="exam-reaction-content">
+        <div class="exam-reaction-score-bar">
+          <div>
+            <span id="examAiReactionSubjName" style="font-size:14px; color:var(--accent-primary); font-weight:800; display:block;">فيزياء</span>
+            <span id="examAiReactionTopicText" style="font-size:11px; color:var(--text-muted);">كويز أسبوعي</span>
+          </div>
+          <div style="text-align:left;">
+            <div id="examAiReactionScoreText" class="tabular" style="font-size:24px; font-weight:900; color:var(--text-main);">48 / 50</div>
+            <span id="examAiReactionBadge" class="rating-badge" style="font-size:11px;">96% ممتاز</span>
+          </div>
+        </div>
+
+        <div class="exam-reaction-speech-box">
+          <div style="font-size:11px; color:var(--accent-secondary); font-weight:700; margin-bottom:4px;">💬 كلام المراقب لكريم:</div>
+          <div id="examAiReactionSpeechText" class="speech-text" style="font-size:14px; line-height:1.75;">
+            جاري كتابة تعقيب المراقب...
+          </div>
+        </div>
+
+        <div id="examAiPointsLostBox" class="exam-lost-points-box">
+          <!-- Populated dynamically with points lost analysis -->
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px;">
+        <button id="speakExamReactionBtn" class="btn btn-sm btn-speak" onclick="window.speakExamReactionSpeech()">
+          🔊 استمع للمراقب
+        </button>
+        <button class="btn btn-primary" onclick="window.closeExamAiReactionModal()">
+          ✅ فهمت يا مراقب وهراجع أخطائي فوراً
+        </button>
       </div>
     </div>
   </div>

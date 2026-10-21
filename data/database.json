@@ -1,0 +1,1297 @@
+{
+  "version": 19,
+  "lastUpdated": 1792602150247,
+  "clientTimestamp": 1792602150225,
+  "data": {
+    "sessions": [
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "مذاكرة الجرامر الافعال و الايساي و مراجعه خفيفة"
+          }
+        ],
+        "id": "s_1792426064546",
+        "minutes": 57,
+        "tsEnd": 1792426064546,
+        "tsStart": 1792422643127
+      },
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "مذاكرة الوحدة التانية"
+          }
+        ],
+        "fbKey": "-P4HTPlHwY2rdzE5OBoH",
+        "id": "s_1792385068159",
+        "minutes": 137,
+        "tsEnd": 1792385068159,
+        "tsStart": 1792383375373
+      },
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "مذاكرة كده على الوحدة الاولى"
+          }
+        ],
+        "fbKey": "-P4C7Iqb-11_CJ9wUcy2",
+        "id": "s_1792295386249",
+        "minutes": 111,
+        "tsEnd": 1792295386249,
+        "tsStart": 1792288666793
+      },
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "مذاكرة مركزة"
+          }
+        ],
+        "id": "s_1792230800004",
+        "minutes": 1,
+        "tsEnd": 1792230800004,
+        "tsStart": 1792230723252
+      },
+      {
+        "entries": [
+          {
+            "subj": "arabic",
+            "task": "مذاكرة الوحدة الاولى و حل امتحان ا محمد"
+          }
+        ],
+        "fbKey": "-P40Bqhd136SW8xizb90",
+        "id": "s_1792095250841",
+        "minutes": 103,
+        "tsEnd": 1792095250841,
+        "tsStart": 1792093008385
+      },
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "كتابة يوميات"
+          }
+        ],
+        "fbKey": "-P4-KSbWArqL8kFxAOhH",
+        "id": "s_1792080730141",
+        "minutes": 28,
+        "tsEnd": 1792080730142,
+        "tsStart": 1792079023489
+      },
+      {
+        "entries": [
+          {
+            "subj": "arabic",
+            "task": "مذاكرة الوحدة الولى"
+          }
+        ],
+        "fbKey": "-P4-BLZ13dQCJ9LVI99q",
+        "id": "s_1792078342030",
+        "minutes": 157,
+        "tsEnd": 1792078342030,
+        "tsStart": 1792068871242
+      },
+      {
+        "entries": [
+          {
+            "subj": "arabic",
+            "task": "انهاء المحاضرة التانية"
+          }
+        ],
+        "fbKey": "-P3yzA92FttDqWhmMbgl",
+        "id": "s_1792058110193",
+        "minutes": 91,
+        "tsEnd": 1792058110193,
+        "tsStart": 1792052605747
+      },
+      {
+        "entries": [
+          {
+            "subj": "arabic",
+            "task": "مذاكرة المحاضرة الاولى و التانية ا محمد صلاح"
+          }
+        ],
+        "fbKey": "-P3yUPEX137WW5-szZyd",
+        "id": "s_1792049783375",
+        "minutes": 147,
+        "tsEnd": 1792049783375,
+        "tsStart": 1792049766022
+      },
+      {
+        "entries": [
+          {
+            "subj": "arabic",
+            "task": "مذاكرة المحاضرة الصفرية"
+          }
+        ],
+        "fbKey": "-P3wqbmOlbV0y8pwISPH",
+        "id": "s_1792022313790",
+        "minutes": 56,
+        "tsEnd": 1792022313790,
+        "tsStart": 1792018947445
+      },
+      {
+        "entries": [
+          {
+            "subj": "history",
+            "task": "مذاكرة مركزة"
+          }
+        ],
+        "fbKey": "-P3trhEP-op67YLjCjMJ",
+        "id": "s_1791972266882",
+        "minutes": 1,
+        "tsEnd": 1791972266882,
+        "tsStart": 1791972197538
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "مزاكرة و حل واجب القدرة و الكفاءة"
+          }
+        ],
+        "fbKey": "-P3jVgnbuF-nXSY-KDqs",
+        "id": "s_1791798462649",
+        "minutes": 105,
+        "tsEnd": 1791798462649,
+        "tsStart": 1791792156697
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "القدرة و الكفاءة"
+          }
+        ],
+        "fbKey": "-P3_nMRA-bDpBPD_AAVK",
+        "id": "s_1791635584519",
+        "minutes": 31,
+        "tsEnd": 1791635584522,
+        "tsStart": 1791633669262
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "مذاكرة مركزة"
+          }
+        ],
+        "fbKey": "-P3__c2u-Hpy4k66ZJDS",
+        "id": "s_1791631982613",
+        "minutes": 10,
+        "tsEnd": 1791631982613,
+        "tsStart": 1791631326641
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "حل عزم القوة"
+          }
+        ],
+        "fbKey": "-P3_6etSkfFKYxgMro5A",
+        "id": "s_1791624129918",
+        "minutes": 55,
+        "tsEnd": 1791586236251,
+        "tsStart": 1791582936251
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "مذاكرة درس اتزان القوى"
+          }
+        ],
+        "fbKey": "-P3WFlkZ8bOCmr2qomhM",
+        "id": "s_1791559408594",
+        "minutes": 90,
+        "tsEnd": 1791559408595,
+        "tsStart": 1791559390227
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "حل واجب و امتحان عزم القوة"
+          }
+        ],
+        "fbKey": "-P3VdcAq-qNcP02UD4Ra",
+        "id": "s_1791549145978",
+        "minutes": 51,
+        "tsEnd": 1791549145978,
+        "tsStart": 1791547150728
+      },
+      {
+        "entries": [
+          {
+            "subj": "history",
+            "task": "مذاكرة مركزة"
+          }
+        ],
+        "fbKey": "-P3PLn9oxv9dc8wQUC7n",
+        "id": "s_1791443546509",
+        "minutes": 67,
+        "tsEnd": 1791443546509,
+        "tsStart": 1791442894318
+      },
+      {
+        "entries": [
+          {
+            "subj": "history",
+            "task": "الدرس الاول و الثاني"
+          }
+        ],
+        "fbKey": "-P3NL6JC2AReKvPK14FM",
+        "id": "s_1791409812543",
+        "minutes": 215,
+        "tsEnd": 1791409812543,
+        "tsStart": 1791406012913
+      },
+      {
+        "entries": [
+          {
+            "subj": "arabic",
+            "task": "العلم بين القانون و الضمير و الجملة الفعلية"
+          }
+        ],
+        "fbKey": "-P3Hmd3wtlYaCK-goN_O",
+        "id": "s_1791316627747",
+        "minutes": 122,
+        "tsEnd": 1791316627747,
+        "tsStart": 1791316604610
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "مذاكرة مركزة"
+          }
+        ],
+        "fbKey": "-P32HbdJ1BdjcKaehtl0",
+        "id": "s_1791056574718",
+        "minutes": 320,
+        "tsEnd": 1791056574718,
+        "tsStart": 1791037333011
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "عزم القوة"
+          }
+        ],
+        "fbKey": "-P30oIz-494BSfJf9mPC",
+        "id": "s_1791031852681",
+        "minutes": 56,
+        "tsEnd": 1791031852681,
+        "tsStart": 1791028467527
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "مذاكرة مركزة"
+          }
+        ],
+        "fbKey": "-P30bMme9XA3Kx9oi3r9",
+        "id": "s_1791028460417",
+        "minutes": 55,
+        "tsEnd": 1791028460417,
+        "tsStart": 1791028456720
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "حل 43 سوال على المقذوفات بزاوية"
+          }
+        ],
+        "fbKey": "-P3-Xqmol7HuK5JAH09P",
+        "id": "s_1791010499519",
+        "minutes": 134,
+        "tsEnd": 1791010499520,
+        "tsStart": 1791002451045
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "مذاكرة مركزة"
+          }
+        ],
+        "fbKey": "-P2ySVXGwjrmVVHsTzWp",
+        "id": "s_1790975543459",
+        "minutes": 108,
+        "tsEnd": 1790975543459,
+        "tsStart": 1790969047154
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "مذاكرة مركزة"
+          }
+        ],
+        "fbKey": "-P2xnI3r8XJqLCR4LRtW",
+        "id": "s_1790964478152",
+        "minutes": 361,
+        "tsEnd": 1790964478152,
+        "tsStart": 1790964475211
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "حركة المقذوفات افقيا"
+          }
+        ],
+        "fbKey": "-P2td1IQOaBf3IJL4Plr",
+        "id": "s_1790894678871",
+        "minutes": 164,
+        "tsEnd": 1790894678871,
+        "tsStart": 1790891786815
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "المتجهات و السرعة النسبية و حل و عجلة"
+          }
+        ],
+        "fbKey": "-P2jFrpJVNx4UbIhXT7V",
+        "id": "s_1790720572826",
+        "minutes": 174,
+        "tsEnd": 1790720572826,
+        "tsStart": 1790716690368
+      },
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "المتجهات"
+          }
+        ],
+        "fbKey": "-P2U294QbwElZc-hOWp8",
+        "minutes": 103,
+        "tsEnd": 1790448542475,
+        "tsStart": 1790445390251
+      },
+      {
+        "entries": [
+          {
+            "subj": "arabic",
+            "task": "كتير"
+          }
+        ],
+        "fbKey": "-P2SZ8JTFk6OioJOzEfQ",
+        "minutes": 150.5,
+        "tsEnd": 1790423635700,
+        "tsStart": 1790384259819
+      },
+      {
+        "entries": [
+          {
+            "subj": "arabic",
+            "task": "الاسماء الخمسة و اسلوبا الخبري و الانشائي و حل تمارين و امتحان على الاسماء الخمسة"
+          }
+        ],
+        "fbKey": "-P2NcV2W89TTdis3Lmc3",
+        "minutes": 133,
+        "tsEnd": 1790340890824,
+        "tsStart": 1790332830251
+      },
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "خ"
+          }
+        ],
+        "fbKey": "-P2J7euaMnMMLckMecqw",
+        "minutes": 113.5,
+        "tsEnd": 1790265437920,
+        "tsStart": 1790258564419
+      },
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "ة"
+          }
+        ],
+        "fbKey": "-P2HlhJgHiBVbBPh1KQA",
+        "minutes": 2,
+        "tsEnd": 1790242641611,
+        "tsStart": 1790242517471
+      },
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "عبارات اسم الفاعل و المفعول المبني للمعلوم"
+          }
+        ],
+        "fbKey": "-P2Fo84momTSnipe6xyd",
+        "minutes": 38,
+        "tsEnd": 1790209724347,
+        "tsStart": 1790207380244
+      },
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "حذف و اختصار ضمائر الوصل"
+          },
+          {
+            "subj": "english",
+            "task": "حروف الجر و ضمائر الوصل"
+          },
+          {
+            "subj": "english",
+            "task": "مراجعه غلى عبارات الوصل"
+          }
+        ],
+        "fbKey": "-P2EGo6HwfXE9nQDpa3H",
+        "minutes": 72,
+        "tsEnd": 1790183948417,
+        "tsStart": 1790179529288
+      },
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "عبارات التحدية و الغير تحديدية"
+          },
+          {
+            "subj": "english",
+            "task": "حذف و اختصار عبارات الوصل"
+          }
+        ],
+        "fbKey": "-P2DqLpT3IiMRc-K4se-",
+        "minutes": 44,
+        "tsEnd": 1790176750633,
+        "tsStart": 1790174083613
+      },
+      {
+        "entries": [
+          {
+            "subj": "english",
+            "task": "راجعت الكلمات"
+          },
+          {
+            "subj": "english",
+            "task": "زاكرت ضمائر الوصل"
+          }
+        ],
+        "fbKey": "-P29iuTh7PJgi2l5knOU",
+        "minutes": 170,
+        "tsEnd": 1790107690865,
+        "tsStart": 1790100409066
+      }
+    ],
+    "exemptions": [
+      {
+        "id": "ex_1792601208307",
+        "minutes": 180,
+        "timestamp": 1792601208307,
+        "title": "مدرسة"
+      },
+      {
+        "fbKey": "-P4JcpwsM8Rg1h3vF0na",
+        "id": "ex_1792421355442",
+        "minutes": 180,
+        "timestamp": 1792421355442,
+        "title": "تاريخ"
+      },
+      {
+        "fbKey": "-P4JcnPzg5FJUno0J30Y",
+        "id": "ex_1792421345080",
+        "minutes": 240,
+        "timestamp": 1792421345080,
+        "title": "المدرسة"
+      },
+      {
+        "fbKey": "-P4CwkQqq66LwZKsJtF-",
+        "id": "ex_1792309134837",
+        "minutes": 180,
+        "timestamp": 1792309134837,
+        "title": "مدرسة"
+      },
+      {
+        "fbKey": "-P401wXCsyYO8Sf1PPOP",
+        "id": "ex_1792092653254",
+        "minutes": 120,
+        "timestamp": 1792092653254,
+        "title": "انجليزي"
+      },
+      {
+        "fbKey": "-P401to35ruJqApmE73B",
+        "id": "ex_1792092642102",
+        "minutes": 240,
+        "timestamp": 1792092642102,
+        "title": "تاريخ"
+      },
+      {
+        "fbKey": "-P3b3Komdz4caveZiH7j",
+        "id": "ex_1791656811527",
+        "minutes": 70,
+        "timestamp": 1791656811527,
+        "title": "عربي"
+      }
+    ],
+    "weeklyTasks": [
+      {
+        "contextInfo": "تنزل السبت 4:00 عصراً",
+        "dayId": "sat",
+        "id": 41,
+        "isRolled": true,
+        "priority": "class",
+        "subjId": "arabic",
+        "text": "حضور وسماع محاضرة العربي الجديدة أ. محمد صلاح (4:00 م)"
+      },
+      {
+        "dayId": "sat",
+        "id": 42,
+        "isRolled": true,
+        "priority": "high",
+        "subjId": "arabic",
+        "text": "تدوين ملاحظات محاضرة العربي وتلخيص النحو والبلاغة"
+      },
+      {
+        "contextInfo": "امتحان فيزياء شامل الخميس",
+        "dayId": "thu",
+        "id": 43,
+        "isRolled": true,
+        "priority": "exam",
+        "subjId": "physics",
+        "text": "مراجعة شاملة لاختبار الفيزياء الأسبوعي"
+      },
+      {
+        "dayId": "sun",
+        "id": 1,
+        "subjId": "physics",
+        "text": "مذاكرة كمية التحرك"
+      },
+      {
+        "dayId": "sun",
+        "id": 2,
+        "overlay": {
+          "height": 3.6,
+          "left": 73.2,
+          "top": 23.3,
+          "width": 22.8
+        },
+        "priority": "normal",
+        "subjId": "physics",
+        "text": "مذاكرة اتزان القوى وحل (الواجب + امتحان)"
+      },
+      {
+        "dayId": "sun",
+        "id": 3,
+        "overlay": {
+          "height": 3.6,
+          "left": 73.2,
+          "top": 27.3,
+          "width": 22.8
+        },
+        "priority": "normal",
+        "subjId": "physics",
+        "text": "مذاكرة القدرة و الكفاءة وحل (الواجب + امتحان)"
+      },
+      {
+        "dayId": "sun",
+        "id": 4,
+        "isRolled": true,
+        "overlay": {
+          "height": 3.6,
+          "left": 73.2,
+          "top": 31.4,
+          "width": 22.8
+        },
+        "priority": "normal",
+        "subjId": "arabic",
+        "text": "مذاكرة الجزء الثاني من الأسلوب الإنشائي والإطناب"
+      },
+      {
+        "dayId": "sun",
+        "id": 5,
+        "overlay": {
+          "height": 3.6,
+          "left": 73.2,
+          "top": 35.5,
+          "width": 22.8
+        },
+        "priority": "normal",
+        "subjId": "arabic",
+        "text": "إنهاء المحاضرة (2) أ. محمد صلاح"
+      },
+      {
+        "dayId": "sun",
+        "id": 6,
+        "isRolled": true,
+        "overlay": {
+          "height": 3.6,
+          "left": 73.2,
+          "top": 39.5,
+          "width": 22.8
+        },
+        "priority": "normal",
+        "subjId": "arabic",
+        "text": "مذاكرة درس العلم نور وحل تدريباته"
+      },
+      {
+        "dayId": "sun",
+        "id": 7,
+        "isRolled": true,
+        "overlay": {
+          "height": 3.6,
+          "left": 73.2,
+          "top": 43.6,
+          "width": 22.8
+        },
+        "priority": "normal",
+        "subjId": "english",
+        "text": "حفظ كلمات الدرس الثاني والثالث الوحدة الأولى"
+      },
+      {
+        "dayId": "sun",
+        "id": 10,
+        "isRolled": true,
+        "overlay": {
+          "height": 3.6,
+          "left": 73.2,
+          "top": 55.8,
+          "width": 22.8
+        },
+        "priority": "normal",
+        "subjId": "arabic",
+        "text": "إنهاء المحاضرة (3) أ. محمد صلاح ومذاكرة الخلق"
+      },
+      {
+        "dayId": "sun",
+        "id": 13,
+        "isRolled": true,
+        "overlay": {
+          "height": 3.6,
+          "left": 73.2,
+          "top": 68,
+          "width": 22.8
+        },
+        "priority": "normal",
+        "subjId": "arabic",
+        "text": "مذاكرة قاعدة المشتقات وقصة حكايات الغريب"
+      },
+      {
+        "dayId": "sun",
+        "id": 14,
+        "isRolled": true,
+        "overlay": {
+          "height": 3.6,
+          "left": 73.2,
+          "top": 72.1,
+          "width": 22.8
+        },
+        "priority": "high",
+        "subjId": "english",
+        "text": "حفظ كلمات الوحدة الثانية استعداداً لدرس الاثنين"
+      },
+      {
+        "contextInfo": "قبل سنتر التاريخ 1:00 ظ",
+        "dayId": "mon",
+        "id": 18,
+        "overlay": {
+          "height": 8.5,
+          "left": 50.8,
+          "top": 32.5,
+          "width": 21.2
+        },
+        "priority": "high",
+        "subjId": "history",
+        "text": "مذاكرة درس التحولات الكبرى ومراجعة ملزمة التاريخ"
+      },
+      {
+        "contextInfo": "سنتر التاريخ 1:00 ظهراً",
+        "dayId": "mon",
+        "id": 20,
+        "overlay": {
+          "height": 8.5,
+          "left": 50.8,
+          "top": 52.5,
+          "width": 21.2
+        },
+        "priority": "class",
+        "subjId": "history",
+        "text": "الذهاب لدرس التاريخ 1:00 ظهراً 🏛️"
+      },
+      {
+        "contextInfo": "ضروري إنهاؤها قبل 7:00 م",
+        "dayId": "mon",
+        "id": 21,
+        "overlay": {
+          "height": 8.5,
+          "left": 50.8,
+          "top": 62.5,
+          "width": 21.2
+        },
+        "priority": "urgent",
+        "subjId": "english",
+        "text": "مراجعة قاعدة الأفعال والواجب قبل درس الإنجليزي"
+      },
+      {
+        "contextInfo": "سنتر الإنجليزي 7:00 مساءً",
+        "dayId": "mon",
+        "id": 22,
+        "overlay": {
+          "height": 8.5,
+          "left": 50.8,
+          "top": 72.5,
+          "width": 21.2
+        },
+        "priority": "class",
+        "subjId": "english",
+        "text": "الذهاب لدرس الإنجليزي 7:00 مساءً 🌐"
+      },
+      {
+        "dayId": "mon",
+        "id": 23,
+        "overlay": {
+          "height": 8.5,
+          "left": 50.8,
+          "top": 82.5,
+          "width": 21.2
+        },
+        "priority": "high",
+        "subjId": "physics",
+        "text": "سماع ورشة مستر محمد عبد المعبود"
+      },
+      {
+        "contextInfo": "تسليم الواجب اليوم",
+        "dayId": "tue",
+        "id": 24,
+        "isRolled": true,
+        "priority": "urgent",
+        "subjId": "arabic",
+        "text": "حل وإنهاء واجب المحاضرة العربي بالكامل قبل الحصة"
+      },
+      {
+        "contextInfo": "سنتر العربي 4:00 عصراً",
+        "dayId": "tue",
+        "id": 33,
+        "overlay": {
+          "height": 5.2,
+          "left": 27.5,
+          "top": 88.6,
+          "width": 22.5
+        },
+        "priority": "class",
+        "subjId": "arabic",
+        "text": "الذهاب لدرس العربي 4:00 عصراً 📖"
+      },
+      {
+        "dayId": "tue",
+        "id": 25,
+        "isRolled": true,
+        "overlay": {
+          "height": 5.2,
+          "left": 27.5,
+          "top": 39,
+          "width": 22.5
+        },
+        "priority": "normal",
+        "subjId": "arabic",
+        "text": "مذاكرة درس العلم بين القانون والضمير وقصة عودة الروح"
+      },
+      {
+        "dayId": "tue",
+        "id": 27,
+        "isRolled": true,
+        "overlay": {
+          "height": 5.2,
+          "left": 27.5,
+          "top": 51.4,
+          "width": 22.5
+        },
+        "priority": "normal",
+        "subjId": "physics",
+        "text": "تجهيز واستعداد لمحاضرة فيزياء المنصة للأربعاء"
+      },
+      {
+        "contextInfo": "منصة الفيزياء الأربعاء",
+        "dayId": "wed",
+        "id": 34,
+        "isRolled": true,
+        "overlay": {
+          "height": 7.2,
+          "left": 4.2,
+          "top": 32.8,
+          "width": 22.5
+        },
+        "priority": "class",
+        "subjId": "physics",
+        "text": "حضور وسماع محاضرة فيزياء منصة أ. محمد عبد المعبود ⚛️"
+      },
+      {
+        "dayId": "wed",
+        "id": 35,
+        "isRolled": true,
+        "overlay": {
+          "height": 7.2,
+          "left": 4.2,
+          "top": 41,
+          "width": 22.5
+        },
+        "priority": "normal",
+        "subjId": "physics",
+        "text": "مذاكرة تفاصيل المحاضرة وتلخيص القوانين"
+      },
+      {
+        "dayId": "wed",
+        "id": 36,
+        "isRolled": true,
+        "overlay": {
+          "height": 7.2,
+          "left": 4.2,
+          "top": 49.2,
+          "width": 22.5
+        },
+        "priority": "high",
+        "subjId": "physics",
+        "text": "حل واجب شيت فيزياء المنصة"
+      },
+      {
+        "dayId": "wed",
+        "id": 40,
+        "isRolled": true,
+        "overlay": {
+          "height": 7.2,
+          "left": 4.2,
+          "top": 82,
+          "width": 22.5
+        },
+        "priority": "normal",
+        "subjId": "arabic",
+        "text": "مذاكرة الهمزات والتاءات والياءات وحل تدريبات النحو"
+      },
+      {
+        "contextInfo": "درس تاريخ 1:00 ظهراً",
+        "dayId": "thu",
+        "id": 44,
+        "priority": "class",
+        "subjId": "history",
+        "text": "الذهاب لدرس التاريخ 1:00 ظهراً 🏛️"
+      },
+      {
+        "contextInfo": "درس إنجليزي 7:00 مساءً",
+        "dayId": "thu",
+        "id": 45,
+        "priority": "class",
+        "subjId": "english",
+        "text": "مذاكرة كلمات وقواعد الإنجليزي والذهاب 7:00 مساءً 🌐"
+      },
+      {
+        "dayId": "fri",
+        "id": 46,
+        "isRolled": true,
+        "priority": "normal",
+        "subjId": "arabic",
+        "text": "حل قطع بلاغة ونصوص متحررة أسبوعية"
+      },
+      {
+        "dayId": "fri",
+        "id": 47,
+        "isRolled": true,
+        "priority": "high",
+        "subjId": "physics",
+        "text": "مراجعة كمية التحرك ومسائل المتفوقين"
+      },
+      {
+        "dayId": "backlog",
+        "id": 48,
+        "priority": "normal",
+        "subjId": "history",
+        "text": "تلخيص الفصل الأول تاريخ ومراجعة الخرائط المتراكمة"
+      },
+      {
+        "contextInfo": "7",
+        "dayId": "thu",
+        "id": 1792422185101,
+        "priority": "exam",
+        "subjId": "english",
+        "text": "الامتحان الشامل الثاني"
+      }
+    ],
+    "completedTaskIds": [
+      33,
+      "33",
+      20,
+      "20",
+      22,
+      "22",
+      1,
+      "1",
+      2,
+      "2",
+      3,
+      "3",
+      5,
+      "5",
+      44,
+      "44",
+      45,
+      "45",
+      1792225330307,
+      "1792225330307",
+      1792225285346,
+      "1792225285346",
+      1792225493283,
+      "1792225493283"
+    ],
+    "lectures": [
+      {
+        "code": "المحاضرة (01)",
+        "details": "شرح متجهات السرعة ومفهوم السرعة النسبية وتطبيقات الحركة في خط مستقيم",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-01-a",
+        "isDone": true,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "منتهية الصلاحية",
+        "title": "متجهات السرعة والسرعة النسبية",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (00)",
+        "details": "أساسيات النحو، مفاتيح الإعراب، وتأسيس علم البيان والبديع والمعاني",
+        "dueDay": "السبت / الثلاثاء",
+        "id": "ar-00",
+        "isDone": true,
+        "packageId": "arabic_course",
+        "packageName": "محاضرات اللغة العربية (أ. محمد صلاح)",
+        "subjId": "arabic",
+        "tag": "السبت محاضرة / الثلاثاء واجب",
+        "title": "المحاضرة الصفرية (تأسيس البلاغة والنحو)",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (01)",
+        "details": "مدرسة الإحياء والبعث، التشبيه والاستعارة، ووحدة النحو الأولى (همزة الوصل والقطع)",
+        "dueDay": "السبت / الثلاثاء",
+        "id": "ar-01",
+        "isDone": true,
+        "packageId": "arabic_course",
+        "packageName": "محاضرات اللغة العربية (أ. محمد صلاح)",
+        "subjId": "arabic",
+        "tag": "السبت محاضرة / الثلاثاء واجب",
+        "title": "المحاضرة الأولى: أدب وبلاغة ونحو شامل",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (02)",
+        "details": "شرح الأسلوب الإنشائي والخبري، صور الإطناب، وقراءة متحررة",
+        "dueDay": "السبت / الثلاثاء",
+        "id": "ar-02",
+        "isDone": true,
+        "packageId": "arabic_course",
+        "packageName": "محاضرات اللغة العربية (أ. محمد صلاح)",
+        "subjId": "arabic",
+        "tag": "السبت محاضرة / الثلاثاء واجب",
+        "title": "المحاضرة الثانية: الإطناب والأسلوب الإنشائي ودرس العلم نور",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (03)",
+        "details": "اسم الفاعل وصيغ المبالغة واسم المفعول وإعمال المشتقات مع النصوص",
+        "dueDay": "السبت / الثلاثاء",
+        "id": "ar-03",
+        "isDone": true,
+        "packageId": "arabic_course",
+        "packageName": "محاضرات اللغة العربية (أ. محمد صلاح)",
+        "subjId": "arabic",
+        "tag": "السبت محاضرة / الثلاثاء واجب",
+        "title": "المحاضرة الثالثة: المشتقات وقصة حكايات الغريب والخلق",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (04)",
+        "details": "اسم التفضيل واسم الزمان والمكان والمصدر الصريح والمؤول وقصة عودة الروح",
+        "dueDay": "السبت / الثلاثاء",
+        "id": "ar-04",
+        "isDone": true,
+        "packageId": "arabic_course",
+        "packageName": "محاضرات اللغة العربية (أ. محمد صلاح)",
+        "subjId": "arabic",
+        "tag": "السبت محاضرة / الثلاثاء واجب",
+        "title": "المحاضرة الرابعة: النحو الشامل وقصة عودة الروح والعلم والضمير",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (01)",
+        "details": "الجزء الثاني من متجهات السرعة وتدريبات متقدمة على مسائل السرعة النسبية",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-01-b",
+        "isDone": true,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "منتهية الصلاحية",
+        "title": "متجهات السرعة والسرعة النسبية ٢",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (02)",
+        "details": "معادلات الحركة في بعدين وحساب المدى الأفقي وزمن التحليق والسرعة اللحظية",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-02",
+        "isDone": true,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "منتهية الصلاحية",
+        "title": "حركة المقذوفات الأفقية",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (03)",
+        "details": "تحليل السرعة الابتدائية لمركبتين أفقية ورأسية وزاوية الإطلاق وأقصى ارتفاع",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-03",
+        "isDone": true,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "منتهية الصلاحية",
+        "title": "حركة المقذوفات بزاوية",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (04)",
+        "details": "مفهوم العزم، ذراع القوة، شروط الاتزان وقاعدة اليد اليمنى وحساب العزوم",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-04",
+        "isDone": true,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "منتهية الصلاحية",
+        "title": "عزم القوة",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (05)",
+        "details": "الاتزان الانتقالي والدوراني وشروط اتزان جسم صلب تحت تأثير عدة قوى متلاقية وغير متلاقية",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-05",
+        "isDone": true,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "منتهية الصلاحية",
+        "title": "اتزان القوى",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (06)",
+        "details": "تعريف القدرة ووحداتها، القدرة اللحظية والمتوسطة، حساب الشغل، وكفاءة الآلات الميكانيكية",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-06",
+        "isDone": true,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "منتهية الصلاحية",
+        "title": "القدرة والكفاءة",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (07)",
+        "details": "العلاقة بين الدفع وكمية التحرك، التغير في الزخم الخطي ومنحنى القوة والزمن",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-07",
+        "isDone": false,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "اشترك الآن",
+        "title": "كمية التحرك والدفع",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (08)",
+        "details": "قانون حفظ كمية التحرك والتصادمات المرنة وغير المرنة في بعد واحد وحل مسائل الارتداد",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-08",
+        "isDone": false,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "اشترك الآن",
+        "title": "حفظ كمية التحرك",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (09)",
+        "details": "الربط بين الزخم وطاقة الحركة ونظرية الشغل والطاقة في التصادمات والأنظمة المعزولة",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-09",
+        "isDone": false,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "اشترك الآن",
+        "title": "كمية التحرك والطاقة الميكانيكية",
+        "type": "lecture"
+      },
+      {
+        "code": "الامتحان الشامل",
+        "details": "اختبار تقييمي شامل على كل ما سبق دراسته في الفيزياء حتى المحاضرة السادسة",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-exam-01",
+        "isDone": true,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "منتهية الصلاحية",
+        "title": "الامتحان الشامل 01",
+        "type": "exam"
+      },
+      {
+        "code": "هدية مراجعة",
+        "details": "مراجعة شاملة وأسئلة تفكير عليا على المقذوفات الأفقية وبزاوية",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-rev-1",
+        "isDone": false,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "اشترك الآن",
+        "title": "مراجعة حركة المقذوفات",
+        "type": "review"
+      },
+      {
+        "code": "الورشة 01",
+        "details": "ورشة عمل وتدريبات أفكار امتحانات وزارية على الميكانيكا ومسائل الربط",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-ws-01",
+        "isDone": false,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "اشترك الآن",
+        "title": "الورشة الأولي 2 بكالوريا",
+        "type": "workshop"
+      },
+      {
+        "code": "الورشة 02",
+        "details": "حل بنك أسئلة الميكانيكا المتقدمة ومسائل المتفوقين في الفيزياء",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "phy-ws-02",
+        "isDone": false,
+        "packageId": "physics_3m",
+        "packageName": "باقة الفيزياء (الثلاث شهور الأولى)",
+        "subjId": "physics",
+        "tag": "اشترك الآن",
+        "title": "الورشة الثانية (ورشة الميكانيكا) 2 بكالوريا",
+        "type": "workshop"
+      }
+    ],
+    "exams": [
+      {
+        "id": "exam_seed_1",
+        "subjId": "arabic",
+        "teacher": "أ. محمد صلاح (عربي منصة)",
+        "topic": "الوحدة الأولى العلم بين القانون و الضمير و الخلق جوهر الفضيلة و الاسماء الخمسة و بلاغة و القصة الاولى",
+        "score": 45,
+        "total": 50,
+        "pct": 96,
+        "examType": "امتحان شامل",
+        "date": "2026-10-15",
+        "notes": ""
+      },
+      {
+        "id": "exam_seed_3",
+        "subjId": "history",
+        "teacher": "أستاذ احمد سمير التاريخ (سنتر 1:00 ظهراً)",
+        "topic": "اول اربع دروس",
+        "score": 28,
+        "total": 30,
+        "pct": 94,
+        "examType": "امتحان شامل",
+        "date": "2026-10-08",
+        "notes": ""
+      },
+      {
+        "id": "ex-1",
+        "subjId": "physics",
+        "teacher": "أ. محمد عبد المعبود (منصة أونلاين)",
+        "topic": "امتحان فيزياء اول ست دروي: المتجهات و السرعه والمقذوفات الأفقية والزاوية و القوى و القدرة و الكفاءة",
+        "score": 38,
+        "total": 40,
+        "pct": 96,
+        "examType": "امتحان شامل",
+        "date": "2026-10-03",
+        "notes": ""
+      },
+      {
+        "id": "exam_seed_2",
+        "subjId": "arabic",
+        "teacher": "أ. تقوى مرزوق (عربي/سنتر)",
+        "topic": "الوحدة الأولى",
+        "score": 28,
+        "total": 30,
+        "pct": 95,
+        "examType": "امتحان شهر",
+        "date": "2026-09-26",
+        "notes": ""
+      },
+      {
+        "id": "exam_seed_4",
+        "subjId": "english",
+        "teacher": "أستاذ ايمن الإنجليزي (7:00 مساءً)",
+        "topic": "Unit 1",
+        "score": 43,
+        "total": 50,
+        "pct": 92,
+        "examType": "امتحان شامل",
+        "date": "2026-09-24",
+        "notes": ""
+      }
+    ],
+    "subjects": [
+      {
+        "id": "history",
+        "name": "تاريخ",
+        "color": "#10b981",
+        "targetMinutes": 120,
+        "icon": "book-open"
+      },
+      {
+        "id": "arabic",
+        "name": "لغة عربية",
+        "color": "#f59e0b",
+        "targetMinutes": 150,
+        "icon": "feather"
+      },
+      {
+        "id": "english",
+        "name": "لغة إنجليزية",
+        "color": "#38bdf8",
+        "targetMinutes": 90,
+        "icon": "globe"
+      },
+      {
+        "id": "physics",
+        "name": "فيزياء",
+        "color": "#818cf8",
+        "targetMinutes": 180,
+        "icon": "atom"
+      }
+    ],
+    "displayTimeMode": "allTime",
+    "customAiInstructions": "راقب الوقت اللي بذاكره والوقت اللي بضيعه وعاتبني وقولي كلام مؤثر جداً. في الامتحانات لو جبت درجة حلوة باركلي، ولو مقفلتش أو نزلت عن الـ 95% قولي ليه كده وعلى حسب الدرجة حاسبني، ولو ما ذاكرتش قولي ما ذاكرتش ليه ليه. ومودك يتغير على حسب مستواي وعدد الساعات اللي بذاكرها وعدد المهمات اللي عملتها.",
+    "vizMode": "spiral",
+    "theme": "indigo"
+  }
+}

@@ -4,26 +4,110 @@
  * session persistence across reloads, wasted time calculations, and lesson exemptions.
  */
 
-// --- FIREBASE CLOUD INTEGRATION ---
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+// --- IMMEDIATE GLOBAL WINDOW BINDINGS (Resilient Bridge) ---
+window.triggerEmergencySyncAndCall = window._triggerEmergencySyncAndCallImpl = async function() {
+  const btn = document.getElementById('emergencySyncHeaderBtn');
+  if (btn) btn.disabled = true;
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBMBd9C41EyU7kWi06CVMgXrYFBVAvU1v8",
-  authDomain: "shapap-13c58.firebaseapp.com",
-  databaseURL: "https://shapap-13c58-default-rtdb.firebaseio.com",
-  projectId: "shapap-13c58",
-  storageBucket: "shapap-13c58.firebasestorage.app",
-  messagingSenderId: "818487036065",
-  appId: "1:818487036065:web:350734adcc4fcd779c48e0",
-  measurementId: "G-8L138W57KK"
+  try {
+    if (typeof toast === 'function') toast('🚨 جاري الإرسال الفوري للبيانات واستدعاء المراقب الطارئ...', 'refresh');
+    if (window.syncManager && typeof window.syncManager.syncNow === 'function') {
+      await window.syncManager.syncNow();
+      window.syncManager.lastPeriodicSyncTime = Date.now();
+    }
+    if (typeof window.triggerAiSupervisorAudit === 'function') {
+      await window.triggerAiSupervisorAudit(true);
+    }
+    if (typeof toast === 'function') toast('تم الإرسال الطارئ والمزامنة واستدعاء المراقب بنجاح! ⚡', 'check');
+  } catch (err) {
+    console.error('Emergency sync error:', err);
+    if (typeof toast === 'function') toast('تنبيه أثناء الاستدعاء الطارئ: ' + err.message, 'alert-triangle');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 };
 
+window.saveCustomAiInstructions = window._saveCustomAiInstructionsImpl = function() {
+  const inp1 = document.getElementById('kareemDirectivesInput');
+  const inp2 = document.getElementById('kareemDirectivesInputHub');
+  const text = (inp1 && inp1.value ? inp1.value : (inp2 && inp2.value ? inp2.value : '')).trim();
+  
+  if (!text) {
+    if (typeof toast === 'function') toast('الرجاء كتابة التعليمات للمراقب قبل الحفظ', 'alert-triangle');
+    return;
+  }
+
+  if (typeof state !== 'undefined') {
+    state.customAiInstructions = text;
+  }
+  localStorage.setItem('kareem_ai_custom_instructions', text);
+  if (inp1) inp1.value = text;
+  if (inp2) inp2.value = text;
+
+  const status = document.getElementById('directivesSaveStatus');
+  if (status) {
+    status.textContent = '⚡ تم الحفظ بنجاح! جاري المزامنة...';
+    setTimeout(() => {
+      status.textContent = '✅ المراقب ملتزم بتعليماتك 100%';
+    }, 2500);
+  }
+
+  if (window.syncManager && typeof window.syncManager.scheduleSync === 'function') {
+    window.syncManager.scheduleSync();
+  }
+  if (typeof renderAiHudSnapshot === 'function') {
+    renderAiHudSnapshot();
+  }
+  if (typeof toast === 'function') {
+    toast('تم حفظ تعليماتك بنجاح! المراقب يعمل الآن وفقاً لما كتبته له ⚡', 'check');
+  }
+};
+
+// Process any pending early stubs from index.html head
+if (window._shapapPendingCalls && Array.isArray(window._shapapPendingCalls)) {
+  const pending = window._shapapPendingCalls.splice(0);
+  setTimeout(() => {
+    pending.forEach(item => {
+      const fn = window[item.fnName];
+      if (typeof fn === 'function') {
+        try { fn.apply(item.self, item.args); } catch(e) {}
+      }
+    });
+  }, 100);
+}
+
+// --- RESILIENT CLOUD & OFFLINE INTEGRATION ---
 let firebaseApp = null;
 let rtdb = null;
 let sessionsDbRef = null;
 let exemptionsDbRef = null;
 let isFirebaseConnected = false;
+
+// Non-blocking optional Firebase RTDB loader (never blocks app execution offline)
+(async function initFirebaseResilient() {
+  try {
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const { getDatabase, ref } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js");
+    const firebaseConfig = {
+      apiKey: "AIzaSyBMBd9C41EyU7kWi06CVMgXrYFBVAvU1v8",
+      authDomain: "shapap-13c58.firebaseapp.com",
+      databaseURL: "https://shapap-13c58-default-rtdb.firebaseio.com",
+      projectId: "shapap-13c58",
+      storageBucket: "shapap-13c58.firebasestorage.app",
+      messagingSenderId: "818487036065",
+      appId: "1:818487036065:web:350734adcc4fcd779c48e0",
+      measurementId: "G-8L138W57KK"
+    };
+    firebaseApp = initializeApp(firebaseConfig);
+    rtdb = getDatabase(firebaseApp);
+    sessionsDbRef = ref(rtdb, 'shapap/sessions');
+    exemptionsDbRef = ref(rtdb, 'shapap/exemptions');
+    isFirebaseConnected = true;
+    console.log('[SHAPAP] Firebase connected in background.');
+  } catch(e) {
+    console.warn('[SHAPAP] Firebase CDN not loaded (offline or local mode). Using unified JSON database sync.');
+  }
+})();
 
 // --- SUBJECTS CONFIGURATION ---
 const DEFAULT_SUBJECTS = [
@@ -85,308 +169,11 @@ function loadInitialSessions() {
   return merged;
 }
 
-// --- WEEKLY TASKS DATA & ENGINE ---
-const DEFAULT_WEEKLY_TASKS = [
-  // السبت (نزول محاضرة العربي 4:00 عصراً + تحضير)
-  { id: 41, dayId: 'sat', subjId: 'arabic', text: 'حضور وسماع محاضرة العربي الجديدة أ. محمد صلاح (4:00 م)', priority: 'class', contextInfo: 'تنزل السبت 4:00 عصراً' },
-  { id: 42, dayId: 'sat', subjId: 'arabic', text: 'تدوين ملاحظات محاضرة العربي وتلخيص النحو والبلاغة', priority: 'high' },
-  { id: 43, dayId: 'sat', subjId: 'physics', text: 'تجهيز شيتات فيزياء الأسبوع وترتيب جدول المذاكرة', priority: 'normal' },
+// --- WEEKLY TASKS DATA & ENGINE (Loaded dynamically from Firebase RTDB) ---
+const DEFAULT_WEEKLY_TASKS = [];
 
-  // الأحد (فيزياء منصة + مهام)
-  { id: 1, dayId: 'sun', subjId: 'physics', text: 'متابعة وحضور فيزياء منصة أ. محمد عبد المعبود', priority: 'class', contextInfo: 'منصة الفيزياء الأحد', overlay: { top: 19.2, height: 3.6, left: 73.2, width: 22.8 } },
-  { id: 2, dayId: 'sun', subjId: 'physics', text: 'مذاكرة اتزان القوى وحل (الواجب + امتحان)', priority: 'normal', overlay: { top: 23.3, height: 3.6, left: 73.2, width: 22.8 } },
-  { id: 3, dayId: 'sun', subjId: 'physics', text: 'مذاكرة القدرة و الكفاءة وحل (الواجب + امتحان)', priority: 'normal', overlay: { top: 27.3, height: 3.6, left: 73.2, width: 22.8 } },
-  { id: 4, dayId: 'sun', subjId: 'arabic', text: 'مذاكرة الجزء الثاني من الأسلوب الإنشائي والإطناب', priority: 'normal', overlay: { top: 31.4, height: 3.6, left: 73.2, width: 22.8 } },
-  { id: 5, dayId: 'sun', subjId: 'arabic', text: 'إنهاء المحاضرة (2) أ. محمد صلاح', priority: 'normal', overlay: { top: 35.5, height: 3.6, left: 73.2, width: 22.8 } },
-  { id: 6, dayId: 'sun', subjId: 'arabic', text: 'مذاكرة درس العلم نور وحل تدريباته', priority: 'normal', overlay: { top: 39.5, height: 3.6, left: 73.2, width: 22.8 } },
-  { id: 7, dayId: 'sun', subjId: 'english', text: 'حفظ كلمات الدرس الثاني والثالث الوحدة الأولى', priority: 'normal', overlay: { top: 43.6, height: 3.6, left: 73.2, width: 22.8 } },
-  { id: 10, dayId: 'sun', subjId: 'arabic', text: 'إنهاء المحاضرة (3) أ. محمد صلاح ومذاكرة الخلق', priority: 'normal', overlay: { top: 55.8, height: 3.6, left: 73.2, width: 22.8 } },
-  { id: 13, dayId: 'sun', subjId: 'arabic', text: 'مذاكرة قاعدة المشتقات وقصة حكايات الغريب', priority: 'normal', overlay: { top: 68.0, height: 3.6, left: 73.2, width: 22.8 } },
-  { id: 14, dayId: 'sun', subjId: 'english', text: 'حفظ كلمات الوحدة الثانية استعداداً لدرس الاثنين', priority: 'high', overlay: { top: 72.1, height: 3.6, left: 73.2, width: 22.8 } },
-
-  // الاثنين (تاريخ 1:00 ظهراً + إنجليزي 7:00 مساءً)
-  { id: 18, dayId: 'mon', subjId: 'history', text: 'مذاكرة درس التحولات الكبرى ومراجعة ملزمة التاريخ', priority: 'high', contextInfo: 'قبل سنتر التاريخ 1:00 ظ', overlay: { top: 32.5, height: 8.5, left: 50.8, width: 21.2 } },
-  { id: 20, dayId: 'mon', subjId: 'history', text: 'الذهاب لدرس التاريخ 1:00 ظهراً 🏛️', priority: 'class', contextInfo: 'سنتر التاريخ 1:00 ظهراً', overlay: { top: 52.5, height: 8.5, left: 50.8, width: 21.2 } },
-  { id: 21, dayId: 'mon', subjId: 'english', text: 'مراجعة قاعدة الأفعال والواجب قبل درس الإنجليزي', priority: 'urgent', contextInfo: 'ضروري إنهاؤها قبل 7:00 م', overlay: { top: 62.5, height: 8.5, left: 50.8, width: 21.2 } },
-  { id: 22, dayId: 'mon', subjId: 'english', text: 'الذهاب لدرس الإنجليزي 7:00 مساءً 🌐', priority: 'class', contextInfo: 'سنتر الإنجليزي 7:00 مساءً', overlay: { top: 72.5, height: 8.5, left: 50.8, width: 21.2 } },
-  { id: 23, dayId: 'mon', subjId: 'physics', text: 'سماع ورشة مستر محمد عبد المعبود', priority: 'high', overlay: { top: 82.5, height: 8.5, left: 50.8, width: 21.2 } },
-
-  // الثلاثاء (عربي 4:00 عصراً - تسليم الواجب)
-  { id: 24, dayId: 'tue', subjId: 'arabic', text: 'حل وإنهاء واجب المحاضرة العربي بالكامل قبل الحصة', priority: 'urgent', contextInfo: 'تسليم الواجب اليوم' },
-  { id: 33, dayId: 'tue', subjId: 'arabic', text: 'الذهاب لدرس العربي 4:00 عصراً 📖', priority: 'class', contextInfo: 'سنتر العربي 4:00 عصراً', overlay: { top: 88.6, height: 5.2, left: 27.5, width: 22.5 } },
-  { id: 25, dayId: 'tue', subjId: 'arabic', text: 'مذاكرة درس العلم بين القانون والضمير وقصة عودة الروح', priority: 'normal', overlay: { top: 39.0, height: 5.2, left: 27.5, width: 22.5 } },
-  { id: 27, dayId: 'tue', subjId: 'physics', text: 'تجهيز واستعداد لمحاضرة فيزياء المنصة للأربعاء', priority: 'normal', overlay: { top: 51.4, height: 5.2, left: 27.5, width: 22.5 } },
-
-  // الأربعاء (فيزياء منصة)
-  { id: 34, dayId: 'wed', subjId: 'physics', text: 'حضور وسماع محاضرة فيزياء منصة أ. محمد عبد المعبود ⚛️', priority: 'class', contextInfo: 'منصة الفيزياء الأربعاء', overlay: { top: 32.8, height: 7.2, left: 4.2, width: 22.5 } },
-  { id: 35, dayId: 'wed', subjId: 'physics', text: 'مذاكرة تفاصيل المحاضرة وتلخيص القوانين', priority: 'normal', overlay: { top: 41.0, height: 7.2, left: 4.2, width: 22.5 } },
-  { id: 36, dayId: 'wed', subjId: 'physics', text: 'حل واجب شيت فيزياء المنصة', priority: 'high', overlay: { top: 49.2, height: 7.2, left: 4.2, width: 22.5 } },
-  { id: 40, dayId: 'wed', subjId: 'arabic', text: 'مذاكرة الهمزات والتاءات والياءات وحل تدريبات النحو', priority: 'normal', overlay: { top: 82.0, height: 7.2, left: 4.2, width: 22.5 } },
-
-  // الخميس (تاريخ 1:00 ظهراً + إنجليزي 7:00 مساءً)
-  { id: 44, dayId: 'thu', subjId: 'history', text: 'الذهاب لدرس التاريخ 1:00 ظهراً 🏛️', priority: 'class', contextInfo: 'درس تاريخ 1:00 ظهراً' },
-  { id: 45, dayId: 'thu', subjId: 'english', text: 'مذاكرة كلمات وقواعد الإنجليزي والذهاب 7:00 مساءً 🌐', priority: 'class', contextInfo: 'درس إنجليزي 7:00 مساءً' },
-  { id: 43, dayId: 'thu', subjId: 'physics', text: 'مراجعة شاملة لاختبار الفيزياء الأسبوعي', priority: 'exam', contextInfo: 'امتحان فيزياء شامل الخميس' },
-
-  // الجمعة (مراجعة وتجهيز حر)
-  { id: 46, dayId: 'fri', subjId: 'arabic', text: 'حل قطع بلاغة ونصوص متحررة أسبوعية', priority: 'normal' },
-  { id: 47, dayId: 'fri', subjId: 'physics', text: 'مراجعة كمية التحرك ومسائل المتفوقين', priority: 'high' },
-  { id: 48, dayId: 'backlog', subjId: 'history', text: 'تلخيص الفصل الأول تاريخ ومراجعة الخرائط المتراكمة', priority: 'normal' }
-];
-
-// --- LECTURES DATA & ENGINE (PHYSICS 3-MONTH PACKAGE + ARABIC) ---
-const DEFAULT_LECTURES = [
-  // باقة الفيزياء (الثلاث شهور الأولى - 14 عنصر)
-  {
-    id: 'phy-01-a',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'المحاضرة (01)',
-    title: 'متجهات السرعة والسرعة النسبية',
-    details: 'شرح متجهات السرعة ومفهوم السرعة النسبية وتطبيقات الحركة في خط مستقيم',
-    type: 'lecture',
-    isDone: true,
-    tag: 'منتهية الصلاحية',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-01-b',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'المحاضرة (01)',
-    title: 'متجهات السرعة والسرعة النسبية ٢',
-    details: 'الجزء الثاني من متجهات السرعة وتدريبات متقدمة على مسائل السرعة النسبية',
-    type: 'lecture',
-    isDone: true,
-    tag: 'منتهية الصلاحية',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-02',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'المحاضرة (02)',
-    title: 'حركة المقذوفات الأفقية',
-    details: 'معادلات الحركة في بعدين وحساب المدى الأفقي وزمن التحليق والسرعة اللحظية',
-    type: 'lecture',
-    isDone: true,
-    tag: 'منتهية الصلاحية',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-03',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'المحاضرة (03)',
-    title: 'حركة المقذوفات بزاوية',
-    details: 'تحليل السرعة الابتدائية لمركبتين أفقية ورأسية وزاوية الإطلاق وأقصى ارتفاع',
-    type: 'lecture',
-    isDone: true,
-    tag: 'منتهية الصلاحية',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-rev-1',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'هدية مراجعة',
-    title: 'مراجعة حركة المقذوفات',
-    details: 'مراجعة شاملة وأسئلة تفكير عليا على المقذوفات الأفقية وبزاوية',
-    type: 'review',
-    isDone: false,
-    tag: 'اشترك الآن',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-04',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'المحاضرة (04)',
-    title: 'عزم القوة',
-    details: 'مفهوم العزم، ذراع القوة، شروط الاتزان وقاعدة اليد اليمنى وحساب العزوم',
-    type: 'lecture',
-    isDone: true,
-    tag: 'منتهية الصلاحية',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-05',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'المحاضرة (05)',
-    title: 'اتزان القوى',
-    details: 'الاتزان الانتقالي والدوراني وشروط اتزان جسم صلب تحت تأثير عدة قوى متلاقية وغير متلاقية',
-    type: 'lecture',
-    isDone: true,
-    tag: 'منتهية الصلاحية',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-06',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'المحاضرة (06)',
-    title: 'القدرة والكفاءة',
-    details: 'تعريف القدرة ووحداتها، القدرة اللحظية والمتوسطة، حساب الشغل، وكفاءة الآلات الميكانيكية',
-    type: 'lecture',
-    isDone: true,
-    tag: 'منتهية الصلاحية',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-07',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'المحاضرة (07)',
-    title: 'كمية التحرك والدفع',
-    details: 'العلاقة بين الدفع وكمية التحرك، التغير في الزخم الخطي ومنحنى القوة والزمن',
-    type: 'lecture',
-    isDone: false,
-    tag: 'اشترك الآن',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-exam-01',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'الامتحان الشامل',
-    title: 'الامتحان الشامل 01',
-    details: 'اختبار تقييمي شامل على كل ما سبق دراسته في الفيزياء حتى المحاضرة السادسة',
-    type: 'exam',
-    isDone: true,
-    tag: 'منتهية الصلاحية',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-08',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'المحاضرة (08)',
-    title: 'حفظ كمية التحرك',
-    details: 'قانون حفظ كمية التحرك والتصادمات المرنة وغير المرنة في بعد واحد وحل مسائل الارتداد',
-    type: 'lecture',
-    isDone: false,
-    tag: 'اشترك الآن',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-ws-01',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'الورشة 01',
-    title: 'الورشة الأولي 2 بكالوريا',
-    details: 'ورشة عمل وتدريبات أفكار امتحانات وزارية على الميكانيكا ومسائل الربط',
-    type: 'workshop',
-    isDone: false,
-    tag: 'اشترك الآن',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-09',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'المحاضرة (09)',
-    title: 'كمية التحرك والطاقة الميكانيكية',
-    details: 'الربط بين الزخم وطاقة الحركة ونظرية الشغل والطاقة في التصادمات والأنظمة المعزولة',
-    type: 'lecture',
-    isDone: false,
-    tag: 'اشترك الآن',
-    dueDay: 'الأحد / الأربعاء'
-  },
-  {
-    id: 'phy-ws-02',
-    packageId: 'physics_3m',
-    packageName: 'باقة الفيزياء (الثلاث شهور الأولى)',
-    subjId: 'physics',
-    code: 'الورشة 02',
-    title: 'الورشة الثانية (ورشة الميكانيكا) 2 بكالوريا',
-    details: 'حل بنك أسئلة الميكانيكا المتقدمة ومسائل المتفوقين في الفيزياء',
-    type: 'workshop',
-    isDone: false,
-    tag: 'اشترك الآن',
-    dueDay: 'الأحد / الأربعاء'
-  },
-
-  // محاضرات اللغة العربية (من الصفرية للرابعة - أ. محمد صلاح)
-  {
-    id: 'ar-00',
-    packageId: 'arabic_course',
-    packageName: 'محاضرات اللغة العربية (أ. محمد صلاح)',
-    subjId: 'arabic',
-    code: 'المحاضرة (00)',
-    title: 'المحاضرة الصفرية (تأسيس البلاغة والنحو)',
-    details: 'أساسيات النحو، مفاتيح الإعراب، وتأسيس علم البيان والبديع والمعاني',
-    type: 'lecture',
-    isDone: true,
-    tag: 'السبت محاضرة / الثلاثاء واجب',
-    dueDay: 'السبت / الثلاثاء'
-  },
-  {
-    id: 'ar-01',
-    packageId: 'arabic_course',
-    packageName: 'محاضرات اللغة العربية (أ. محمد صلاح)',
-    subjId: 'arabic',
-    code: 'المحاضرة (01)',
-    title: 'المحاضرة الأولى: أدب وبلاغة ونحو شامل',
-    details: 'مدرسة الإحياء والبعث، التشبيه والاستعارة، ووحدة النحو الأولى (همزة الوصل والقطع)',
-    type: 'lecture',
-    isDone: true,
-    tag: 'السبت محاضرة / الثلاثاء واجب',
-    dueDay: 'السبت / الثلاثاء'
-  },
-  {
-    id: 'ar-02',
-    packageId: 'arabic_course',
-    packageName: 'محاضرات اللغة العربية (أ. محمد صلاح)',
-    subjId: 'arabic',
-    code: 'المحاضرة (02)',
-    title: 'المحاضرة الثانية: الإطناب والأسلوب الإنشائي ودرس العلم نور',
-    details: 'شرح الأسلوب الإنشائي والخبري، صور الإطناب، وقراءة متحررة',
-    type: 'lecture',
-    isDone: true,
-    tag: 'السبت محاضرة / الثلاثاء واجب',
-    dueDay: 'السبت / الثلاثاء'
-  },
-  {
-    id: 'ar-03',
-    packageId: 'arabic_course',
-    packageName: 'محاضرات اللغة العربية (أ. محمد صلاح)',
-    subjId: 'arabic',
-    code: 'المحاضرة (03)',
-    title: 'المحاضرة الثالثة: المشتقات وقصة حكايات الغريب والخلق',
-    details: 'اسم الفاعل وصيغ المبالغة واسم المفعول وإعمال المشتقات مع النصوص',
-    type: 'lecture',
-    isDone: true,
-    tag: 'السبت محاضرة / الثلاثاء واجب',
-    dueDay: 'السبت / الثلاثاء'
-  },
-  {
-    id: 'ar-04',
-    packageId: 'arabic_course',
-    packageName: 'محاضرات اللغة العربية (أ. محمد صلاح)',
-    subjId: 'arabic',
-    code: 'المحاضرة (04)',
-    title: 'المحاضرة الرابعة: النحو الشامل وقصة عودة الروح والعلم والضمير',
-    details: 'اسم التفضيل واسم الزمان والمكان والمصدر الصريح والمؤول وقصة عودة الروح',
-    type: 'lecture',
-    isDone: true,
-    tag: 'السبت محاضرة / الثلاثاء واجب',
-    dueDay: 'السبت / الثلاثاء'
-  }
-];
+// --- LECTURES DATA & ENGINE (Loaded dynamically from Firebase RTDB) ---
+const DEFAULT_LECTURES = [];
 
 // --- PERSISTENCE ENGINE & STORAGE KEYS (v5 Unified) ---
 const STORAGE_KEYS = {
@@ -399,6 +186,21 @@ const STORAGE_KEYS = {
 function normalizeTaskId(id) {
   const num = Number(id);
   return (!isNaN(num) && String(num) === String(id).trim()) ? num : id;
+}
+
+function addNormalizedToSet(set, id) {
+  if (id === undefined || id === null) return;
+  set.add(id);
+  set.add(String(id));
+  const num = Number(id);
+  if (!isNaN(num)) set.add(num);
+}
+
+function isTaskCompleted(id) {
+  if (id === undefined || id === null || !state || !state.completedTaskIds) return false;
+  return state.completedTaskIds.has(id) || 
+         state.completedTaskIds.has(String(id)) || 
+         state.completedTaskIds.has(Number(id));
 }
 
 function loadSavedWeeklyTasks() {
@@ -431,7 +233,7 @@ function loadSavedCompletedTaskIds() {
     if (v5) {
       const parsed = JSON.parse(v5);
       if (Array.isArray(parsed)) {
-        parsed.forEach(id => set.add(normalizeTaskId(id)));
+        parsed.forEach(id => addNormalizedToSet(set, id));
         return set;
       }
     }
@@ -439,7 +241,7 @@ function loadSavedCompletedTaskIds() {
     if (v3) {
       const parsed = JSON.parse(v3);
       if (Array.isArray(parsed)) {
-        parsed.forEach(id => set.add(normalizeTaskId(id)));
+        parsed.forEach(id => addNormalizedToSet(set, id));
         return set;
       }
     }
@@ -447,7 +249,7 @@ function loadSavedCompletedTaskIds() {
     if (v2) {
       const parsed = JSON.parse(v2);
       if (Array.isArray(parsed)) {
-        parsed.forEach(id => set.add(normalizeTaskId(id)));
+        parsed.forEach(id => addNormalizedToSet(set, id));
         return set;
       }
     }
@@ -455,7 +257,7 @@ function loadSavedCompletedTaskIds() {
     if (legacy) {
       const parsed = JSON.parse(legacy);
       if (Array.isArray(parsed)) {
-        parsed.forEach(id => set.add(normalizeTaskId(id)));
+        parsed.forEach(id => addNormalizedToSet(set, id));
       }
     }
   } catch(e) {
@@ -474,24 +276,12 @@ function loadSavedLectures() {
     const v2 = localStorage.getItem('kareem_lectures_v2');
     if (v2) {
       const parsed = JSON.parse(v2);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // If v2 already has the full set of physics & arabic items
-        const hasAllPhysics = DEFAULT_LECTURES.every(dl => parsed.some(pl => pl.id === dl.id));
-        if (hasAllPhysics) return parsed;
-        // Merge user completion statuses and custom lectures into DEFAULT_LECTURES
-        const customItems = parsed.filter(p => p.id && String(p.id).startsWith('cust-'));
-        const completionMap = new Map(parsed.map(p => [p.id, p.isDone]));
-        const merged = DEFAULT_LECTURES.map(dl => ({
-          ...dl,
-          isDone: completionMap.has(dl.id) ? completionMap.get(dl.id) : dl.isDone
-        }));
-        return [...merged, ...customItems];
-      }
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch(e) {
     console.error('Error loading lectures:', e);
   }
-  return JSON.parse(JSON.stringify(DEFAULT_LECTURES));
+  return [];
 }
 
 function persistLectures() {
@@ -499,6 +289,7 @@ function persistLectures() {
     const json = JSON.stringify(state.lectures);
     localStorage.setItem(STORAGE_KEYS.LECTURES, json);
     localStorage.setItem('kareem_lectures_v2', json);
+    if (window.syncManager) window.syncManager.scheduleSync();
   } catch(e) {
     console.error('Error persisting lectures:', e);
   }
@@ -516,52 +307,8 @@ function loadSanitizedSubjects() {
   return DEFAULT_SUBJECTS;
 }
 
-const DEFAULT_EXAMS = [
-  {
-    id: 'exam_seed_1',
-    subjId: 'physics',
-    teacher: 'أ. محمد عبد المعبود (فيزياء منصة)',
-    topic: 'الفصل الأول: التيار الكهربي وقانون أوم وقانونا كيرشوف',
-    score: 48,
-    total: 50,
-    examType: 'امتحان شامل',
-    date: '2026-10-11',
-    notes: 'أداء ممتاز جداً! راجع فقط حساب الإشارات في مسارات كيرشوف المغلقة'
-  },
-  {
-    id: 'exam_seed_2',
-    subjId: 'arabic',
-    teacher: 'أ. محمد صلاح (عربي منصة/سنتر)',
-    topic: 'الوحدة الأولى نحو (همزة الوصل والقطع) + البلاغة المحسنات البديعية',
-    score: 57,
-    total: 60,
-    examType: 'امتحان شهر',
-    date: '2026-10-09',
-    notes: 'مراجعة إعراب المستثنى بغير وسوى وإعراب ما بعد خلا وعدا وحاشا'
-  },
-  {
-    id: 'exam_seed_3',
-    subjId: 'history',
-    teacher: 'أستاذ التاريخ (سنتر 1:00 ظهراً)',
-    topic: 'الفصل الأول: أحوال المجتمع المصري قبل الحملة وثورة القاهرة الأولى',
-    score: 47,
-    total: 50,
-    examType: 'كويز حصة أسبوعي',
-    date: '2026-10-06',
-    notes: 'إجابات نموذجية في الربط بين موقعة أبي قير وتدهور التجارة'
-  },
-  {
-    id: 'exam_seed_4',
-    subjId: 'english',
-    teacher: 'أستاذ الإنجليزي (7:00 مساءً)',
-    topic: 'Unit 1 & Unit 2: Past Simple, Past Continuous & Vocabulary Check',
-    score: 46,
-    total: 50,
-    examType: 'كويز حصة أسبوعي',
-    date: '2026-10-03',
-    notes: 'مراجعة حروف الجر الخاصة بالكلمات والمترادفات والمتلازمات اللفظية'
-  }
-];
+// --- EXAMS & ASSESSMENTS DATA & ENGINE (Loaded dynamically from Firebase RTDB) ---
+const DEFAULT_EXAMS = [];
 
 function loadSavedExams() {
   try {
@@ -573,12 +320,16 @@ function loadSavedExams() {
   } catch(e) {
     console.error('Error loading saved exams:', e);
   }
-  return JSON.parse(JSON.stringify(DEFAULT_EXAMS));
+  return [];
 }
 
 function persistExams() {
   try {
-    localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify(state.exams));
+    const json = JSON.stringify(state.exams);
+    localStorage.setItem(STORAGE_KEYS.EXAMS, json);
+    localStorage.setItem('kareem_exams_v1', json);
+    localStorage.setItem('kareem_exams', json);
+    if (window.syncManager) window.syncManager.scheduleSync();
   } catch(e) {
     console.error('Error persisting exams:', e);
   }
@@ -611,7 +362,9 @@ const state = {
   activeExamRatingFilter: 'all',
   examSearchQuery: '',
   examSortBy: 'newest',
-  editingExamId: null
+  editingExamId: null,
+  // Custom Directives for AI Supervisor ("يشتغل باللي أنا كاتبهوله")
+  customAiInstructions: localStorage.getItem('kareem_ai_custom_instructions') || "راقب الوقت اللي بذاكره والوقت اللي بضيعه وعاتبني وقولي كلام مؤثر جداً. في الامتحانات لو جبت درجة حلوة باركلي، ولو مقفلتش أو نزلت عن الـ 95% قولي ليه كده وعلى حسب الدرجة حاسبني، ولو ما ذاكرتش قولي ما ذاكرتش ليه ليه. ومودك يتغير على حسب مستواي وعدد الساعات اللي بذاكرها وعدد المهمات اللي عملتها."
 };
 
 // --- SESSION STORAGE & REFRESH RECOVERY ---
@@ -861,6 +614,16 @@ function calculateWastedTime() {
     isTragic
   };
 }
+
+function getWastedMinutesToday() {
+  try {
+    const w = calculateWastedTime();
+    return (w && typeof w.wastedMins === 'number') ? w.wastedMins : 0;
+  } catch(e) {
+    return 0;
+  }
+}
+window.getWastedMinutesToday = getWastedMinutesToday;
 
 // --- VISUALIZATIONS (Canvas Drawing with 4 Supercharged Modes) ---
 const mainCanvas = document.getElementById('mainVisualizerCanvas');
@@ -1214,6 +977,10 @@ function persistWeeklyTasks() {
     localStorage.setItem('kareem_completed_task_ids_v3', completedJson);
     localStorage.setItem('kareem_completed_task_ids_v2', completedJson);
     localStorage.setItem('backlog_4days_tasks_v1', completedJson);
+
+    if (window.syncManager && typeof window.syncManager.scheduleSync === 'function') {
+      window.syncManager.scheduleSync();
+    }
   } catch(e) {
     console.error('Error persisting weekly tasks:', e);
   }
@@ -1227,6 +994,16 @@ function renderUI() {
   // Top Header Badge
   const headerVal = document.getElementById('headerAllTimeValue');
   if (headerVal) headerVal.textContent = fmtHMEn(allTimeMins);
+
+  // Sync Karim's directives textarea values if not being typed into
+  const dir1 = document.getElementById('kareemDirectivesInput');
+  const dir2 = document.getElementById('kareemDirectivesInputHub');
+  if (dir1 && !dir1.value && state.customAiInstructions && document.activeElement !== dir1) {
+    dir1.value = state.customAiInstructions;
+  }
+  if (dir2 && !dir2.value && state.customAiInstructions && document.activeElement !== dir2) {
+    dir2.value = state.customAiInstructions;
+  }
 
   // Center Clock in Canvas (Shows all-time and today simultaneously)
   const centerNum = document.getElementById('canvasCenterNum');
@@ -1326,6 +1103,7 @@ function renderUI() {
   renderVisualTimetableBoard();
   renderLecturesUI();
   renderExamsTrackerUI();
+  renderAiHudSnapshot();
 }
 
 function renderDashboardMetrics() {
@@ -1428,16 +1206,16 @@ function renderWeeklyPlannerUI() {
   const totalTasks = state.weeklyTasks.length;
   const nonBacklogTasks = state.weeklyTasks.filter(t => t.dayId !== 'backlog');
   const weeklyTotal = nonBacklogTasks.length;
-  const weeklyCompleted = nonBacklogTasks.filter(t => state.completedTaskIds.has(t.id)).length;
+  const weeklyCompleted = nonBacklogTasks.filter(t => isTaskCompleted(t.id)).length;
   const weeklyPct = weeklyTotal > 0 ? Math.round((weeklyCompleted / weeklyTotal) * 100) : 0;
 
-  const monthlyCompleted = state.weeklyTasks.filter(t => state.completedTaskIds.has(t.id)).length;
+  const monthlyCompleted = state.weeklyTasks.filter(t => isTaskCompleted(t.id)).length;
   const monthlyPct = totalTasks > 0 ? Math.round((monthlyCompleted / totalTasks) * 100) : 0;
 
   const pendingWeekly = weeklyTotal - weeklyCompleted;
   const examClassCount = state.weeklyTasks.filter(t => 
     (t.priority === 'exam' || t.priority === 'class' || t.priority === 'urgent') && 
-    !state.completedTaskIds.has(t.id)
+    !isTaskCompleted(t.id)
   ).length;
 
   // Header Boxes
@@ -1466,7 +1244,7 @@ function renderWeeklyPlannerUI() {
     const todayDayId = getTodayDayId();
     strip.innerHTML = DAYS_CONFIG.map(d => {
       const dTasks = state.weeklyTasks.filter(t => t.dayId === d.id);
-      const dDone = dTasks.filter(t => state.completedTaskIds.has(t.id)).length;
+      const dDone = dTasks.filter(t => isTaskCompleted(t.id)).length;
       const dTotal = dTasks.length;
       const dPct = dTotal > 0 ? Math.round((dDone / dTotal) * 100) : 0;
       const isActive = state.activeDayFilter === d.id;
@@ -1490,7 +1268,7 @@ function renderWeeklyPlannerUI() {
     posterLayer.innerHTML = state.weeklyTasks
       .filter(t => t.overlay)
       .map(t => {
-        const isDone = state.completedTaskIds.has(t.id);
+        const isDone = isTaskCompleted(t.id);
         const ov = t.overlay;
         return `
           <div class="poster-slot-interactive ${isDone ? 'done' : ''}" 
@@ -1530,14 +1308,14 @@ function renderWeeklyPlannerUI() {
   // Smart Sorting: Uncompleted first, then Exam/Urgent -> Class -> High -> Normal
   const priorityScore = { exam: 5, urgent: 4, class: 3, high: 2, normal: 1 };
   filtered.sort((a, b) => {
-    const doneA = state.completedTaskIds.has(a.id) ? 1 : 0;
-    const doneB = state.completedTaskIds.has(b.id) ? 1 : 0;
+    const doneA = isTaskCompleted(a.id) ? 1 : 0;
+    const doneB = isTaskCompleted(b.id) ? 1 : 0;
     if (doneA !== doneB) return doneA - doneB;
     return (priorityScore[b.priority] || 1) - (priorityScore[a.priority] || 1);
   });
 
   grid.innerHTML = filtered.map(t => {
-    const isDone = state.completedTaskIds.has(t.id);
+    const isDone = isTaskCompleted(t.id);
     const sub = state.subjects.find(s => s.id === t.subjId) || { name: 'عام', color: '#64748b' };
     const dayConfig = DAYS_CONFIG.find(d => d.id === t.dayId) || { name: 'المتراكم' };
 
@@ -1605,19 +1383,19 @@ function renderWeeklyPlannerUI() {
 
 // Global actions exposed for event bindings
 window.toggleTaskCompletion = function(rawId) {
-  const id = normalizeTaskId(rawId);
-  const wasDone = state.completedTaskIds.has(id);
+  const wasDone = isTaskCompleted(rawId);
   if (wasDone) {
-    state.completedTaskIds.delete(id);
-    state.completedTaskIds.delete(String(id));
-    state.completedTaskIds.delete(Number(id));
+    state.completedTaskIds.delete(rawId);
+    state.completedTaskIds.delete(String(rawId));
+    state.completedTaskIds.delete(Number(rawId));
     playChimeSound(false);
   } else {
-    state.completedTaskIds.add(id);
+    addNormalizedToSet(state.completedTaskIds, rawId);
     playChimeSound(true);
   }
 
   persistWeeklyTasks();
+  if (window.syncManager) window.syncManager.scheduleSync();
   renderWeeklyPlannerUI();
   renderVisualTimetableBoard();
 
@@ -1690,7 +1468,7 @@ window.carryOverUnfinishedTasks = function(targetDayId) {
   let count = 0;
   state.weeklyTasks.forEach(t => {
     const id = normalizeTaskId(t.id);
-    if (!state.completedTaskIds.has(id) && t.dayId !== actualTarget && t.dayId !== 'backlog') {
+    if (!isTaskCompleted(id) && t.dayId !== actualTarget && t.dayId !== 'backlog') {
       t.dayId = actualTarget;
       t.isRolled = true;
       count++;
@@ -1699,6 +1477,7 @@ window.carryOverUnfinishedTasks = function(targetDayId) {
 
   if (count > 0) {
     persistWeeklyTasks();
+    if (window.syncManager) window.syncManager.scheduleSync();
     renderWeeklyPlannerUI();
     renderVisualTimetableBoard();
     const dayName = (DAYS_CONFIG.find(d => d.id === actualTarget) || {}).name || actualTarget;
@@ -1718,6 +1497,7 @@ window.resetTasksProgress = function(mode) {
     toast('تمت استعادة الجدول الأصلي بالكامل!', 'refresh');
   }
   persistWeeklyTasks();
+  if (window.syncManager) window.syncManager.scheduleSync();
   renderWeeklyPlannerUI();
   renderVisualTimetableBoard();
 };
@@ -1733,12 +1513,12 @@ function renderVisualTimetableBoard() {
   container.innerHTML = daysToShow.map(day => {
     const isToday = day.id === todayId;
     const dayTasks = state.weeklyTasks.filter(t => t.dayId === day.id);
-    const completedCount = dayTasks.filter(t => state.completedTaskIds.has(t.id)).length;
+    const completedCount = dayTasks.filter(t => isTaskCompleted(t.id)).length;
     const totalCount = dayTasks.length;
     const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
     const tasksHtml = dayTasks.length ? dayTasks.slice(0, 5).map(t => {
-      const isDone = state.completedTaskIds.has(t.id);
+      const isDone = isTaskCompleted(t.id);
       const sub = state.subjects.find(s => s.id === t.subjId) || { name: 'عام', color: '#64748b' };
       return `
         <div class="day-task-mini-item ${isDone ? 'done' : ''}" onclick="window.toggleTaskCompletion(${t.id})">
@@ -2124,7 +1904,7 @@ window.generateAndShowScheduleImage = function() {
   ctx.fillStyle = '#8b9ea3';
   ctx.font = '14px Cairo, sans-serif';
   const totalT = state.weeklyTasks.filter(t => t.dayId !== 'backlog').length;
-  const doneT = state.weeklyTasks.filter(t => t.dayId !== 'backlog' && state.completedTaskIds.has(t.id)).length;
+  const doneT = state.weeklyTasks.filter(t => t.dayId !== 'backlog' && isTaskCompleted(t.id)).length;
   const weeklyPct = totalT > 0 ? Math.round((doneT / totalT) * 100) : 0;
   ctx.fillText(`إنجاز الأسبوع: ${doneT} من ${totalT} مهمة (${weeklyPct}%) • السبت إلى الجمعة`, canvas.width / 2, 114);
 
@@ -2139,7 +1919,7 @@ window.generateAndShowScheduleImage = function() {
   daysToShow.forEach((day, idx) => {
     const x = startX + idx * (colW + gap);
     const dayTasks = state.weeklyTasks.filter(t => t.dayId === day.id);
-    const completedCount = dayTasks.filter(t => state.completedTaskIds.has(t.id)).length;
+    const completedCount = dayTasks.filter(t => isTaskCompleted(t.id)).length;
 
     // Column background card
     ctx.fillStyle = '#172226';
@@ -2191,7 +1971,7 @@ window.generateAndShowScheduleImage = function() {
     const tasksToDraw = dayTasks.slice(0, 8);
 
     tasksToDraw.forEach(t => {
-      const isDone = state.completedTaskIds.has(t.id);
+      const isDone = isTaskCompleted(t.id);
       const sub = state.subjects.find(s => s.id === t.subjId) || { name: 'عام', color: '#818cf8' };
 
       // Task item background
@@ -2444,70 +2224,1205 @@ function finishSession() {
   document.getElementById('finishModal').classList.add('show');
 }
 
-// --- FIREBASE SYNC FUNCTIONS ---
-function updateCloudIndicator(connected) {
-  const el = document.getElementById('cloudStatusIndicator');
-  if (!el) return;
-  if (connected) {
-    el.style.background = 'rgba(16, 185, 129, 0.12)';
+// --- DATABASE SYNC MANAGER (Cloud + Offline-First Engine) ---
+const syncManager = {
+  isOnline: navigator.onLine,
+  isSyncing: false,
+  pendingSyncTimer: null,
+  hasPendingChanges: false,
+  lastSyncedTimestamp: null,
+  lastPeriodicSyncTime: Date.now(),
+
+  init() {
+    window.addEventListener('online', () => {
+      this.isOnline = true;
+      this.updateIndicator();
+      toast('تم استعادة الاتصال بالإنترنت! جاري المزامنة مع قاعدة البيانات ⚡', 'check');
+      this.syncNow(true);
+    });
+
+    window.addEventListener('offline', () => {
+      this.isOnline = false;
+      this.updateIndicator();
+      toast('أنت الآن في وضع عدم الاتصال (Offline). مؤقتك وملاحظاتك وكل بياناتك محفوظة محلياً بأمان!', 'timer');
+    });
+
+    // Initial pull and bidirectional merge from server database
+    this.initialPull();
+
+    // 1-second ticker for the 1-hour periodic sync countdown
+    setInterval(() => {
+      this.tickCountdown();
+    }, 1000);
+    this.tickCountdown();
+
+    // Periodic sync interval every 1 hour (60 minutes) to drastically reduce calls
+    setInterval(() => {
+      if (this.isOnline) {
+        console.log('[SHAPAP DB] 1-hour periodic database sync running...');
+        this.lastPeriodicSyncTime = Date.now();
+        this.syncNow(true);
+      }
+    }, 60 * 60 * 1000);
+  },
+
+  tickCountdown() {
+    const ONE_HOUR = 60 * 60 * 1000;
+    const elapsed = Date.now() - (this.lastPeriodicSyncTime || Date.now());
+    const remainingMs = Math.max(0, ONE_HOUR - (elapsed % ONE_HOUR));
+    const totalSecs = Math.floor(remainingMs / 1000);
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    const str = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    const el1 = document.getElementById('syncNextCountdown');
+    const el2 = document.getElementById('syncCountdownDashboard');
+    if (el1) el1.textContent = str;
+    if (el2) el2.textContent = str;
+  },
+
+  updateIndicator(statusText) {
+    const el = document.getElementById('cloudStatusIndicator');
+    const txt = document.getElementById('cloudStatusText');
+    if (!el || !txt) return;
+
+    if (!this.isOnline) {
+      el.style.background = 'rgba(245, 158, 11, 0.15)';
+      el.style.color = '#f59e0b';
+      el.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+      txt.textContent = 'أوفلاين (محلي آمن)';
+      return;
+    }
+
+    if (this.isSyncing) {
+      el.style.background = 'rgba(56, 189, 248, 0.15)';
+      el.style.color = '#38bdf8';
+      el.style.border = '1px solid rgba(56, 189, 248, 0.3)';
+      txt.textContent = 'جاري المزامنة...';
+      return;
+    }
+
+    el.style.background = 'rgba(16, 185, 129, 0.15)';
     el.style.color = '#10b981';
-    el.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#10b981; display:inline-block;"></span> سحابي (Firebase متصل)`;
+    el.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+    txt.textContent = statusText || 'قاعدة البيانات مؤمنة ومتزامنة 100% ⚡';
+  },
+
+  scheduleSync() {
+    this.hasPendingChanges = true;
+    if (this.pendingSyncTimer) clearTimeout(this.pendingSyncTimer);
+    // Debounce push to database by 3.5s to minimize calls while user is actively clicking
+    this.pendingSyncTimer = setTimeout(() => {
+      this.syncNow(true);
+    }, 3500);
+  },
+
+  applyMergedData(d, pushAfterMerge = false) {
+    if (!d || typeof d !== 'object') return;
+    let changed = false;
+
+    function toNormalizedArray(val) {
+      if (!val) return [];
+      if (Array.isArray(val)) return val.filter(Boolean);
+      if (typeof val === 'object') return Object.values(val).filter(Boolean);
+      return [];
+    }
+
+    const incomingSessions = toNormalizedArray(d.sessions);
+    const incomingExemptions = toNormalizedArray(d.exemptions);
+    const incomingExams = toNormalizedArray(d.exams);
+    const incomingTasks = toNormalizedArray(d.weeklyTasks);
+    const incomingCompleted = toNormalizedArray(d.completedTaskIds);
+    const incomingLectures = toNormalizedArray(d.lectures);
+    const incomingSubjects = toNormalizedArray(d.subjects);
+
+    // 1. Study Sessions: Smart bidirectional union merge (DB + Cache)
+    if (incomingSessions.length > 0) {
+      const sessMap = new Map();
+      (state.sessions || []).forEach(s => {
+        if (s && (s.minutes || s.tsStart)) {
+          const k = s.id || (s.fbKey ? `fb_${s.fbKey}` : (s.tsStart ? `ts_${s.tsStart}` : `${s.subjId}_${s.minutes}`));
+          sessMap.set(String(k), s);
+        }
+      });
+      incomingSessions.forEach(s => {
+        if (s && (s.minutes || s.tsStart)) {
+          const k = s.id || (s.fbKey ? `fb_${s.fbKey}` : (s.tsStart ? `ts_${s.tsStart}` : `${s.subjId}_${s.minutes}`));
+          if (!sessMap.has(String(k))) {
+            sessMap.set(String(k), s);
+            changed = true;
+          } else {
+            const prev = sessMap.get(String(k));
+            sessMap.set(String(k), { ...(prev || {}), ...s });
+          }
+        }
+      });
+      state.sessions = Array.from(sessMap.values()).sort((a, b) => (b.tsStart || 0) - (a.tsStart || 0));
+      try {
+        localStorage.setItem('kareem_sessions_v3', JSON.stringify(state.sessions));
+        localStorage.setItem('kareem_sessions_v2', JSON.stringify(state.sessions));
+      } catch(e) {}
+    }
+
+    // 2. Lesson Exemptions: Smart bidirectional union merge (DB + Cache)
+    if (incomingExemptions.length > 0) {
+      const exmMap = new Map();
+      (state.lessonExemptions || []).forEach(x => {
+        if (x) {
+          const k = x.id || (x.fbKey ? `fb_${x.fbKey}` : `${x.subjId || ''}_${x.timestamp || x.date || ''}_${x.title || ''}`);
+          exmMap.set(String(k), x);
+        }
+      });
+      incomingExemptions.forEach(x => {
+        if (x) {
+          const k = x.id || (x.fbKey ? `fb_${x.fbKey}` : `${x.subjId || ''}_${x.timestamp || x.date || ''}_${x.title || ''}`);
+          if (!exmMap.has(String(k))) {
+            exmMap.set(String(k), x);
+            changed = true;
+          } else {
+            const prev = exmMap.get(String(k));
+            exmMap.set(String(k), { ...(prev || {}), ...x });
+          }
+        }
+      });
+      state.lessonExemptions = Array.from(exmMap.values());
+      try {
+        localStorage.setItem('kareem_exemptions_today', JSON.stringify(state.lessonExemptions));
+      } catch(e) {}
+    }
+
+    // 3. Exams & Grades: Smart bidirectional union merge (DB + Cache)
+    const examMap = new Map();
+    (state.exams || []).forEach(ex => {
+      if (ex) {
+        const k = ex.id ? String(ex.id) : `exam_${ex.subjId}_${ex.score}_${ex.total}_${ex.date || ''}`;
+        examMap.set(k, ex);
+      }
+    });
+    if (incomingExams.length > 0) {
+      incomingExams.forEach(ex => {
+        if (ex) {
+          const k = ex.id ? String(ex.id) : `exam_${ex.subjId}_${ex.score}_${ex.total}_${ex.date || ''}`;
+          const prev = examMap.get(k);
+          const score = Number(ex.score) || 0;
+          const total = Number(ex.total) || 50;
+          const pct = ex.pct !== undefined ? Number(ex.pct) : Math.round((score / total) * 100);
+          examMap.set(k, {
+            id: ex.id || (prev && prev.id) || `exam_${Date.now()}`,
+            subjId: ex.subjId || (prev && prev.subjId) || 'physics',
+            teacher: ex.teacher || (prev && prev.teacher) || (ex.subjId === 'physics' ? 'أ. محمد عبد المعبود (منصة أونلاين)' : ex.subjId === 'arabic' ? 'أ. محمد صلاح' : 'أستاذ المادة'),
+            topic: ex.topic || (prev && prev.topic) || 'امتحان شامل',
+            score: score,
+            total: total,
+            pct: pct,
+            examType: ex.examType || (prev && prev.examType) || 'امتحان شامل',
+            date: ex.date || (prev && prev.date) || new Date().toISOString().split('T')[0],
+            notes: ex.notes || (prev && prev.notes) || ''
+          });
+          if (!prev) changed = true;
+        }
+      });
+    }
+    state.exams = Array.from(examMap.values()).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    try {
+      const examsJson = JSON.stringify(state.exams);
+      localStorage.setItem(STORAGE_KEYS.EXAMS, examsJson);
+      localStorage.setItem('kareem_exams_v1', examsJson);
+      localStorage.setItem('kareem_exams', examsJson);
+    } catch(e) {}
+
+    // 4. Weekly Tasks: Smart bidirectional union merge (DB + Cache)
+    const taskMap = new Map();
+    (state.weeklyTasks || []).forEach(t => {
+      if (t) {
+        const k = (t.id !== undefined && t.id !== null) ? String(t.id) : `task_${t.dayId}_${t.text}`;
+        taskMap.set(k, t);
+      }
+    });
+    if (incomingTasks.length > 0) {
+      incomingTasks.forEach(t => {
+        if (t) {
+          const k = (t.id !== undefined && t.id !== null) ? String(t.id) : `task_${t.dayId}_${t.text}`;
+          const prev = taskMap.get(k);
+          taskMap.set(k, { ...(prev || {}), ...t });
+          if (!prev) changed = true;
+        }
+      });
+    }
+    state.weeklyTasks = Array.from(taskMap.values());
+    try {
+      const tasksJson = JSON.stringify(state.weeklyTasks);
+      localStorage.setItem(STORAGE_KEYS.TASKS, tasksJson);
+      localStorage.setItem('kareem_weekly_tasks_v4', tasksJson);
+      localStorage.setItem('kareem_weekly_tasks_v3', tasksJson);
+      localStorage.setItem('kareem_weekly_tasks_v2', tasksJson);
+    } catch(e) {}
+
+    // 5. Completed Task IDs: Union of Cache and DB
+    if (incomingCompleted.length > 0) {
+      incomingCompleted.forEach(id => addNormalizedToSet(state.completedTaskIds, id));
+      try {
+        const completedArr = Array.from(state.completedTaskIds).map(normalizeTaskId);
+        const completedJson = JSON.stringify(completedArr);
+        localStorage.setItem(STORAGE_KEYS.COMPLETED, completedJson);
+        localStorage.setItem('kareem_completed_task_ids_v4', completedJson);
+        localStorage.setItem('kareem_completed_task_ids_v3', completedJson);
+      } catch(e) {}
+    }
+
+    // 6. Lectures: Merge status and full collection
+    if (incomingLectures.length > 0) {
+      if (!state.lectures || state.lectures.length === 0) {
+        state.lectures = incomingLectures;
+        changed = true;
+      } else {
+        const dbLecMap = new Map();
+        incomingLectures.forEach(l => {
+          if (l && l.id) dbLecMap.set(String(l.id), l);
+        });
+        state.lectures.forEach(l => {
+          const remote = dbLecMap.get(String(l.id));
+          if (remote && remote.isDone !== undefined) {
+            l.isDone = l.isDone || remote.isDone;
+          }
+        });
+        incomingLectures.forEach(l => {
+          if (l && l.id && !state.lectures.some(x => String(x.id) === String(l.id))) {
+            state.lectures.push(l);
+            changed = true;
+          }
+        });
+      }
+      try {
+        const json = JSON.stringify(state.lectures);
+        localStorage.setItem(STORAGE_KEYS.LECTURES, json);
+        localStorage.setItem('kareem_lectures_v2', json);
+      } catch(e) {}
+    }
+
+    // 7. Core Subjects
+    if (incomingSubjects.length >= 4) {
+      state.subjects = incomingSubjects;
+      try { localStorage.setItem('kareem_subjects', JSON.stringify(incomingSubjects)); } catch(e) {}
+    }
+
+    // 8. Custom AI Instructions
+    if (d.customAiInstructions && d.customAiInstructions.trim()) {
+      state.customAiInstructions = d.customAiInstructions.trim();
+      try { localStorage.setItem('kareem_ai_custom_instructions', state.customAiInstructions); } catch(e) {}
+      const inp1 = document.getElementById('kareemDirectivesInput');
+      const inp2 = document.getElementById('kareemDirectivesInputHub');
+      if (inp1) inp1.value = state.customAiInstructions;
+      if (inp2) inp2.value = state.customAiInstructions;
+    }
+
+    // 9. Display Mode & Theme
+    if (d.displayTimeMode) {
+      state.displayTimeMode = d.displayTimeMode;
+      try { localStorage.setItem('kareem_display_mode', d.displayTimeMode); } catch(e) {}
+    }
+    if (d.vizMode) {
+      state.vizMode = d.vizMode;
+      try { localStorage.setItem('kareem_viz_mode', d.vizMode); } catch(e) {}
+    }
+    if (d.theme) {
+      document.body.dataset.theme = d.theme;
+      const th = document.getElementById('themeSelect');
+      if (th) th.value = d.theme;
+    }
+
+    // Re-render UI views
+    renderUI();
+    renderWeeklyPlannerUI();
+    renderVisualTimetableBoard();
+    renderLecturesUI();
+    renderExamsTrackerUI();
+    renderAiHudSnapshot();
+
+    // 10. Automatically push the merged unified snapshot to server DB if requested
+    if (pushAfterMerge && this.isOnline) {
+      this.syncNow(false);
+    }
+  },
+
+  async initialPull() {
+    if (!this.isOnline) {
+      this.updateIndicator();
+      return;
+    }
+    try {
+      this.isSyncing = true;
+      this.updateIndicator('جاري استدعاء البيانات من قاعدة البيانات...');
+      const res = await fetch('/api/db/sync');
+      if (res.ok) {
+        const payload = await res.json();
+        if (payload.success && payload.data) {
+          // Perform full two-way union merge and push complete merged set to cloud DB
+          this.applyMergedData(payload.data, true);
+          this.lastSyncedTimestamp = payload.lastUpdated || Date.now();
+          this.updateIndicator('✅ قاعدة البيانات والكاش متزامنان 100% ⚡');
+        } else {
+          // Seed cloud database from local state if DB is fresh
+          await this.syncNow(false);
+        }
+      }
+    } catch (e) {
+      console.warn('Initial sync note:', e.message);
+    } finally {
+      this.isSyncing = false;
+      this.updateIndicator();
+    }
+  },
+
+  async syncNow(andApply = true) {
+    if (!this.isOnline) {
+      this.updateIndicator();
+      return;
+    }
+    try {
+      this.isSyncing = true;
+      this.updateIndicator('جاري حفظ ومزامنة كافة البيانات...');
+
+      const snapshot = {
+        clientTimestamp: Date.now(),
+        data: {
+          sessions: state.sessions || [],
+          exemptions: state.lessonExemptions || [],
+          weeklyTasks: state.weeklyTasks || [],
+          completedTaskIds: Array.from(state.completedTaskIds),
+          lectures: state.lectures || [],
+          exams: state.exams || [],
+          subjects: state.subjects || DEFAULT_SUBJECTS,
+          displayTimeMode: state.displayTimeMode || 'today',
+          vizMode: state.vizMode || 'spiral',
+          theme: document.body.dataset.theme || 'default',
+          customAiInstructions: state.customAiInstructions || localStorage.getItem('kareem_ai_custom_instructions') || ''
+        }
+      };
+
+      const res = await fetch('/api/db/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(snapshot)
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        this.hasPendingChanges = false;
+        this.lastSyncedTimestamp = result.lastUpdated || Date.now();
+        if (andApply && result.success && result.data) {
+          this.applyMergedData(result.data, false);
+        }
+        this.updateIndicator('✅ قاعدة البيانات والكاش متزامنان 100% ⚡');
+      }
+    } catch (e) {
+      console.warn('Sync attempt note:', e.message);
+    } finally {
+      this.isSyncing = false;
+      this.updateIndicator();
+    }
+  }
+};
+
+window.syncManager = syncManager;
+
+window.triggerManualSync = async function() {
+  toast('جاري المزامنة مع قاعدة البيانات...', 'refresh');
+  await syncManager.syncNow();
+  toast('تمت المزامنة بنجاح وحفظ كافة بياناتك بأمان في قاعدة البيانات! ⚡', 'check');
+};
+
+// --- PROGRESSIVE WEB APP (PWA) INSTALL ENGINE ---
+let deferredPwaPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPwaPrompt = e;
+  const btn = document.getElementById('pwaInstallHeaderBtn');
+  if (btn) btn.style.display = 'inline-flex';
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredPwaPrompt = null;
+  toast('تم تثبيت تطبيق SHAPAP بنجاح على جهازك! ⚡', 'check');
+  const btn = document.getElementById('pwaInstallHeaderBtn');
+  if (btn) btn.style.display = 'none';
+});
+
+window.installPwaApp = function() {
+  if (deferredPwaPrompt) {
+    deferredPwaPrompt.prompt();
+    deferredPwaPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        toast('جاري تثبيت تطبيق SHAPAP...', 'check');
+      }
+      deferredPwaPrompt = null;
+    });
   } else {
-    el.style.background = 'rgba(245, 158, 11, 0.12)';
-    el.style.color = '#f59e0b';
-    el.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#f59e0b; display:inline-block;"></span> وضع محلي آمن`;
+    const modal = document.getElementById('pwaInstallModal');
+    if (modal) modal.classList.add('show');
   }
+};
+
+window.closePwaModal = function() {
+  const modal = document.getElementById('pwaInstallModal');
+  if (modal) modal.classList.remove('show');
+};
+
+window.triggerPwaPrompt = function() {
+  if (deferredPwaPrompt) {
+    deferredPwaPrompt.prompt();
+    window.closePwaModal();
+  } else {
+    toast('إذا كنت على Safari، اضغط مشاركة (Share) ثم "إضافة إلى الشاشة الرئيسية" 📲', 'check');
+  }
+};
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => {
+        console.log('[SHAPAP SW] Registered with scope:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('[SHAPAP SW] Registration note:', err.message);
+      });
+  });
 }
 
-function initFirebase() {
+// --- AI STUDY SUPERVISOR & TIME MANAGEMENT ENGINE ---
+function formatMarkdown(text) {
+  if (!text) return '';
+  return text
+    .replace(/^### (.*$)/gim, '<h3 style="color:var(--accent-primary); font-size:15px; font-weight:800; margin:14px 0 6px;">$1</h3>')
+    .replace(/^## (.*$)/gim, '<h3 style="color:var(--accent-secondary); font-size:16px; font-weight:800; margin:16px 0 8px;">$1</h3>')
+    .replace(/^# (.*$)/gim, '<h3 style="color:var(--text-main); font-size:17px; font-weight:800; margin:18px 0 10px;">$1</h3>')
+    .replace(/^\> (.*$)/gim, '<blockquote style="border-right:3px solid var(--accent-primary); background:rgba(86,194,166,0.08); padding:8px 12px; margin:10px 0; border-radius:var(--radius-sm); font-style:normal;">$1</blockquote>')
+    .replace(/\*\*(.*?)\*\*/gim, '<strong style="color:var(--text-main); font-weight:700;">$1</strong>')
+    .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+    .replace(/^\* (.*$)/gim, '<div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:6px;"><span style="color:var(--accent-primary); font-size:14px; line-height:1.2;">•</span><span>$1</span></div>')
+    .replace(/\n\n/gim, '<div style="height:8px;"></div>');
+}
+
+function getExamOverallStats() {
   try {
-    firebaseApp = initializeApp(firebaseConfig);
-    rtdb = getDatabase(firebaseApp);
-    sessionsDbRef = ref(rtdb, 'shapap/sessions');
-    exemptionsDbRef = ref(rtdb, 'shapap/exemptions');
-
-    // Live sync for sessions
-    onValue(sessionsDbRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const list = Object.entries(data).map(([key, item]) => ({
-          fbKey: key,
-          ...item
-        }));
-        state.sessions = list;
-        localStorage.setItem('kareem_sessions_v3', JSON.stringify(list));
-        isFirebaseConnected = true;
-        updateCloudIndicator(true);
-        renderUI();
-      }
-    }, (err) => {
-      console.warn('Firebase sessions note (local mode active):', err.message);
-      updateCloudIndicator(false);
-    });
-
-    // Live sync for exemptions
-    onValue(exemptionsDbRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const list = Object.entries(data).map(([key, item]) => ({
-          fbKey: key,
-          ...item
-        }));
-        state.lessonExemptions = list;
-        localStorage.setItem('kareem_exemptions_today', JSON.stringify(list));
-        renderUI();
-      }
-    }, (err) => {
-      console.warn('Firebase exemptions note:', err.message);
-    });
-
-    isFirebaseConnected = true;
-    updateCloudIndicator(true);
-  } catch (err) {
-    console.warn('Firebase init fallback:', err);
-    updateCloudIndicator(false);
+    return calculateExamStats();
+  } catch(e) {
+    return { overallAvg: 0, totalCount: 0 };
   }
 }
+
+function getAiStudentContext() {
+  const todayMins = typeof getStudyMinutesToday === 'function' ? getStudyMinutesToday() : 0;
+  let wastedMins = 0;
+  try {
+    if (typeof getWastedMinutesToday === 'function') {
+      wastedMins = getWastedMinutesToday();
+    } else if (typeof calculateWastedTime === 'function') {
+      const w = calculateWastedTime();
+      wastedMins = (w && typeof w.wastedMins === 'number') ? w.wastedMins : 0;
+    }
+  } catch(e) {}
+
+  let examStats = { overallAvg: 0, totalCount: 0 };
+  try {
+    if (typeof calculateExamStats === 'function') {
+      examStats = calculateExamStats();
+    }
+  } catch(e) {}
+  
+  const pendingTasks = (state.weeklyTasks || []).filter(t => !isTaskCompleted(t.id)).map(t => ({
+    text: t.text,
+    subj: t.subjId,
+    day: t.dayId,
+    priority: t.priority
+  }));
+
+  const subjectStats = state.subjects.map(s => {
+    const sExams = state.exams.filter(e => e.subjId === s.id);
+    let sAvg = 0;
+    if (sExams.length > 0) {
+      const sum = sExams.reduce((acc, e) => acc + (getExamPercentage(e.score, e.total) || 0), 0);
+      sAvg = Math.round(sum / sExams.length);
+    }
+    return {
+      name: s.name,
+      id: s.id,
+      examsCount: sExams.length,
+      examAvgPct: sAvg
+    };
+  });
+
+  return {
+    student: 'كريم',
+    todayStudyMins: todayMins,
+    wastedMins: wastedMins,
+    pendingTasksCount: pendingTasks.length,
+    completedTodayCount: state.weeklyTasks.filter(t => isTaskCompleted(t.id)).length,
+    examsCount: state.exams.length,
+    examsOverallAvg: examStats.overallAvg,
+    subjectBreakdown: subjectStats,
+    pendingTasks: pendingTasks.slice(0, 10)
+  };
+}
+
+// --- AI DYNAMIC MOOD & TOUCHING ACCOUNTABILITY SYSTEM ---
+function calculateAiMood(ctx) {
+  const todayMins = ctx.todayStudyMins || 0;
+  const wastedMins = ctx.wastedMins || 0;
+  const examAvg = ctx.examsOverallAvg || 0;
+  const pendingTasks = ctx.pendingTasksCount || 0;
+  const completedTasks = ctx.completedTodayCount || 0;
+  const latestExam = state.exams && state.exams[0] ? state.exams[0] : null;
+  const latestExamPct = latestExam ? getExamPercentage(latestExam.score, latestExam.total) : null;
+
+  const currentHour = new Date().getHours();
+
+  // 1. EMERGENCY (مود الغضب والإنذار الأحمر - مزاكرتش ليه ليه؟!)
+  if ((todayMins === 0 && currentHour >= 14) || wastedMins >= 150 || (latestExamPct !== null && latestExamPct < 80)) {
+    let reason = '';
+    let speech = '';
+    if (todayMins === 0 && currentHour >= 14) {
+      reason = `الساعة أصبحت ${currentHour}:00 ومفتحتش كتاب حتى الآن!`;
+      speech = 'مزاكرتش ليه ليه لحد دلوقتي يا كريم؟! الساعات بتجري وانت مكانك! حلم طب وتعب أهلك بيضيعوا في التسويف.. ثانوية عامة مفيهاش بكرة، قوم اقفل أي تشتت واقعد على مكتبك حالاً!';
+    } else if (wastedMins >= 150) {
+      reason = `فاقد زمني كارثي قدره ${wastedMins} دقيقة (${(wastedMins / 60).toFixed(1)} ساعة)!`;
+      speech = `كريم.. ضيعت ${wastedMins} دقيقة النهاردة في الهوا! عارف الوقت ده كان ممكن تخلص فيه درسين فيزياء كاملين وتحل واجب العربي؟ الوقت اللي بيموت ده من عمرك ومجموعك، فوق لنفسك!`;
+    } else {
+      const subInfo = latestExam ? getExamSubjectInfo(latestExam.subjId) : { name: 'المادة' };
+      reason = `درجة الامتحان الأخير ${latestExamPct}% في ${subInfo.name} كارثية!`;
+      speech = `صدمة ووقفة حاسمة يا كريم! جبت ${latestExamPct}% في ${subInfo.name}؟! ليه كده ليه؟! لازم تقعد مع نفسك وتعرف الخلل فين قبل ما يفوت الأوان وتصلحه فوراً!`;
+    }
+
+    return {
+      key: 'EMERGENCY',
+      emoji: '🚨',
+      title: 'إنذار أحمر: كفاية تسويف!',
+      score: Math.max(10, 30 - Math.round(wastedMins / 15)),
+      color: '#ef4444',
+      reason,
+      speech
+    };
+  }
+
+  // 2. REPROACHFUL (مود العتاب الصادق واللوم المؤثر - ليه نزلت عن 95%؟)
+  if (wastedMins >= 60 || (latestExamPct !== null && latestExamPct < 95) || (todayMins < 90 && currentHour >= 17) || (pendingTasks > 5 && completedTasks === 0)) {
+    let reason = '';
+    let speech = '';
+    if (latestExamPct !== null && latestExamPct < 95) {
+      const subInfo = latestExam ? getExamSubjectInfo(latestExam.subjId) : { name: 'المادة' };
+      reason = `نزلت عن الـ 95% في امتحان ${subInfo.name} الأخير (${latestExamPct}%)!`;
+      speech = `ليه كده يا كريم؟! جبت ${latestExamPct}% في امتحان ${subInfo.name} ونزلت عن الـ 95% ليه؟! الدرجة دي كويسة لغيرك بس مش لكريم بتاع الأوائل! ضيعت درجات فين؟ تسرّع ولا عدم تركيز؟ افتح كشكول الملاحظات وراجع أخطائك فوراً!`;
+    } else if (wastedMins >= 60) {
+      reason = `تم رصد فاقد زمني قدره ${wastedMins} دقيقة بدون مذاكرة.`;
+      speech = `كريم.. أنا زعلان منك وعاتب عليك بجد! ضيعت ${wastedMins} دقيقة النهاردة كان أولى بيهم حلمك ومستقبلك.. إنت أشطر من إنك تستسلم للمشتتات، قوم استعن بالله وابدأ جلسة تركيز!`;
+    } else {
+      reason = `عندك ${pendingTasks} مهام أسبوعية معلقة وتأخر في وتيرة الإنجاز.`;
+      speech = `المهمات بتكتر عليك يا كريم واليوم بيعدي.. ليه التأجيل؟ الأوائل بيبدأوا قبل غيرهم، خلص أول مهمة دلوقتي وهتشوف الفرق!`;
+    }
+
+    return {
+      key: 'REPROACHFUL',
+      emoji: '😠',
+      title: 'عاتب وزعلان منك',
+      score: Math.max(35, 60 - Math.round(wastedMins / 20)),
+      color: '#f59e0b',
+      reason,
+      speech
+    };
+  }
+
+  // 3. LEGENDARY (مود الفخر والاعتزاز - أسطورة الأوائل)
+  if (todayMins >= 270 || (todayMins >= 180 && wastedMins <= 45 && examAvg >= 95)) {
+    const hours = (todayMins / 60).toFixed(1);
+    return {
+      key: 'LEGENDARY',
+      emoji: '🦁',
+      title: 'أسطوري وفخور بيك جداً',
+      score: Math.min(100, 85 + Math.round(todayMins / 30)),
+      color: '#10b981',
+      reason: `حققت ${hours} ساعة مذاكرة صافية بنسبة التزام عالية ومستوى الأوائل!`,
+      speech: `تسلم إيدك يا وحش! أنجزت ${hours} ساعة مذاكرة مركزة النهاردة.. ده الشغل الحقيقي بتاع أوائل الجمهورية ودكاترة المستقبل! فخور بيك جداً يا كريم، حافظ على العزيمة دي وماتهدّيش!`
+    };
+  }
+
+  // 4. VIGILANT (مود الصرامة والتركيز العالي)
+  const hours = (todayMins / 60).toFixed(1);
+  return {
+    key: 'VIGILANT',
+    emoji: '🧐',
+    title: 'صارم ومترقب',
+    score: Math.min(84, 65 + Math.round(todayMins / 25)),
+    color: '#38bdf8',
+    reason: `ذاكرت ${hours} ساعة حتى الآن واليوم مستمر.. الرصد شغال لكل دقيقة.`,
+    speech: `أداء متماسك وبداية كويسة يا كريم، بس المشوار لسه محتاج دفعة أكبر.. عندك جدول ومواد مستنية، كمل وماتديش للتسويف فرصة يتسلل لجدولك!`
+  };
+}
+
+function renderAiHudSnapshot() {
+  const ctx = getAiStudentContext();
+  const mood = calculateAiMood(ctx);
+
+  const statusText = document.getElementById('aiHudStatusText');
+  const wastedText = document.getElementById('aiHudWastedText');
+  const prioritySubj = document.getElementById('aiHudPrioritySubj');
+  const examsAvg = document.getElementById('aiHudExamsAvg');
+
+  // Update dynamic mood widgets
+  const avatarIcon = document.getElementById('aiMoodAvatarIcon');
+  const moodBadge = document.getElementById('aiSupervisorMoodBadge');
+  const moodScore = document.getElementById('aiMoodScoreBadge');
+  const moodReason = document.getElementById('aiMoodReasonText');
+  const speechText = document.getElementById('aiLiveSpeechText');
+  const speechBubble = document.getElementById('aiLiveSpeechBubble');
+  const headerIcon = document.getElementById('headerMoodIcon');
+  const headerLabel = document.getElementById('headerMoodLabel');
+
+  if (avatarIcon) {
+    avatarIcon.textContent = mood.emoji;
+    avatarIcon.style.borderColor = mood.color;
+    avatarIcon.style.boxShadow = `0 0 16px ${mood.color}44`;
+  }
+  if (moodBadge) {
+    moodBadge.textContent = `${mood.emoji} ${mood.title}`;
+    moodBadge.style.color = mood.color;
+    moodBadge.style.borderColor = mood.color;
+    moodBadge.style.background = `${mood.color}18`;
+  }
+  if (moodScore) {
+    moodScore.textContent = `رضا المراقب: ${mood.score}%`;
+    moodScore.style.color = mood.color;
+  }
+  if (moodReason) {
+    moodReason.textContent = mood.reason;
+  }
+  if (speechText) {
+    speechText.textContent = mood.speech;
+  }
+  if (speechBubble) {
+    speechBubble.style.borderRightColor = mood.color;
+  }
+  if (headerIcon) {
+    headerIcon.textContent = mood.emoji;
+  }
+  if (headerLabel) {
+    headerLabel.textContent = mood.title.split(':')[0].trim();
+    headerLabel.style.color = mood.color;
+  }
+
+  if (wastedText) {
+    wastedText.textContent = `${ctx.wastedMins} دقيقة`;
+    if (ctx.wastedMins > 60) wastedText.style.color = 'var(--danger)';
+    else wastedText.style.color = 'var(--text-muted)';
+  }
+
+  if (examsAvg) {
+    examsAvg.textContent = `${ctx.examsOverallAvg}%`;
+    if (ctx.examsOverallAvg < 95 && ctx.examsCount > 0) {
+      examsAvg.style.color = 'var(--danger)';
+      examsAvg.title = 'تنبيه: متوسط الدرجات أقل من شرط الـ 95% الإلزامي للأوائل!';
+    } else {
+      examsAvg.style.color = '#10b981';
+    }
+  }
+
+  if (statusText) {
+    statusText.textContent = `${mood.emoji} ${mood.title}`;
+    statusText.style.color = mood.color;
+  }
+
+  if (prioritySubj) {
+    const sorted = [...ctx.subjectBreakdown].sort((a, b) => a.examAvgPct - b.examAvgPct);
+    const weakest = sorted[0];
+    if (weakest) {
+      prioritySubj.textContent = `${weakest.name} (${weakest.examAvgPct}%)`;
+    } else {
+      prioritySubj.textContent = 'فيزياء';
+    }
+  }
+}
+
+// Web Speech Audio Voice Player for AI Supervisor
+let isSpeechActive = false;
+window.speakCurrentAiMessage = function() {
+  if (!('speechSynthesis' in window)) {
+    toast('المتصفح الحالي لا يدعم التحدث الصوتي، اقرأ كلام المراقب المكتوب ⚡', 'alert-triangle');
+    return;
+  }
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    isSpeechActive = false;
+    toast('تم إيقاف صوت المراقب', 'check');
+    return;
+  }
+  const speechTextElem = document.getElementById('aiLiveSpeechText');
+  const text = speechTextElem ? speechTextElem.innerText.trim() : '';
+  if (!text) return;
+
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'ar-EG';
+  utter.rate = 0.95;
+  utter.pitch = 1.0;
+
+  const voices = window.speechSynthesis.getVoices();
+  const arVoice = voices.find(v => v.lang.startsWith('ar') || (v.name && v.name.includes('Arabic')));
+  if (arVoice) utter.voice = arVoice;
+
+  utter.onstart = () => {
+    isSpeechActive = true;
+    toast('المراقب الأكاديمي يتحدث الآن 🔊', 'sparkles');
+  };
+  utter.onend = () => { isSpeechActive = false; };
+  utter.onerror = () => { isSpeechActive = false; };
+
+  window.speechSynthesis.speak(utter);
+};
+
+window.speakExamReactionSpeech = function() {
+  if (!('speechSynthesis' in window)) {
+    toast('المتصفح لا يدعم نطق الصوت', 'alert-triangle');
+    return;
+  }
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    return;
+  }
+  const textElem = document.getElementById('examAiReactionSpeechText');
+  const text = textElem ? textElem.innerText.trim() : '';
+  if (!text) return;
+
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'ar-EG';
+  utter.rate = 0.95;
+  const voices = window.speechSynthesis.getVoices();
+  const arVoice = voices.find(v => v.lang.startsWith('ar'));
+  if (arVoice) utter.voice = arVoice;
+
+  window.speechSynthesis.speak(utter);
+};
+
+window.showExamAiReaction = async function(exam, pct, rating) {
+  const modal = document.getElementById('examAiReactionModal');
+  if (!modal) return;
+
+  const avatar = document.getElementById('examAiReactionAvatar');
+  const subjName = document.getElementById('examAiReactionSubjName');
+  const topicText = document.getElementById('examAiReactionTopicText');
+  const scoreText = document.getElementById('examAiReactionScoreText');
+  const badge = document.getElementById('examAiReactionBadge');
+  const speechText = document.getElementById('examAiReactionSpeechText');
+  const lostBox = document.getElementById('examAiPointsLostBox');
+
+  const sub = getExamSubjectInfo(exam.subjId);
+  const score = parseFloat(exam.score);
+  const total = parseFloat(exam.total);
+  const lost = Math.round((total - score) * 10) / 10;
+
+  if (subjName) subjName.textContent = sub.name + (exam.teacher ? ` - ${exam.teacher}` : '');
+  if (topicText) topicText.textContent = exam.topic || 'امتحان';
+  if (scoreText) scoreText.textContent = `${score} / ${total}`;
+  if (badge) {
+    badge.textContent = `${pct}% ${rating.label}`;
+    badge.className = `rating-badge ${rating.class}`;
+    badge.style.background = rating.color + '22';
+    badge.style.color = rating.color;
+    badge.style.borderColor = rating.color;
+  }
+
+  let speech = '';
+  let avatarIcon = '🦁';
+  let lostHtml = '';
+
+  if (pct === 100) {
+    avatarIcon = '🏆';
+    speech = `ألف ترليون مبروك يا دكتور كريم! 🏆 تقفيل 100% كاملة في ${sub.name}! دي شطارة وعزيمة أوائل الجمهورية.. فخور بيك جداً، حافظ على الوحشية دي وماتهدّيش في أي كويز أو امتحان!`;
+    lostHtml = `<strong style="color:#10b981;">🎉 أداء أسطوري! قفلت الدرجة النهائية بدون أي أخطاء (ناقص 0 درجة).</strong>`;
+  } else if (pct >= 95) {
+    avatarIcon = '🔥';
+    speech = `عاش جداً يا وحش! ${pct}% في ${sub.name} نتيجة تشرّف ومستوى كبار! 🎉 فاضل تكّة صغيرة جداً (${(100 - pct).toFixed(1)}%) وتقفل الـ 100%.. راجع السؤال أو الاتنين اللي طاروا دول كويس عشان متكررهمش تاني أبداً!`;
+    lostHtml = `فقدت <strong>${lost}</strong> درجات فقط. ممتاز جداً، اقفل الدرجة دي في الامتحان الجاي!`;
+  } else if (pct >= 90) {
+    avatarIcon = '😠';
+    speech = `ليه كده يا كريم؟! ${pct}% في ${sub.name} نزلت عن الـ 95% ليه؟! ⚠️ الدرجة دي حلوة لأي حد تاني، بس مش لكريم بتاع الأوائل وكلية الطب! ضيعت درجات فين؟ تسرّع في الاختيارات ولا سؤال مقالي؟ اكتب غلطاتك في كشكول الملاحظات فوراً وراجعها!`;
+    lostHtml = `<strong style="color:var(--warning);">⚠️ تنبيه شرط الـ 95%:</strong> فقدت <strong>${lost}</strong> درجة من ${total} (فارق ${(100 - pct).toFixed(1)}% عن الحد الأدنى للتفوق).`;
+  } else if (pct >= 80) {
+    avatarIcon = '😠';
+    speech = `لأ مش مستواك خالص يا بطل! ${pct}% في ${sub.name} دي جرس إنذار صريح! ${(100 - pct).toFixed(0)}% طارت في الهوا! راجع الباب ده من أول وجديد من منصة أو سنتر المدرس قبل ما يتراكم عليك!`;
+    lostHtml = `<strong style="color:var(--danger);">⚠️ فاقد درجات خطير:</strong> طار منك <strong>${lost}</strong> درجة. افتح الدرس وحل 50 سؤال إضافي اليوم!`;
+  } else {
+    avatarIcon = '🛑';
+    speech = `صدمة ووقفة حاسمة يا كريم! ${pct}% في ${sub.name}؟! ليه كده ليه؟! لازم تقعد مع نفسك وتعرف الخلل فين: هل مش بتذاكر؟ هل بتسرح في الحصص؟ هل مقصر في الحل؟ صلح الخلل ده النهاردة وماتأجلش دقيقة واحدة!`;
+    lostHtml = `<strong style="color:var(--danger);">🚨 إنذار أحمر:</strong> خسرت <strong>${lost}</strong> درجة من ${total}. كشكول الملاحظات إلزامي وإعادة حل الامتحان فوراً!`;
+  }
+
+  if (avatar) avatar.textContent = avatarIcon;
+  if (speechText) speechText.textContent = speech;
+  if (lostBox) lostBox.innerHTML = lostHtml;
+
+  modal.classList.add('show');
+
+  // Also query server-side AI for customized feedback
+  try {
+    const res = await fetch('/api/ai/exam-reaction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        exam: { ...exam, subjName: sub.name },
+        currentAvg: ctx ? ctx.examsOverallAvg : pct
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.reaction && speechText) {
+        speechText.textContent = data.reaction;
+      }
+    }
+  } catch (e) {
+    // Graceful fallback to rich local template
+  }
+};
+
+window.closeExamAiReactionModal = function() {
+  const modal = document.getElementById('examAiReactionModal');
+  if (modal) modal.classList.remove('show');
+  if (window.speechSynthesis && window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+  }
+};
+
+window.triggerEmergencySyncAndCall = async function() {
+  const btn = document.getElementById('emergencySyncHeaderBtn');
+  if (btn) btn.disabled = true;
+
+  try {
+    toast('🚨 جاري الإرسال الفوري للبيانات واستدعاء المراقب الطارئ...', 'refresh');
+    await syncManager.syncNow();
+    await window.triggerAiSupervisorAudit(true);
+    toast('تم الإرسال الطارئ والمزامنة واستدعاء المراقب بنجاح! ⚡', 'check');
+  } catch (err) {
+    console.error('Emergency sync error:', err);
+    toast('خطأ أثناء الاستدعاء الطارئ: ' + err.message, 'alert-triangle');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+window.triggerAiSupervisorAudit = async function(forceFresh = false) {
+  const container = document.getElementById('aiSupervisorOutputContainer');
+  const btn = document.getElementById('aiAuditTriggerBtn');
+  if (!container) return;
+
+  container.style.display = 'block';
+  container.innerHTML = `
+    <div class="ai-output-box" style="display:flex; align-items:center; gap:12px;">
+      <span class="pulse-dot-ai"></span>
+      <div>
+        <strong style="color:var(--accent-primary);">المراقب الأكاديمي الحصري يحلل أداء كريم الآن...</strong>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">يتم تدقيق ساعات المذاكرة، الفاقد، ومستواك في الفيزياء والعربي والتاريخ والإنجليزي، وتطبيق شرط الـ 95%.</div>
+      </div>
+    </div>
+  `;
+
+  if (btn) btn.disabled = true;
+
+  try {
+    const studyData = getAiStudentContext();
+    const res = await fetch('/api/ai/monitor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studyData,
+        forceFresh,
+        customInstructions: state.customAiInstructions
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `خطأ ${res.status}`);
+    }
+
+    const data = await res.json();
+    const htmlAdvice = formatMarkdown(data.analysis || 'تم إتمام التحليل بنجاح');
+    const cacheNotice = data.fromCache ? '<span style="font-size:11px; color:var(--text-muted); margin-right:8px;">(من الذاكرة المؤقتة لتقليل الاستدعاء ⚡)</span>' : '';
+
+    container.innerHTML = `
+      <div class="ai-output-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-subtle); padding-bottom:10px; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="pulse-dot-ai"></span>
+            <strong style="font-size:14px; color:var(--accent-primary);">تقرير المراقب الأكاديمي الحصري 👁️</strong>
+            ${cacheNotice}
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-sm" onclick="window.copyAiReport()" style="font-size:11px;">📋 نسخ التقرير</button>
+            <button class="btn btn-sm" onclick="document.getElementById('aiSupervisorOutputContainer').style.display='none'" style="font-size:11px;">✕ إغلاق</button>
+          </div>
+        </div>
+        <div id="aiFormattedReportBody">
+          ${htmlAdvice}
+        </div>
+      </div>
+    `;
+
+    localStorage.setItem('kareem_last_ai_audit', JSON.stringify({
+      timestamp: Date.now(),
+      html: container.innerHTML
+    }));
+
+    toast('تم استلام توجيهات المراقب الذكي بنجاح! ⚡', 'check');
+  } catch (err) {
+    console.error('Audit error:', err);
+    container.innerHTML = `
+      <div class="ai-output-box" style="border-color:var(--danger); color:var(--danger);">
+        ⚠️ تعذر استدعاء المراقب الذكي: ${err.message}. تأكد من اتصال الإنترنت وحاول مجدداً.
+      </div>
+    `;
+    toast('تعذر استدعاء المراقب الذكي', 'alert-triangle');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+
+window.copyAiReport = function() {
+  const body = document.getElementById('aiFormattedReportBody');
+  if (body) {
+    navigator.clipboard.writeText(body.innerText).then(() => {
+      toast('تم نسخ تقرير المراقب إلى الحافظة! 📋', 'check');
+    });
+  }
+};
+
+window.openAiScheduleModal = function() {
+  const modal = document.getElementById('aiScheduleModal');
+  if (modal) modal.classList.add('show');
+};
+
+window.closeAiScheduleModal = function() {
+  const modal = document.getElementById('aiScheduleModal');
+  if (modal) modal.classList.remove('show');
+};
+
+window.generateSmartSchedule = async function() {
+  const hours = document.getElementById('aiSchedHoursInput').value;
+  const bedtime = document.getElementById('aiSchedBedtimeInput').value;
+  const energy = document.getElementById('aiSchedEnergySelect').value;
+  const priority = document.getElementById('aiSchedPrioritySubjSelect').value;
+  const resContainer = document.getElementById('aiScheduleResultContainer');
+
+  if (!resContainer) return;
+  resContainer.style.display = 'block';
+  resContainer.innerHTML = `
+    <div class="ai-output-box">
+      <span class="pulse-dot-ai"></span>
+      جاري هندسة جدول ساعات المذاكرة الذكي بالدقائق...
+    </div>
+  `;
+
+  try {
+    const studentData = getAiStudentContext();
+    const res = await fetch('/api/ai/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        availableHours: hours,
+        bedtime,
+        focusLevel: energy,
+        prioritySubject: priority,
+        pendingTasks: studentData.pendingTasks,
+        examStats: { overallAvg: studentData.examsOverallAvg },
+        customInstructions: state.customAiInstructions
+      })
+    });
+
+    if (!res.ok) throw new Error('فشل توليد الجدول');
+    const data = await res.json();
+    const formatted = formatMarkdown(data.schedule);
+
+    resContainer.innerHTML = `
+      <div class="ai-output-box" style="border-color:var(--accent-secondary);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <strong style="color:var(--accent-secondary);">⏱️ جدول ساعات المذاكرة الذكي المقترح:</strong>
+          <button class="btn btn-sm" onclick="toast('تم اعتماد الجدول لليوم! استعن بالله ⚡', 'check')">✅ اعتماد الجدول</button>
+        </div>
+        ${formatted}
+      </div>
+    `;
+    toast('تم توليد جدول اليوم الذكي بنجاح! ⏱️', 'check');
+  } catch (err) {
+    resContainer.innerHTML = `<div class="ai-output-box" style="color:var(--danger);">⚠️ ${err.message}</div>`;
+  }
+};
+
+window.generateSmartScheduleFromModal = async function() {
+  const hours = document.getElementById('aiModalHoursInput').value;
+  const bedtime = document.getElementById('aiModalBedtimeInput').value;
+  const energy = document.getElementById('aiModalEnergySelect').value;
+  const resContainer = document.getElementById('aiModalScheduleResult');
+
+  if (!resContainer) return;
+  resContainer.style.display = 'block';
+  resContainer.innerHTML = `<div class="ai-output-box"><span class="pulse-dot-ai"></span> جاري توليد الجدول...</div>`;
+
+  try {
+    const studentData = getAiStudentContext();
+    const res = await fetch('/api/ai/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        availableHours: hours,
+        bedtime,
+        focusLevel: energy,
+        pendingTasks: studentData.pendingTasks,
+        examStats: { overallAvg: studentData.examsOverallAvg }
+      })
+    });
+
+    if (!res.ok) throw new Error('فشل توليد الجدول');
+    const data = await res.json();
+    resContainer.innerHTML = `
+      <div class="ai-output-box" style="max-height:360px; overflow:auto;">
+        ${formatMarkdown(data.schedule)}
+      </div>
+    `;
+  } catch (err) {
+    resContainer.innerHTML = `<div class="ai-output-box" style="color:var(--danger);">⚠️ ${err.message}</div>`;
+  }
+};
+
+window.triggerAiExamAudit = async function() {
+  const containerExams = document.getElementById('aiExamAuditResultContainer');
+  const containerHub = document.getElementById('aiExamDiagnosticHubContainer');
+
+  const showIn = (html) => {
+    if (containerExams) {
+      containerExams.style.display = 'block';
+      containerExams.innerHTML = html;
+    }
+    if (containerHub) {
+      containerHub.style.display = 'block';
+      containerHub.innerHTML = html;
+    }
+  };
+
+  showIn(`
+    <div class="ai-output-box">
+      <span class="pulse-dot-ai"></span>
+      جاري فحص درجات امتحاناتك في المواد الـ 4 واستخراج نقاط النزيف والروشتة...
+    </div>
+  `);
+
+  try {
+    const res = await fetch('/api/ai/exam-audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        exams: state.exams,
+        subjects: state.subjects,
+        customInstructions: state.customAiInstructions
+      })
+    });
+
+    if (!res.ok) throw new Error('فشل تحليل درجات الامتحانات');
+    const data = await res.json();
+    const formatted = formatMarkdown(data.diagnostic);
+
+    const fullHtml = `
+      <div class="ai-output-box" style="border-color:var(--accent-primary);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border-subtle); padding-bottom:8px;">
+          <strong style="color:var(--accent-primary); font-size:14px;">🧠 روشتة وتشخيص المراقب لدرجات الامتحانات (4 مواد):</strong>
+          <button class="btn btn-sm" onclick="this.parentElement.parentElement.style.display='none'">✕ إخفاء</button>
+        </div>
+        ${formatted}
+      </div>
+    `;
+
+    showIn(fullHtml);
+    toast('تم استخراج روشتة تفوق الامتحانات بنجاح! 🎯', 'check');
+  } catch (err) {
+    showIn(`<div class="ai-output-box" style="color:var(--danger);">⚠️ ${err.message}</div>`);
+  }
+};
+
+window.sendAiChatMessage = async function() {
+  const input = document.getElementById('aiChatTextInput');
+  const list = document.getElementById('aiChatMessagesList');
+  if (!input || !list) return;
+
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  // Append user message
+  list.innerHTML += `
+    <div class="ai-msg user">
+      ${msg}
+    </div>
+  `;
+  input.value = '';
+
+  // Append typing indicator
+  const typingId = 'typing_' + Date.now();
+  list.innerHTML += `
+    <div id="${typingId}" class="ai-msg ai" style="opacity:0.7;">
+      <span class="pulse-dot-ai"></span> المراقب يكتب رداً...
+    </div>
+  `;
+  list.scrollTop = list.scrollHeight;
+
+  try {
+    const context = getAiStudentContext();
+    const res = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, context, customInstructions: state.customAiInstructions })
+    });
+
+    const el = document.getElementById(typingId);
+    if (!res.ok) throw new Error('تعذر الرد');
+    const data = await res.json();
+
+    if (el) {
+      el.removeAttribute('id');
+      el.style.opacity = '1';
+      el.innerHTML = `<strong>👁️ المراقب:</strong><br/>${formatMarkdown(data.reply)}`;
+    }
+  } catch (err) {
+    const el = document.getElementById(typingId);
+    if (el) {
+      el.innerHTML = `⚠️ تعذر استلام الرد: ${err.message}`;
+    }
+  }
+  list.scrollTop = list.scrollHeight;
+};
+
+window.clearAiChat = function() {
+  const list = document.getElementById('aiChatMessagesList');
+  if (list) {
+    list.innerHTML = `
+      <div class="ai-msg ai">
+        <strong>👁️ المراقب الذكي:</strong><br/>
+        تم مسح المحادثة السابقة. أنا جاهز لمساعدتك في أي تنظيم أو إدارة للوقت اليوم!
+      </div>
+    `;
+  }
+};
+
+window.getAiFocusIntervention = function() {
+  const sec = getActiveSessionSeconds();
+  const mins = Math.floor(sec / 60);
+  const tipEl = document.getElementById('aiFocusWatchdogTip');
+  if (!tipEl) return;
+
+  if (mins >= 60) {
+    tipEl.textContent = `⚡ بطل يا كريم! عديت ${mins} دقيقة تركيز عميق. خلص الفكرة أو المسألة اللي قدامك وخد راحة 10 دقائق عشان عقلك يثبت المعلومة.`;
+  } else if (mins >= 25) {
+    tipEl.textContent = `🎯 استمر.. أنت في قمة تدفق التركيز (Flow State) دلوقتي بعد ${mins} دقيقة. متسيبش القلم واكمل حل!`;
+  } else {
+    tipEl.textContent = `🔥 الدقايق الأولى هي أصعب مرحلة للتغلب على كسل البداية. اقفل موبايلك، ركز في الصفحة اللي قدامك، وكل ثانية بتفرق!`;
+  }
+  toast('توجيه فوري من المراقب 👁️', 'check');
+};
 
 function saveFinishedSession() {
   const sec = getActiveSessionSeconds();
@@ -2522,18 +3437,10 @@ function saveFinishedSession() {
     minutes: mins,
     entries: [{ subj: subjId, task }]
   };
-  
-  // Realtime Database Push
-  if (rtdb && sessionsDbRef) {
-    try {
-      push(sessionsDbRef, sessionRecord).catch(e => console.warn('Firebase push offline:', e));
-    } catch (e) {
-      console.warn('Firebase error:', e);
-    }
-  }
 
   state.sessions.push(sessionRecord);
   localStorage.setItem('kareem_sessions_v3', JSON.stringify(state.sessions));
+  if (window.syncManager) window.syncManager.scheduleSync();
   
   state.activeSession = null;
   persistActiveSession();
@@ -2541,7 +3448,7 @@ function saveFinishedSession() {
   document.getElementById('finishModal').classList.remove('show');
   showView('dashView');
   renderUI();
-  toast('تم توثيق إنجازك وحفظه سحابياً في تاريخك!', 'check');
+  toast('تم توثيق إنجازك وحفظه في سجل المذاكرة وقاعدة البيانات! ⚡', 'check');
 }
 
 // Exemption (Lesson / Class)
@@ -2552,41 +3459,25 @@ function addExemption(title, minutes) {
     minutes: parseInt(minutes, 10),
     timestamp: Date.now()
   };
-  
-  // Realtime Database Push
-  if (rtdb && exemptionsDbRef) {
-    try {
-      push(exemptionsDbRef, record).catch(e => console.warn('Exemption push note:', e));
-    } catch(e) {}
-  }
 
   state.lessonExemptions.push(record);
   localStorage.setItem('kareem_exemptions_today', JSON.stringify(state.lessonExemptions));
+  if (window.syncManager) window.syncManager.scheduleSync();
   renderUI();
   toast('تم تسجيل الحصة ولن تُحسب كوقت ضائع!', 'check');
 }
 
 window.deleteExemption = function(idx) {
-  const item = state.lessonExemptions[idx];
-  if (item && item.fbKey && rtdb) {
-    try {
-      remove(ref(rtdb, `shapap/exemptions/${item.fbKey}`)).catch(e => console.warn('Exemption remove note', e));
-    } catch(e) {}
-  }
   state.lessonExemptions.splice(idx, 1);
   localStorage.setItem('kareem_exemptions_today', JSON.stringify(state.lessonExemptions));
+  if (window.syncManager) window.syncManager.scheduleSync();
   renderUI();
 };
 
 window.deleteSession = function(idx) {
-  const item = state.sessions[idx];
-  if (item && item.fbKey && rtdb) {
-    try {
-      remove(ref(rtdb, `shapap/sessions/${item.fbKey}`)).catch(e => console.warn('Remove error', e));
-    } catch(e) {}
-  }
   state.sessions.splice(idx, 1);
   localStorage.setItem('kareem_sessions_v3', JSON.stringify(state.sessions));
+  if (window.syncManager) window.syncManager.scheduleSync();
   renderUI();
   toast('تم حذف الجلسة', 'trash');
 };
@@ -3334,7 +4225,10 @@ function saveExamRecord() {
         date,
         notes
       };
+      const pct = getExamPercentage(score, total);
+      const rating = getExamRating(pct);
       toast('تم تحديث درجة الامتحان بنجاح ⚡', 'check');
+      window.showExamAiReaction(state.exams[idx], pct, rating);
     }
   } else {
     const newExam = {
@@ -3352,9 +4246,11 @@ function saveExamRecord() {
     const pct = getExamPercentage(score, total);
     const rating = getExamRating(pct);
     toast(`تم تسجيل درجة الامتحان: ${score}/${total} (${pct}%) ${rating.label}`, 'sparkles');
+    window.showExamAiReaction(newExam, pct, rating);
   }
 
   persistExams();
+  if (window.syncManager) window.syncManager.scheduleSync();
   closeExamModal();
   renderUI();
 }
@@ -3662,11 +4558,24 @@ document.addEventListener('DOMContentLoaded', () => {
     examTotalInput.addEventListener('input', updateExamModalLiveCalc);
   }
 
-  // Load quotes and start render loops
-  initFirebase();
+  // Initialize Unified Cloud Database Sync & Offline Engine
+  syncManager.init();
   loadMotivationQuotes();
   drawMainVisualizer();
   restoreActiveSession();
+
+  // Restore cached AI audit if available
+  try {
+    const savedAudit = JSON.parse(localStorage.getItem('kareem_last_ai_audit') || 'null');
+    if (savedAudit && savedAudit.html) {
+      const container = document.getElementById('aiSupervisorOutputContainer');
+      if (container) {
+        container.style.display = 'block';
+        container.innerHTML = savedAudit.html;
+      }
+    }
+  } catch(e) {}
+
   renderUI();
   
   // Continuous UI clock tick
