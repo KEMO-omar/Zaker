@@ -1,5 +1,6 @@
 import React from 'react';
 import { Subject } from '../types';
+import { Target } from 'lucide-react';
 
 interface ActiveSessionBannerProps {
   isRunning: boolean;
@@ -34,8 +35,9 @@ export const ActiveSessionBanner: React.FC<ActiveSessionBannerProps> = ({
           </div>
         </div>
       </div>
-      <button className="btn btn-primary btn-sm" onClick={onGoToFocus}>
-        الانتقال إلى غرفة التركيز 🎯
+      <button className="btn btn-primary btn-sm" onClick={onGoToFocus} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Target size={14} />
+        <span>الانتقال إلى غرفة التركيز</span>
       </button>
     </div>
   );

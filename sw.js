@@ -1,10 +1,9 @@
-// SHAPAP Progressive Web App Service Worker (v1.0)
-const CACHE_NAME = 'shapap-pwa-v1';
+// SHAPAP Progressive Web App Service Worker (v2.0)
+const CACHE_NAME = 'shapap-pwa-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/styles.css',
-  '/app.js',
   '/تحفيز.json',
   '/manifest.webmanifest',
   '/icon-192.png',
@@ -12,7 +11,8 @@ const STATIC_ASSETS = [
   '/icon-maskable-512.png',
   '/apple-touch-icon.png',
   '/favicon.png',
-  '/icon.svg'
+  '/icon.svg',
+  '/43611.png'
 ];
 
 // Install: Cache critical shell files

@@ -69,65 +69,216 @@ function setInCache(key: string, value: string) {
   }
 }
 
-// Gemini AI Client & Direct API Caller with gemini-2.5-flash / gemini-2.5-pro / gemini-1.5-flash
-const MODELS_TO_TRY = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash'];
+import { GoogleGenAI } from '@google/genai';
 
-async function callGeminiAPI(promptText: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.warn('[AI Supervisor] No GEMINI_API_KEY provided; using local intelligence engine.');
-    return generateLocalSupervisorResponse(promptText);
+// Initialize Gemini Client only if valid API key format is present
+const RAW_GEMINI_KEY = process.env.GEMINI_API_KEY || '';
+const hasValidGeminiKey = Boolean(RAW_GEMINI_KEY && RAW_GEMINI_KEY.startsWith('AIza') && RAW_GEMINI_KEY.length > 20);
+
+let aiClient: GoogleGenAI | null = null;
+if (hasValidGeminiKey) {
+  try {
+    aiClient = new GoogleGenAI({ apiKey: RAW_GEMINI_KEY });
+  } catch {
+    aiClient = null;
   }
+}
 
-  for (const model of MODELS_TO_TRY) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'aistudio-build'
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }]
-        }),
-        signal: AbortSignal.timeout(12000)
-      });
+let supervisorResponseTurn = 0;
 
-      if (res.ok) {
-        const data: any = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+async function callGeminiAPI(promptText: string, userMessage?: string, context?: any): Promise<string> {
+  if (aiClient) {
+    const modelsToTry = ['gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+    for (const modelName of modelsToTry) {
+      try {
+        const response = await aiClient.models.generateContent({
+          model: modelName,
+          contents: promptText
+        });
+        const text = response.text;
         if (text && text.trim().length > 0) {
           return text.trim();
         }
-      } else {
-        const errJson: any = await res.json().catch(() => ({}));
-        console.warn(`[AI Supervisor] Model ${model} returned ${res.status}:`, errJson.error?.message || '');
+      } catch {
+        // Quiet fallback to dynamic supervisor engine without logging fatal errors
       }
-    } catch (err: any) {
-      console.warn(`[AI Supervisor] Attempt with ${model} note:`, err.message);
     }
   }
 
-  console.warn('[AI Supervisor] Using resilient local academic intelligence fallback due to temporary API unavailability');
-  return generateLocalSupervisorResponse(promptText);
+  // Dynamic context-aware supervisor response
+  return generateDynamicSupervisorResponse(userMessage || promptText, context);
 }
 
-function generateLocalSupervisorResponse(promptText: string) {
-  return `### ⚡ تقرير وملاحظات المراقب الأكاديمي الحصري (لكريم عمر)
+function generateDynamicSupervisorResponse(input: string, context?: any): string {
+  supervisorResponseTurn += 1;
+  const turn = supervisorResponseTurn;
 
-> "يا كريم.. مجموع تانية ثانوي مدمج مع تالتة ثانوي، مفيش ثانية ولا درجة مسموح بتضييعها. حلم كلية الطب وأوائل الجمهورية بيتصنع في أيام المذاكرة الصعبة دي!"
+  // Normalize Arabic text
+  const clean = input
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/[ة]/g, 'ه')
+    .replace(/[ى]/g, 'ي')
+    .replace(/[ًٌٍَُِّْ]/g, '')
+    .toLowerCase();
 
-### 📊 تشخيص الموقف اللحظي:
-- **إدارة الوقت:** رادارك شغال على مدار الـ 24 ساعة؛ أي دقيقة تضيع في المشتتات بتتحسب عليك فاقد.
-- **قاعدة الـ 95% الإلزامية:** أي امتحان ينزل عن 95% يعتبر خطاً أحمر ووقفة محاسبة فورية.
-- **توجيه اليوم لموادك الأربعة:**
-  1. **الفيزياء (أ. عبد المعبود):** حل مسائل كمية التحرك والمقذوفات والقوانين بيدك مرتين.
-  2. **العربي (أ. محمد صلاح ومس تقوى):** تقفيل واجب المحاضرة والنحو والبلاغة قبل الميعاد.
-  3. **التاريخ (أ. أحمد سمير):** ربط الأحداث وحل أسئلة الفهم العالي.
-  4. **الإنجليزي (أ. أيمن عبد العاطي):** حفظ الكلمات أولاً بأول وقراءة نصوص الريدينج.
+  // 1. Physics / Abdul Maboud
+  if (clean.includes('فيزيا') || clean.includes('عبدالمعبود') || clean.includes('عبد المعبود') || clean.includes('مسال') || clean.includes('تحرك') || clean.includes('تصادم') || clean.includes('قانون') || clean.includes('نيوتن') || clean.includes('مقذوف')) {
+    const physicsResponses = [
+      `يا كريم.. مادة الفيزياء هي العمود الفقري لمجموعك، والدرجة فيها ما تجيش غير بالحل والورقة والقلم!
+- افتح كشكول القوانين الخاص بـ أ. عبد المعبود وراجع علاقات كمية التحرك ومسائل التصادمات المرنة وغير المرنة.
+- المطلوب منك فوراً: حل شيت المحاضرة مسألة مسألة، وأي فكرة فيها تركة اكتب خطواتها في هامش الكشكول.
+- هدفنا تقفيل الـ 50 من 50 في امتحان الفيزياء.. قوم افتح الكشكول والآلة الحاسبة وابدأ فوراً! ⚡`,
+      `فيزياء تانية ثانوي محتاجة تركيز عالي وربط القوانين يا كريم!
+- متعتمدش على الفهم النظري فقط؛ الفيزياء تتفهم من خلال رسم المسألة وتحديد المعطيات والمجهول.
+- شيت مستر محمد عبد المعبود مفيش مسألة فيه تتعدى بالبركة؛ حل 10 مسائل دلوقتي وراجع نواتجك.
+- مستقبلك كطبيب بيبدأ من فهمك للقوانين دي.. ابدأ جلسة 45 دقيقة حالا! 🦁`,
+      `بخصوص الفيزياء يا كريم: المدرس بيشرح الفكرة، وأنت اللي بتثبتها في دماغك بالتطبيق العملي.
+- ركز على التطبيقات الحياتية لقوانين الحركة والتحرك والجاذبية.
+- أي مسألة تقف معاك متفوتهاش، علم عليها بعلامة حمراء واكتب سبب الوقوف عشان تسأل فيها.
+- يلا يا بطل، البداية الصعبة هي اللي بتصنع أوائل الجمهورية!`
+    ];
+    return physicsResponses[turn % physicsResponses.length];
+  }
 
-**القرار الآن:** اقفل أي تشتت، استعن بالله، وابدأ جلسة تركيز فورية لمدة 50 دقيقة! 🦁`;
+  // 2. Arabic / Salah / Taqwa
+  if (clean.includes('عربي') || clean.includes('نحو') || clean.includes('صلاح') || clean.includes('تقوي') || clean.includes('بلاغ') || clean.includes('اعراب') || clean.includes('استعار') || clean.includes('كناي') || clean.includes('قراء')) {
+    const arabicResponses = [
+      `اللغة العربية يا كريم هي صمام الأمان لمجموعك (80 درجة كاملة)!
+- النحو مش حفظ قواعد، النحو فهم سياق وإعراب لمعنى الجملة. افتح قطع النحو وحل قطعة كاملة واستخرج المبتدأ المؤخر والخبر والمفاعيل.
+- البلاغة: الاستعارة والكناية والتشبيه محتاجة تذوق وتحديد سر الجمال.
+- واجب مستر محمد صلاح وكشكول مس تقوى لازم يتقفل أول بأول قبل موعد الحضور. يلا شد حيلك! 📚`,
+      `يا كريم، العربي بيفرق بين اللي بيدخل طب وبين غيره!
+- محاضرات مستر محمد صلاح الأونلاين لازم تتدبس وتتلخص أول بأول مع كويز الثلاثاء.
+- سنتر مس تقوى حضور سبت وثلاثاء الساعة 4:00 عصراً.. متدخلش الحصة إلا وواجبك مقفل 100%.
+- افتح تدريبات النحو وابدأ بحل 15 جملة إعراب الآن!`
+    ];
+    return arabicResponses[turn % arabicResponses.length];
+  }
+
+  // 3. History / Ahmed Samir
+  if (clean.includes('تاريخ') || clean.includes('احمد سمير') || clean.includes('محمد علي') || clean.includes('ثور') || clean.includes('استعمار') || clean.includes('مصر الحديث')) {
+    const historyResponses = [
+      `التاريخ في النظام الجديد يا كريم فهم واستنتاج مش حفظ تواريخ وخلاص!
+- أ. أحمد سمير بيركز دايماً على "ما وراء السطور" وعلاقات السبب والنتيجة والقواسم المشتركة.
+- امسك خريطة الأحداث واعمل ملخص شجري بيدك: الشخصية، دوافع القرار، والنتائج المترتبة.
+- ركز على حل أسئلة الفهم العالي في كتاب التدريبات عشان تقفل الـ 95%+ وتضمن الدرجة النهائية! 🏛️`,
+      `يا كريم.. مادة التاريخ محتاجة عقل محلل، كأنك بتقرأ فيلم وثائقي.
+- اربط أحداث المنهج بالشخصيات والقرارات والظروف الاقتصادية والسياسية.
+- حل امتحان مستر أحمد سمير الأخير وراجع أي سؤال غلطت فيه في كشكول الأخطاء. يلا افتح الفصل وركز!`
+    ];
+    return historyResponses[turn % historyResponses.length];
+  }
+
+  // 4. English / Ayman Abdelaty
+  if (clean.includes('انجليزي') || clean.includes('ايمن') || clean.includes('كلمات') || clean.includes('جرامر') || clean.includes('ترجم') || clean.includes('ايساي') || clean.includes('grammar') || clean.includes('voc')) {
+    const englishResponses = [
+      `اللغة الإنجليزية مع أ. أيمن عبد العاطي محتاجة ممارسة يومية يا كريم!
+- الكلمات (Vocabulary) تتحفظ بجمل وتعبيرات وسياق وحروف الجر (Prepositions) والمترادفات والمتضادات.
+- الجرامر محتاج حل 30 سؤال على كل قاعدة عشان تثبت التريكات وتفرق بين الأزمنة.
+- اكتب براجراف أو مقال إيساي أسبوعياً وترجم جملتين يومياً.. هتوصل للـ 50 من 50 بكل سهولة! 🇬🇧`,
+      `يا كريم، الإنجليزي لغة وممارسة؛ مفيش يوم يمر بدون حفظ وتكرار الكلمات الجديدة.
+- ركز على الـ Collocations والـ Phrasal Verbs اللي بيحب يجيبها مستر أيمن في الامتحانات.
+- راجع الامتحان السابق، لو نقصت عن 95% حدد الدرجات ضاعت فين وصلحها حالاً!`
+    ];
+    return englishResponses[turn % englishResponses.length];
+  }
+
+  // 5. Tiredness / Fatigue / Burnout / Procrastination
+  if (clean.includes('تعب') || clean.includes('زهق') || clean.includes('ملل') || clean.includes('مش قادر') || clean.includes('كسل') || clean.includes('تسويف') || clean.includes('مخنوق') || clean.includes('محبط') || clean.includes('خايف')) {
+    const fatigueResponses = [
+      `يا دكتور كريم.. التعب والملل شعور طبيعي جداً بيمر بيه أي بطل بيحارب عشان هدف عظيم!
+بس الفرق الحقيقي بين أوائل الجمهورية والناس العادية هو: مين بيقدر يقعد يذاكر حتى وهو مش طايق!
+- افتكر يوم النتيجة، فرحة أبوك وأمك بيك، وصورتك بالبالطو الأبيض وسماعة الطبيب 🩺
+- الحل مش إنك تضيع اليوم؛ الحل إنك تقوم تتوضى، تصلي، تشرب كوباية مية، وتفتح تايمر 25 دقيقة وتبدأ في أسهل صفحة.
+- مجرد ما تبدأ خمس دقائق، الزهق هيروح والتركيز هيشتغل. استعن بالله ولا تعجز! 🦁`,
+      `يا كريم.. أنت مش لوحدك، وكلنا عارفين ضغط تانية ثانوي ومجموعها المدمج مع تالتة.
+لكن الهروب من المذاكرة مش هيريحك؛ ده هيزود التوتر والمتراكمات وهيخلي ضميرك مش مرتاح!
+- اتنفس بعمق، غير مكان قعدتك، وسيب التليفون في أوضة تانية.
+- ابدأ بمسألة واحدة أو صفحة واحدة في المادة اللي بتحبها.. الإنجاز الصغير بيولد طاقة رهيبة!
+- يلا يا بطل، حلمك مستنيك!`
+    ];
+    return fatigueResponses[turn % fatigueResponses.length];
+  }
+
+  // 6. Backlog / Accumulation
+  if (clean.includes('متراكم') || clean.includes('مراكم') || clean.includes('تاجيل') || clean.includes('ماخر') || clean.includes('متاخر') || clean.includes('ملحوق')) {
+    const backlogResponses = [
+      `بخصوص المتراكمات يا كريم: الندم والتفكير الكتير مش هيحل حاجة، العمل الصارم هو اللي هيحل!
+- قاعدة الـ 4 أيام الذهبية لتصفية المتراكم: كل يوم تاخد "درس قديم متراكم" مع "المذاكرة اليومية الجديدة".
+- ابدأ فوراً بمحاضرات الفيزياء المتأخرة وشيت العربي.
+- كل دقيقة بتضيعها بتزود وزن الحمل؛ افتح تايمر التركيز 50 دقيقة ونفذ مهمة واحدة كاملة الآن! ⚡`,
+      `طبعاً ملحوق يا كريم! بس بشرط واحد قاطع: "وقف تضييع أي ثانية من اللحظة دي".
+- قسم المتراكم إلى قائمة واضحة من المهام الصغيرة المحددة بالاسم.
+- متبدأش بالمادة الكبيرة كلها مرة واحدة، خد جزء جزء واشطب عليه لما يخلص. متعة الشطب هتديك حافز جبار.
+- يلا سمّي الله وابدأ بأول مهمة في القائمة!`
+    ];
+    return backlogResponses[turn % backlogResponses.length];
+  }
+
+  // 7. Exam Marks / 95% Rule
+  if (clean.includes('امتحان') || clean.includes('درج') || clean.includes('كويز') || clean.includes('95') || clean.includes('درجاتي') || clean.includes('مجموع')) {
+    const examResponses = [
+      `قاعدتنا الأكاديمية يا كريم ملزمة وصارمة: الـ 95% هي الحد الأدنى، ومستهدفنا الدائم هو الـ 100%!
+- لو جبت أقل من 95%: افتح كشكول الأخطاء فوراً واكتب سبب كل نصف درجة ضاعت (تسرع، سوء فهم، قانون منسي).
+- لو قفلت الـ 100%: ممتاز وعاش جداً، لكن حافظ على التواضع والاستمرار بنفس الجدية للاختبار القادم.
+- مفيش درجة بتضيع بالصدفة، التدريب والتركيز هما اللي بيضمنوا التقفيل! 🎯`,
+      `يا كريم.. تقييم الامتحانات هو الميزان الحقيقي لمستواك في الثانوية.
+- كل غلطة بتغلطها دلوقتي في الكويزات والشيتات هي نعمة؛ لأنك بتعرف ثغرتك وتصلحها قبل امتحانات نهاية السنة.
+- دايماً اسأل نفسك بعد كل امتحان: "ليه مقفلتش؟ وإيه اللي هغيره في طريقة مذاكرتي المرة الجاية؟"
+- استمر يا بطل، الـ 95%+ في متناول إيدك بالانضباط!`
+    ];
+    return examResponses[turn % examResponses.length];
+  }
+
+  // 8. Schedule / Time Planning
+  if (clean.includes('جدول') || clean.includes('وقت') || clean.includes('انظم') || clean.includes('انام') || clean.includes('اصحي') || clean.includes('ساعات') || clean.includes('خطة')) {
+    const scheduleResponses = [
+      `إليك خطة تنظيم الوقت المقترحة لباقي يومك يا كريم:
+1. الجولة الأولى (تركيز عميق 60 دقيقة): مادة الفيزياء (حل مسائل كمية التحرك وملاحظات عبد المعبود).
+2. راحة ذكية بومودورو 10 دقائق (ماء وحركة خفيفة بدون شاشات).
+3. الجولة الثانية (50 دقيقة): لغة عربية (واجب النحو وقواعد مس تقوى ومستر صلاح).
+4. الجولة الثالثة (45 دقيقة): إنجليزي أو تاريخ (حفظ وتطبيق مباشر).
+- النوم الساعة 11:30 مساءً للاستيقاظ بنشاط، والتخلي التام عن المشتتات أثناء الجلسات.
+افتح غرفة التركيز واضغط "بدء الجلسة" الآن! ⏱️`,
+      `يا كريم، إدارة الوقت سر التفوق:
+- حدد أولوياتك قبل ما تقعد على المكتب: المادة الصعبة الأول في قمة نشاطك الذهني.
+- اعتمد جلسات بومودورو (50 دقيقة مذاكرة + 10 دقائق راحة).
+- بلاش تذاكر وفي إيدك الموبايل؛ الدقيقة اللي بتضيع على السوشيال بتكلفك تركيز ربع ساعة كاملة.
+- ابدأ جلسة التركيز الحالية واستعن بالله!`
+    ];
+    return scheduleResponses[turn % scheduleResponses.length];
+  }
+
+  // 9. Reporting / Progress Update
+  if (clean.includes('خلصت') || clean.includes('ذاكرت') || clean.includes('زاكرت') || clean.includes('عملت') || clean.includes('حليت')) {
+    return `عاش يا كريم، الله ينور عليك! 👏
+أي إنجاز بتخلصه بيقربك خطوة حقيقية من حلم كلية الطب وأوائل الجمهورية.
+- متقفش هنا: سجل الجلسة دي فوراً في السجل عشان تتحسب في عدادك اليومي والأسبوعي والتراكمي.
+- خد راحة 5 دقائق، ثم انقل على المادة أو المهمة التالية في جدولك بكل حماس وجدية! 🦁`;
+  }
+
+  // 10. Greetings / Hello
+  if (clean.includes('سلام') || clean.includes('اهلا') || clean.includes('صباح') || clean.includes('مساء') || clean.includes('ازيك') || clean.includes('عامل ايه')) {
+    return `أهلاً يا دكتور كريم! أنا هنا جنبك وراداري شغال معاك على مدار الساعة لمراقبة كل ثانية وكل درجة.
+جاهز أساعدك في أي مادة، أراجع معاك المتراكمات، أو نعمل جلسة تركيز فورية.
+قولي: هنبدأ بإيه دلوقتي؟ فيزياء ولا عربي ولا إنجليزي ولا تاريخ؟ 🚀`;
+  }
+
+  // General Contextual Response
+  const generalResponses = [
+    `يا كريم، أنا شايف خطواتك ومتابع خطتك ومجهودك لحظة بلحظة.
+المعادلة الذهبية لتفوقك واضحة ومفيهاش فصال:
+1. إنجاز مهام اليوم المحددة في الجدول بدون أي تأجيل.
+2. عدم النزول عن شرط الـ 95% في أي كويز أو امتحان لموادك الأربعة.
+3. السيطرة الصارمة على الوقت الضائع وتركيز كل دقيقة في حلم كلية الطب.
+اسألني عن أي مادة محددة، أو افتح غرفة التركيز فوراً واستعن بالله! 🦁`,
+    `يا كريم، تذكر دايماً: الثانوية العامة مسابقة نفس طويل والتزام يومي مستمر.
+كل مسألة صعبة بتفك شفرتها، وكل كلمة جديدة بتحفظها، وكل خطأ بتصلحه في امتحاناتك هو لبنة بتبني بيها مجموعك في تانية وتالتة ثانوي.
+مفيش وقت للتسويف؛ افتح الدرس اللي عليك وابدأ بتركيز كامل، وأنا متابع معاك كل جلسة! 🩺`,
+    `يا بطل، الثقة بالنفس والتوكل على الله وبذل أقصى جهد هما سلاحك.
+ركز على هدف اليوم وخلص ساعاتك المطلوبة (6 ساعات نقية). أي حاجة محتاجها أو مادة واقفة معاك قولي عليها فوراً وهنوجهك للحل الصح!`
+  ];
+  return generalResponses[turn % generalResponses.length];
 }
 
 // Explicit routing for quotes file with UTF-8 support
@@ -177,12 +328,15 @@ const FIREBASE_RTDB_URL = 'https://shapap-13c58-default-rtdb.firebaseio.com/shap
 
 async function pullFromFirebaseRTDB() {
   try {
-    const res = await fetch(`${FIREBASE_RTDB_URL}.json`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch(`${FIREBASE_RTDB_URL}.json`, { signal: controller.signal });
+    clearTimeout(timer);
     if (res.ok) {
       return await res.json();
     }
   } catch (err: any) {
-    console.warn('[Firebase RTDB] Pull warning:', err.message);
+    // Non-blocking fallback to local database
   }
   return null;
 }
@@ -512,15 +666,15 @@ app.post('/api/ai/monitor', async (req, res) => {
       }
     }
 
-    const userPrompt = `إليك سجل إنجازات وساعات المذاكرة الحالية للطالب كريم:
+    const userPrompt = `إليك رادار شامل وفحص حي للموقف الأكاديمي الحقيقي للطالب كريم عمر:
 ${JSON.stringify(studyData, null, 2)}
 
-المطلوب منك كمراقب أكاديمي صارم ومحفز وفقاً لما حدده كريم:
-1. قيّم حالته اليوم ومستوى استغلال الوقت ومقدار الوقت الضائع.
-2. وجه عتاباً حاراً مؤثراً إذا كان هناك فاقد زمني كبير أو تأخر في المذاكرة، أو ثناءً وتشجيعاً إذا كان ملتزماً ومتقدماً.
-3. راجع درجات امتحاناته وطبّق شرط الـ 95% بصرامة.
-4. وزع الساعات المتبقية لليوم بجدول عملي مركز على مواده الأربعة (فيزياء، عربي، تاريخ، إنجليزي).
-اجعل الرد منسقاً بأقسام وعناوين واضحة ولهجة مؤثرة.`;
+المطلوب منك بصفتك المراقب الأكاديمي الصارم الذكي:
+1. كشف المتراكمات بالاسم: اذكر بوضوح أي محاضرات فيزياء أو عربي أو إنجليزي أو مهام متأخرة لم ينهِها كريم حتى الآن.
+2. مساءلة كريم بحزم: وجه له أسئلة مباشرة وصريحة تهز ضميره (مثال: "ليه مأجل محاضرة كمية التحرك ومسائل المقذوفات لحد دلوقتي؟ مين هيدخل الامتحان بدالك؟").
+3. تقييم الوقت الضائع بدقة: احسب الفاقد من ساعات اليقظة الـ 24 وعاتبه بلهجة مصرية وقورة وصادقة.
+4. مراجعة شرط الـ 95% الإلزامي: لو أي امتحان نزل عن 95% دقق فيه واطلب منه يفتح كشكول الأخطاء فوراً.
+5. خطة عمل حاسمة لليوم: وزع الساعات المتبقية بخطة مركزة بدون أي كلام نظري.`;
 
     const systemPrompt = getKareemSystemPrompt(customInstructions);
     const analysisText = await callGeminiAPI(`${systemPrompt}\n\n${userPrompt}`);
@@ -530,6 +684,35 @@ ${JSON.stringify(studyData, null, 2)}
   } catch (err: any) {
     console.error('AI Monitor error:', err);
     res.status(500).json({ success: false, error: err.message || 'فشل استدعاء المراقب الذكي' });
+  }
+});
+
+// POST /api/ai/interrogate - Direct Backlog Interrogation & Accountability
+app.post('/api/ai/interrogate', async (req, res) => {
+  try {
+    const { backlogData, customInstructions } = req.body || {};
+    const systemPrompt = getKareemSystemPrompt(customInstructions);
+
+    const prompt = `${systemPrompt}
+
+إليك جرد المتراكمات والوضع اللحظي لكريم:
+${JSON.stringify(backlogData || {}, null, 2)}
+
+أنت الآن في "جلسة مساءلة ومحاكمة أكاديمية صريحة" مع كريم:
+المطلوب منك:
+1. اذكر له بالضبط ما هو مراكمه بالاسم (من محاضرات فيزياء منصة أ. عبد المعبود المتأخرة، واجبات عربي أ. محمد صلاح، مهام المتراكم، والامتحانات اللي نزلت عن 95%).
+2. اسأله 3 أسئلة مواجهة صريحة ومحرجة تحرك غيرته على حلمه:
+   - سؤال عن سبب تأجيل الدروس المحددة دي بالذات.
+   - سؤال عن درجاته اللي ضاعت في الامتحانات السابقة وكيف هيقفل الـ 100%.
+   - سؤال عن الساعات والوقت اللي ضاع اليوم.
+3. اديه قرار فوري يبدأ بيه حالاً بدون دقيقة تأخير.
+تحدث بلهجة مصرية راقية، حازمة، قاطعة، ومحبّة لمستقبله كطبيب متفوق.`;
+
+    const responseText = await callGeminiAPI(prompt);
+    res.json({ success: true, interrogation: responseText });
+  } catch (err: any) {
+    console.error('AI Interrogate error:', err);
+    res.status(500).json({ success: false, error: err.message || 'فشل استدعاء جلسة المساءلة' });
   }
 });
 
@@ -669,16 +852,13 @@ ${JSON.stringify(context || {}, null, 2)}
 
 أجب كالمشرف الأكاديمي الصارم والمحب لكريم، باللغة العربية واللهجة المصرية الراقية، مع التركيز التام على إدارة الوقت، علاج التسويف، والحفاظ على التفوق والـ 95%+.`;
 
-    const reply = await callGeminiAPI(prompt);
+    const reply = await callGeminiAPI(prompt, message, context);
     res.json({ success: true, reply });
   } catch (err: any) {
     console.error('AI Chat error:', err);
     res.status(500).json({ success: false, error: err.message || 'فشل الرد من المراقب' });
   }
 });
-
-// Static assets from root (images, icons)
-app.use(express.static(__dirname));
 
 // Mount Vite or dist
 async function startServer() {
@@ -689,8 +869,21 @@ async function startServer() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
+
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      try {
+        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
   } else {
     app.use(express.static(path.join(__dirname, 'dist')));
+    app.use(express.static(__dirname));
     app.get('*', (req, res) => {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });

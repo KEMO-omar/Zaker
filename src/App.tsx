@@ -8,6 +8,7 @@ import {
   callAiExamReaction,
   callAiSchedule,
   callAiExamAudit,
+  callAiInterrogate,
   fetchQuotes
 } from './services/api';
 
@@ -17,11 +18,17 @@ import { ActiveSessionBanner } from './components/ActiveSessionBanner';
 import {
   BreakModal,
   ExamModal,
+  EditExamModal,
   ExamReactionModal,
   NewTaskModal,
+  EditTaskModal,
   NewLectureModal,
+  EditLectureModal,
+  EditSubjectsModal,
   ExemptionModal,
-  AiScheduleModal
+  AiScheduleModal,
+  InterrogationModal,
+  ManualSessionModal
 } from './components/Modals';
 
 import { DashboardView } from './views/DashboardView';
@@ -39,9 +46,18 @@ export const App: React.FC = () => {
   const [theme, setTheme] = useState<ThemeType>('default');
   const [vizMode, setVizMode] = useState<'spiral' | 'gauge' | 'bars'>('spiral');
 
-  // Core Data
+  // Core Data with instant LocalStorage caching
   const [subjects, setSubjects] = useState<Subject[]>(DEFAULT_SUBJECTS);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<Session[]>(() => {
+    try {
+      const saved = localStorage.getItem('kareem_sessions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
   const [exemptions, setExemptions] = useState<Exemption[]>([]);
   const [weeklyTasks, setWeeklyTasks] = useState<WeeklyTask[]>([]);
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string | number>>(new Set());
@@ -49,6 +65,7 @@ export const App: React.FC = () => {
   const [exams, setExams] = useState<ExamRecord[]>([]);
   const [customAiInstructions, setCustomAiInstructions] = useState<string>('');
   const [quotes, setQuotes] = useState<string[]>([]);
+  const [isManualSessionOpen, setIsManualSessionOpen] = useState(false);
 
   // Focus Timer State
   const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -77,17 +94,59 @@ export const App: React.FC = () => {
   // Modals State
   const [isBreakOpen, setIsBreakOpen] = useState(false);
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
+  const [isEditExamOpen, setIsEditExamOpen] = useState(false);
+  const [examToEdit, setExamToEdit] = useState<ExamRecord | null>(null);
+
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
+  const [isEditTaskOpen, setIsEditTaskOpen] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState<WeeklyTask | null>(null);
+
   const [isNewLectureModalOpen, setIsNewLectureModalOpen] = useState(false);
+  const [isEditLectureOpen, setIsEditLectureOpen] = useState(false);
+  const [lectureToEdit, setLectureToEdit] = useState<Lecture | null>(null);
+
+  const [isEditSubjectsOpen, setIsEditSubjectsOpen] = useState(false);
   const [isExemptionModalOpen, setIsExemptionModalOpen] = useState(false);
+
   const [isAiScheduleOpen, setIsAiScheduleOpen] = useState(false);
   const [aiScheduleText, setAiScheduleText] = useState<string | null>(null);
   const [isGeneratingSchedule, setIsGeneratingSchedule] = useState(false);
+
   const [examAuditReport, setExamAuditReport] = useState<string | null>(null);
   const [isAuditingExams, setIsAuditingExams] = useState(false);
   const [lastExamForReaction, setLastExamForReaction] = useState<ExamRecord | null>(null);
   const [examReactionText, setExamReactionText] = useState<string>('');
   const [isExamReactionOpen, setIsExamReactionOpen] = useState(false);
+
+  // Backlog Interrogation State
+  const [isInterrogationOpen, setIsInterrogationOpen] = useState(false);
+  const [interrogationText, setInterrogationText] = useState<string | null>(null);
+  const [isInterrogating, setIsInterrogating] = useState(false);
+
+  // PWA Install State for Chrome
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        showToast('تم تثبيت التطبيق بنجاح على جهازك!');
+        setDeferredPrompt(null);
+      }
+    } else {
+      showToast('للتثبيت في كروم: اضغط على القائمة (⋮) ثم "تثبيت التطبيق" أو "Install App"');
+    }
+  };
 
   // Sync Timer
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -120,7 +179,31 @@ export const App: React.FC = () => {
           setSubjects(db.subjects);
         }
         if (Array.isArray(db.sessions)) {
-          setSessions(db.sessions);
+          let localSaved: Session[] = [];
+          try {
+            const raw = localStorage.getItem('kareem_sessions');
+            if (raw) localSaved = JSON.parse(raw);
+          } catch (e) {}
+
+          const sessMap = new Map<string, any>();
+          // 1. Put local sessions
+          localSaved.forEach((s) => {
+            const k = s.id || s.fbKey || (s.tsStart ? `ts_${s.tsStart}` : null);
+            if (k) sessMap.set(String(k), s);
+          });
+          // 2. Put server sessions (union)
+          db.sessions.forEach((s: any, idx: number) => {
+            const k = s.id || s.fbKey || (s.tsStart ? `ts_${s.tsStart}` : `s_${s.date || idx}`);
+            if (k) {
+              const existing = sessMap.get(String(k));
+              sessMap.set(String(k), { ...(existing || {}), ...s, id: s.id || k });
+            }
+          });
+          const mergedSessions = Array.from(sessMap.values()).sort((a, b) => (b.tsStart || 0) - (a.tsStart || 0));
+          setSessions(mergedSessions);
+          try {
+            localStorage.setItem('kareem_sessions', JSON.stringify(mergedSessions));
+          } catch (e) {}
         }
         if (Array.isArray(db.exemptions)) {
           setExemptions(db.exemptions);
@@ -150,6 +233,15 @@ export const App: React.FC = () => {
     }
     loadInitialData();
   }, []);
+
+  // Sync sessions to localStorage on every change
+  useEffect(() => {
+    if (sessions && sessions.length > 0) {
+      try {
+        localStorage.setItem('kareem_sessions', JSON.stringify(sessions));
+      } catch (e) {}
+    }
+  }, [sessions]);
 
   // Set HTML theme attribute
   useEffect(() => {
@@ -204,17 +296,17 @@ export const App: React.FC = () => {
 
   // Emergency Sync & Call
   const handleTriggerEmergencySync = async () => {
-    showToast('🚨 جاري المزامنة الفورية واستدعاء المراقب الطارئ...');
+    showToast('جاري المزامنة الفورية واستدعاء المراقب الطارئ...');
     await triggerAutoSync();
     setSyncCountdown(3600);
     await handleTriggerAiAudit(true);
-    showToast('تمت المزامنة واستدعاء المراقب بنجاح! ⚡');
+    showToast('تمت المزامنة واستدعاء المراقب بنجاح!');
   };
 
   const handleTriggerManualSync = async () => {
     showToast('جاري المزامنة مع قاعدة البيانات السحابية...');
     const ok = await triggerAutoSync();
-    if (ok) showToast('تمت المزامنة وحفظ التعديلات بنجاح! ⚡');
+    if (ok) showToast('تمت المزامنة وحفظ التعديلات بنجاح!');
   };
 
   // AI Supervisor Audit
@@ -282,7 +374,7 @@ export const App: React.FC = () => {
     utterance.lang = 'ar-EG';
     utterance.rate = 1.0;
     window.speechSynthesis.speak(utterance);
-    showToast('🔊 جاري تشغيل صوت المراقب...');
+    showToast('جاري تشغيل صوت المراقب...');
   };
 
   // Task Toggle
@@ -316,7 +408,19 @@ export const App: React.FC = () => {
       priority: taskData.priority
     };
     setWeeklyTasks((prev) => [newTask, ...prev]);
-    showToast('تمت إضافة المهمة بنجاح! ⚡');
+    showToast('تمت إضافة المهمة بنجاح!');
+    setTimeout(() => triggerAutoSync(), 400);
+  };
+
+  // Edit Task
+  const handleOpenEditTask = (task: WeeklyTask) => {
+    setTaskToEdit(task);
+    setIsEditTaskOpen(true);
+  };
+
+  const handleUpdateTask = (updatedTask: WeeklyTask) => {
+    setWeeklyTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+    showToast('تم حفظ تعديلات المهمة بنجاح!');
     setTimeout(() => triggerAutoSync(), 400);
   };
 
@@ -344,7 +448,25 @@ export const App: React.FC = () => {
       isDone: false
     };
     setLectures((prev) => [newLec, ...prev]);
-    showToast('تمت إضافة المحاضرة بنجاح 📚');
+    showToast('تمت إضافة المحاضرة بنجاح');
+    setTimeout(() => triggerAutoSync(), 400);
+  };
+
+  // Edit Lecture
+  const handleOpenEditLecture = (lecture: Lecture) => {
+    setLectureToEdit(lecture);
+    setIsEditLectureOpen(true);
+  };
+
+  const handleUpdateLecture = (updatedLecture: Lecture) => {
+    setLectures((prev) => prev.map((l) => (l.id === updatedLecture.id ? updatedLecture : l)));
+    showToast('تم حفظ تعديلات المحاضرة بنجاح!');
+    setTimeout(() => triggerAutoSync(), 400);
+  };
+
+  const handleDeleteLecture = (id: string) => {
+    setLectures((prev) => prev.filter((l) => l.id !== id));
+    showToast('تم حذف المحاضرة');
     setTimeout(() => triggerAutoSync(), 400);
   };
 
@@ -358,7 +480,7 @@ export const App: React.FC = () => {
     };
 
     setExams((prev) => [newExam, ...prev]);
-    showToast('تم تسجيل نتيجة الامتحان! 📝');
+    showToast('تم تسجيل نتيجة الامتحان!');
 
     // Call instant AI reaction
     const currentAvg = exams.length > 0
@@ -373,10 +495,29 @@ export const App: React.FC = () => {
     setTimeout(() => triggerAutoSync(), 400);
   };
 
+  // Edit Exam
+  const handleOpenEditExam = (exam: ExamRecord) => {
+    setExamToEdit(exam);
+    setIsEditExamOpen(true);
+  };
+
+  const handleUpdateExam = (updatedExam: ExamRecord) => {
+    setExams((prev) => prev.map((e) => (e.id === updatedExam.id ? updatedExam : e)));
+    showToast('تم حفظ تعديلات الامتحان بنجاح!');
+    setTimeout(() => triggerAutoSync(), 400);
+  };
+
   // Delete Exam
   const handleDeleteExam = (id: string) => {
     setExams((prev) => prev.filter((e) => e.id !== id));
     showToast('تم حذف سجل الامتحان');
+    setTimeout(() => triggerAutoSync(), 400);
+  };
+
+  // Save Subjects Targets
+  const handleSaveSubjects = (updatedSubjects: Subject[]) => {
+    setSubjects(updatedSubjects);
+    showToast('تم حفظ أهداف المواد بنجاح!');
     setTimeout(() => triggerAutoSync(), 400);
   };
 
@@ -389,7 +530,7 @@ export const App: React.FC = () => {
       timestamp: Date.now()
     };
     setExemptions((prev) => [newExm, ...prev]);
-    showToast('تم تسجيل الإعفاء بنجاح 🏫');
+    showToast('تم تسجيل الإعفاء بنجاح');
     setTimeout(() => triggerAutoSync(), 400);
   };
 
@@ -402,23 +543,76 @@ export const App: React.FC = () => {
 
   // Delete Session
   const handleDeleteSession = (id: string) => {
-    setSessions((prev) => prev.filter((s) => s.id !== id));
+    const updatedSessions = sessions.filter(
+      (s) => s.id !== id && s.fbKey !== id && (s.tsStart ? `ts_${s.tsStart}` !== id : true)
+    );
+    setSessions(updatedSessions);
+    try {
+      localStorage.setItem('kareem_sessions', JSON.stringify(updatedSessions));
+    } catch (e) {}
     showToast('تم حذف الجلسة من السجل');
-    setTimeout(() => triggerAutoSync(), 400);
+    saveDbData({
+      sessions: updatedSessions,
+      exemptions,
+      weeklyTasks,
+      completedTaskIds: Array.from(completedTaskIds),
+      lectures,
+      exams,
+      subjects,
+      customAiInstructions
+    });
+  };
+
+  // Add Manual Session
+  const handleSaveManualSession = (sessionData: { subjId: string; minutes: number; task: string; date?: string }) => {
+    const sessionDate = sessionData.date || new Date().toISOString().split('T')[0];
+    const sessionTs = new Date(sessionDate).getTime() || Date.now();
+    const newSession: Session = {
+      id: `s_${Date.now()}`,
+      minutes: sessionData.minutes,
+      tsStart: sessionTs,
+      tsEnd: sessionTs + sessionData.minutes * 60 * 1000,
+      date: sessionDate,
+      entries: [
+        {
+          subj: sessionData.subjId,
+          task: sessionData.task.trim() || 'مذاكرة مستقلة'
+        }
+      ]
+    };
+
+    const updatedSessions = [newSession, ...sessions];
+    setSessions(updatedSessions);
+    try {
+      localStorage.setItem('kareem_sessions', JSON.stringify(updatedSessions));
+    } catch (e) {}
+
+    showToast(`تم تسجيل وحفظ الجلسة (${sessionData.minutes} دقيقة) بنجاح ⚡`);
+
+    saveDbData({
+      sessions: updatedSessions,
+      exemptions,
+      weeklyTasks,
+      completedTaskIds: Array.from(completedTaskIds),
+      lectures,
+      exams,
+      subjects,
+      customAiInstructions
+    });
   };
 
   // Save Directives
   const handleSaveCustomInstructions = (text: string) => {
     setCustomAiInstructions(text);
     localStorage.setItem('kareem_ai_custom_instructions', text);
-    showToast('تم حفظ تعليماتك بنجاح! المراقب يعمل الآن وفقاً لها ⚡');
+    showToast('تم حفظ تعليماتك بنجاح! المراقب يعمل الآن وفقاً لها');
     setTimeout(() => triggerAutoSync(), 400);
   };
 
   // Focus Timer actions
   const handleStartTimer = () => {
     setIsRunning(true);
-    showToast('بدأت جلسة التركيز! استعن بالله 🦁');
+    showToast('بدأت جلسة التركيز! استعن بالله');
   };
 
   const handlePauseTimer = () => {
@@ -427,11 +621,12 @@ export const App: React.FC = () => {
 
   const handleFinishSession = () => {
     const mins = Math.max(Math.round(elapsedSeconds / 60), 1);
+    const nowTs = Date.now();
     const newSession: Session = {
-      id: `s_${Date.now()}`,
+      id: `s_${nowTs}`,
       minutes: mins,
-      tsStart: Date.now() - elapsedSeconds * 1000,
-      tsEnd: Date.now(),
+      tsStart: nowTs - Math.max(elapsedSeconds, 60) * 1000,
+      tsEnd: nowTs,
       entries: [
         {
           subj: activeSubjId,
@@ -440,12 +635,27 @@ export const App: React.FC = () => {
       ]
     };
 
-    setSessions((prev) => [newSession, ...prev]);
+    const updatedSessions = [newSession, ...sessions];
+    setSessions(updatedSessions);
+    try {
+      localStorage.setItem('kareem_sessions', JSON.stringify(updatedSessions));
+    } catch (e) {}
+
     setIsRunning(false);
     setElapsedSeconds(0);
     setTaskNote('');
-    showToast(`عاش يا بطل! تم حفظ الجلسة (${mins} دقيقة) بنجاح ⚡`);
-    setTimeout(() => triggerAutoSync(), 500);
+    showToast(`تم حفظ الجلسة (${mins} دقيقة) بنجاح ⚡`);
+
+    saveDbData({
+      sessions: updatedSessions,
+      exemptions,
+      weeklyTasks,
+      completedTaskIds: Array.from(completedTaskIds),
+      lectures,
+      exams,
+      subjects,
+      customAiInstructions
+    });
   };
 
   // AI Schedule Generator Action
@@ -470,6 +680,32 @@ export const App: React.FC = () => {
     const report = await callAiExamAudit(exams, customAiInstructions);
     setExamAuditReport(report);
     setIsAuditingExams(false);
+  };
+
+  // AI Backlog Interrogation & Direct Accountability Action
+  const handleTriggerInterrogation = async () => {
+    setIsInterrogating(true);
+    setIsInterrogationOpen(true);
+    const undoneLectures = lectures.filter((l) => !l.isDone).map((l) => `${l.title} (${l.code})`);
+    const pendingTasks = weeklyTasks
+      .filter((t) => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id)))
+      .map((t) => `${t.text} [${t.dayId}]`);
+    const lowExams = exams
+      .filter((e) => (e.pct || Math.round((e.score / e.total) * 100)) < 95)
+      .map((e) => `${e.topic} (${e.score}/${e.total} = ${e.pct || Math.round((e.score / e.total) * 100)}%) مع ${e.teacher}`);
+
+    const backlogData = {
+      student: 'كريم عمر سيد',
+      track: 'تانية ثانوي علمي علوم - طب وحياة',
+      goal: 'أوائل الجمهورية والطب البشري',
+      undoneLectures,
+      pendingTasks,
+      lowExams
+    };
+
+    const text = await callAiInterrogate(backlogData, customAiInstructions);
+    setInterrogationText(text);
+    setIsInterrogating(false);
   };
 
   // Calculate All-Time total minutes
@@ -498,6 +734,7 @@ export const App: React.FC = () => {
         isSyncing={isSyncing}
         onTriggerEmergencySync={handleTriggerEmergencySync}
         onTriggerManualSync={handleTriggerManualSync}
+        onInstallPwa={handleInstallPwa}
       />
 
       <main className="container">
@@ -529,9 +766,12 @@ export const App: React.FC = () => {
               setIsRunning(true);
             }}
             onOpenAiSchedule={() => setIsAiScheduleOpen(true)}
+            onOpenInterrogation={handleTriggerInterrogation}
+            onOpenEditSubjects={() => setIsEditSubjectsOpen(true)}
             onTriggerAudit={() => handleTriggerAiAudit(true)}
             onSpeakAi={() => speakText(aiMood.speech)}
             onNavigateToView={setCurrentTab}
+            onOpenManualSession={() => setIsManualSessionOpen(true)}
             aiMood={aiMood}
             vizMode={vizMode}
             onVizModeChange={setVizMode}
@@ -550,6 +790,7 @@ export const App: React.FC = () => {
             onSaveCustomInstructions={handleSaveCustomInstructions}
             onTriggerAudit={() => handleTriggerAiAudit(true)}
             onOpenSchedule={() => setIsAiScheduleOpen(true)}
+            onOpenInterrogation={handleTriggerInterrogation}
             onSpeak={speakText}
             auditReport={auditReport}
             isAuditing={isAuditing}
@@ -565,6 +806,7 @@ export const App: React.FC = () => {
             completedTaskIds={completedTaskIds}
             onToggleTask={handleToggleTask}
             onOpenNewTaskModal={() => setIsNewTaskModalOpen(true)}
+            onOpenEditTask={handleOpenEditTask}
             onDeleteTask={handleDeleteTask}
           />
         )}
@@ -576,6 +818,8 @@ export const App: React.FC = () => {
             subjects={subjects}
             onToggleLecture={handleToggleLecture}
             onOpenNewLectureModal={() => setIsNewLectureModalOpen(true)}
+            onOpenEditLecture={handleOpenEditLecture}
+            onDeleteLecture={handleDeleteLecture}
           />
         )}
 
@@ -585,6 +829,7 @@ export const App: React.FC = () => {
             exams={exams}
             subjects={subjects}
             onOpenExamModal={() => setIsExamModalOpen(true)}
+            onOpenEditExam={handleOpenEditExam}
             onDeleteExam={handleDeleteExam}
             onTriggerAudit={handleTriggerExamAudit}
             isAuditing={isAuditingExams}
@@ -606,6 +851,7 @@ export const App: React.FC = () => {
             onPauseTimer={handlePauseTimer}
             onFinishSession={handleFinishSession}
             onOpenBreak={() => setIsBreakOpen(true)}
+            onOpenManualSession={() => setIsManualSessionOpen(true)}
             quotes={quotes}
           />
         )}
@@ -626,6 +872,7 @@ export const App: React.FC = () => {
             sessions={sessions}
             subjects={subjects}
             onDeleteSession={handleDeleteSession}
+            onOpenManualSession={() => setIsManualSessionOpen(true)}
           />
         )}
       </main>
@@ -643,6 +890,15 @@ export const App: React.FC = () => {
         onSave={handleSaveExam}
       />
 
+      <EditExamModal
+        isOpen={isEditExamOpen}
+        onClose={() => setIsEditExamOpen(false)}
+        exam={examToEdit}
+        subjects={subjects}
+        onUpdate={handleUpdateExam}
+        onDelete={handleDeleteExam}
+      />
+
       <ExamReactionModal
         isOpen={isExamReactionOpen}
         onClose={() => setIsExamReactionOpen(false)}
@@ -658,11 +914,36 @@ export const App: React.FC = () => {
         onSave={handleSaveNewTask}
       />
 
+      <EditTaskModal
+        isOpen={isEditTaskOpen}
+        onClose={() => setIsEditTaskOpen(false)}
+        task={taskToEdit}
+        subjects={subjects}
+        onUpdate={handleUpdateTask}
+        onDelete={handleDeleteTask}
+      />
+
       <NewLectureModal
         isOpen={isNewLectureModalOpen}
         onClose={() => setIsNewLectureModalOpen(false)}
         subjects={subjects}
         onSave={handleSaveNewLecture}
+      />
+
+      <EditLectureModal
+        isOpen={isEditLectureOpen}
+        onClose={() => setIsEditLectureOpen(false)}
+        lecture={lectureToEdit}
+        subjects={subjects}
+        onUpdate={handleUpdateLecture}
+        onDelete={handleDeleteLecture}
+      />
+
+      <EditSubjectsModal
+        isOpen={isEditSubjectsOpen}
+        onClose={() => setIsEditSubjectsOpen(false)}
+        subjects={subjects}
+        onSave={handleSaveSubjects}
       />
 
       <ExemptionModal
@@ -677,6 +958,30 @@ export const App: React.FC = () => {
         onGenerate={handleGenerateSchedule}
         isLoading={isGeneratingSchedule}
         generatedSchedule={aiScheduleText}
+      />
+
+      <InterrogationModal
+        isOpen={isInterrogationOpen}
+        onClose={() => setIsInterrogationOpen(false)}
+        interrogationText={interrogationText}
+        isLoading={isInterrogating}
+        onRefresh={handleTriggerInterrogation}
+        onSpeak={speakText}
+        onStartEmergencyFocus={(subjId) => {
+          setActiveSubjId(subjId);
+          setCurrentTab('focusView');
+          setIsRunning(true);
+        }}
+        undoneLecturesCount={lectures.filter((l) => !l.isDone).length}
+        backlogTasksCount={weeklyTasks.filter((t) => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))).length}
+        lowExamsCount={exams.filter((e) => (e.pct || Math.round((e.score / e.total) * 100)) < 95).length}
+      />
+
+      <ManualSessionModal
+        isOpen={isManualSessionOpen}
+        onClose={() => setIsManualSessionOpen(false)}
+        subjects={subjects}
+        onSave={handleSaveManualSession}
       />
     </div>
   );

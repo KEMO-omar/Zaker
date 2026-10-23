@@ -1,9 +1,22 @@
 {
-  "version": 23,
-  "lastUpdated": 1792602941284,
-  "clientTimestamp": 1792602940673,
+  "version": 30,
+  "lastUpdated": 1792743858640,
+  "clientTimestamp": 1792743858489,
   "data": {
     "sessions": [
+      {
+        "entries": [
+          {
+            "subj": "physics",
+            "task": "مذاكرة مركزة"
+          }
+        ],
+        "fbKey": "-P4UbNrZzzl1t-C76h5f",
+        "id": "s_1792605523152",
+        "minutes": 1,
+        "tsEnd": 1792605523152,
+        "tsStart": 1792605521152
+      },
       {
         "entries": [
           {
@@ -374,6 +387,7 @@
           }
         ],
         "fbKey": "-P2U294QbwElZc-hOWp8",
+        "id": "-P2U294QbwElZc-hOWp8",
         "minutes": 103,
         "tsEnd": 1790448542475,
         "tsStart": 1790445390251
@@ -386,6 +400,7 @@
           }
         ],
         "fbKey": "-P2SZ8JTFk6OioJOzEfQ",
+        "id": "-P2SZ8JTFk6OioJOzEfQ",
         "minutes": 150.5,
         "tsEnd": 1790423635700,
         "tsStart": 1790384259819
@@ -398,6 +413,7 @@
           }
         ],
         "fbKey": "-P2NcV2W89TTdis3Lmc3",
+        "id": "-P2NcV2W89TTdis3Lmc3",
         "minutes": 133,
         "tsEnd": 1790340890824,
         "tsStart": 1790332830251
@@ -410,6 +426,7 @@
           }
         ],
         "fbKey": "-P2J7euaMnMMLckMecqw",
+        "id": "-P2J7euaMnMMLckMecqw",
         "minutes": 113.5,
         "tsEnd": 1790265437920,
         "tsStart": 1790258564419
@@ -422,6 +439,7 @@
           }
         ],
         "fbKey": "-P2HlhJgHiBVbBPh1KQA",
+        "id": "-P2HlhJgHiBVbBPh1KQA",
         "minutes": 2,
         "tsEnd": 1790242641611,
         "tsStart": 1790242517471
@@ -434,6 +452,7 @@
           }
         ],
         "fbKey": "-P2Fo84momTSnipe6xyd",
+        "id": "-P2Fo84momTSnipe6xyd",
         "minutes": 38,
         "tsEnd": 1790209724347,
         "tsStart": 1790207380244
@@ -454,6 +473,7 @@
           }
         ],
         "fbKey": "-P2EGo6HwfXE9nQDpa3H",
+        "id": "-P2EGo6HwfXE9nQDpa3H",
         "minutes": 72,
         "tsEnd": 1790183948417,
         "tsStart": 1790179529288
@@ -470,6 +490,7 @@
           }
         ],
         "fbKey": "-P2DqLpT3IiMRc-K4se-",
+        "id": "-P2DqLpT3IiMRc-K4se-",
         "minutes": 44,
         "tsEnd": 1790176750633,
         "tsStart": 1790174083613
@@ -486,6 +507,7 @@
           }
         ],
         "fbKey": "-P29iuTh7PJgi2l5knOU",
+        "id": "-P29iuTh7PJgi2l5knOU",
         "minutes": 170,
         "tsEnd": 1790107690865,
         "tsStart": 1790100409066
@@ -1006,7 +1028,7 @@
         "details": "اسم الفاعل وصيغ المبالغة واسم المفعول وإعمال المشتقات مع النصوص",
         "dueDay": "السبت / الثلاثاء",
         "id": "ar-03",
-        "isDone": true,
+        "isDone": false,
         "packageId": "arabic_course",
         "packageName": "محاضرات اللغة العربية (أ. محمد صلاح)",
         "subjId": "arabic",
@@ -1019,7 +1041,7 @@
         "details": "اسم التفضيل واسم الزمان والمكان والمصدر الصريح والمؤول وقصة عودة الروح",
         "dueDay": "السبت / الثلاثاء",
         "id": "ar-04",
-        "isDone": true,
+        "isDone": false,
         "packageId": "arabic_course",
         "packageName": "محاضرات اللغة العربية (أ. محمد صلاح)",
         "subjId": "arabic",
@@ -1195,9 +1217,81 @@
         "tag": "اشترك الآن",
         "title": "الورشة الثانية (ورشة الميكانيكا) 2 بكالوريا",
         "type": "workshop"
+      },
+      {
+        "code": "المحاضرة (91)",
+        "details": "",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "lec_1792660392039",
+        "isDone": false,
+        "packageName": "باقة الفيزياء",
+        "subjId": "physics",
+        "tag": "متاح الآن",
+        "title": "كمية التحرك و الطاقة الميكانيكية",
+        "type": "lecture"
+      },
+      {
+        "code": "الورشة التانية",
+        "details": "",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "lec_1792660469613",
+        "isDone": false,
+        "packageName": "باقة الفيزياء",
+        "subjId": "physics",
+        "tag": "متاح الآن",
+        "title": "الورشة التانية",
+        "type": "lecture"
+      },
+      {
+        "code": "التقييمات",
+        "details": "",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "lec_1792660505395",
+        "isDone": false,
+        "packageName": "باقة الفيزياء",
+        "subjId": "physics",
+        "tag": "متاح الآن",
+        "title": "التقييمات الاسبوعية الوزارية من 1 ل 5",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (10)",
+        "details": "",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "lec_1792660552794",
+        "isDone": false,
+        "packageName": "باقة الفيزياء",
+        "subjId": "physics",
+        "tag": "متاح الآن",
+        "title": "الحركة الدائرية و القوة المركزية",
+        "type": "lecture"
+      },
+      {
+        "code": "المحاضرة (11)",
+        "details": "",
+        "dueDay": "الأحد / الأربعاء",
+        "id": "lec_1792660582958",
+        "isDone": false,
+        "packageName": "باقة الفيزياء",
+        "subjId": "physics",
+        "tag": "متاح الآن",
+        "title": "الحركة الدائرية الراسية الجزء الاول",
+        "type": "lecture"
       }
     ],
     "exams": [
+      {
+        "date": "2026-10-19",
+        "examType": "امتحان شامل",
+        "id": "exam_1792743602528",
+        "notes": "",
+        "pct": 89,
+        "score": 44.5,
+        "subjId": "english",
+        "teacher": "مستر أيمن عبد العاطي",
+        "topic": "Unit 2",
+        "total": 50
+      },
       {
         "date": "2026-10-15",
         "examType": "امتحان شامل",

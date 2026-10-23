@@ -76,6 +76,28 @@ export async function callAiMonitor(studyData: any, customInstructions?: string,
 **القرار الآن:** اقفل أي تشتت، استعن بالله، وابدأ جلسة تركيز فورية لمدة 50 دقيقة! 🦁`;
 }
 
+export async function callAiInterrogate(backlogData: any, customInstructions?: string): Promise<string> {
+  try {
+    const res = await fetch('/api/ai/interrogate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backlogData, customInstructions })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.interrogation) return data.interrogation;
+    }
+  } catch (err) {
+    console.warn('[AI Interrogate] Error:', err);
+  }
+  return `### ⚡ جلسة مساءلة ومحاكمة أكاديمية:
+يا كريم.. أنت مراكم محاضرات فيزياء وشيتات عربي، ونزلت في امتحان الإنجليزي والتاريخ عن الـ 95%، والوقت بيعدي!
+1. مراكم فيزياء عبد المعبود ليه لحد دلوقتي؟ ناوي تبدأها إمتى؟
+2. درجات الإنجليزي (92%) ضاعت فين؟ حفظ كلمات ولا جرامر؟
+3. الوقت اللي ضاع النهاردة مين هيعوضه؟
+القرار فوراً: اقفل الموبايل وابدأ جلسة تركيز 50 دقيقة في الفيزياء! 🦁`;
+}
+
 export async function callAiExamReaction(exam: ExamRecord, currentAvg: number, customInstructions?: string): Promise<{ reaction: string; pct: number }> {
   try {
     const res = await fetch('/api/ai/exam-reaction', {
@@ -165,7 +187,10 @@ export async function callAiChat(message: string, context: any, customInstructio
 
 export async function fetchQuotes(): Promise<string[]> {
   try {
-    const res = await fetch('/تحفيز.json');
+    let res = await fetch('/motivation.json');
+    if (!res.ok) {
+      res = await fetch('/تحفيز.json');
+    }
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) return data;

@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { Subject } from '../types';
+import {
+  Play,
+  Pause,
+  CheckCircle2,
+  Coffee,
+  Quote,
+  Clock
+} from 'lucide-react';
 
 interface FocusViewProps {
   subjects: Subject[];
@@ -14,6 +22,7 @@ interface FocusViewProps {
   onPauseTimer: () => void;
   onFinishSession: () => void;
   onOpenBreak: () => void;
+  onOpenManualSession?: () => void;
   quotes: string[];
 }
 
@@ -29,6 +38,7 @@ export const FocusView: React.FC<FocusViewProps> = ({
   onPauseTimer,
   onFinishSession,
   onOpenBreak,
+  onOpenManualSession,
   quotes
 }) => {
   const [quoteIndex, setQuoteIndex] = useState(0);
@@ -51,11 +61,7 @@ export const FocusView: React.FC<FocusViewProps> = ({
   const timeFormatted = `${hours > 0 ? `${hours < 10 ? '0' : ''}${hours}:` : ''}${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
   const handleFinish = () => {
-    if (elapsedSeconds < 60) {
-      if (!confirm('الجلسة أقل من دقيقة واحدة، هل أنت متأكد من حفظها؟')) {
-        return;
-      }
-    }
+    if (elapsedSeconds < 1) return;
     try {
       confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
     } catch (e) {}
@@ -113,19 +119,22 @@ export const FocusView: React.FC<FocusViewProps> = ({
         </div>
 
         {/* Ambient Motivational Quote */}
-        <div className="quote-card">
-          <span>❝ {quotes[quoteIndex] || 'يا كريم، حلم كلية الطب بيتصنع في الساعات دي!'} ❞</span>
+        <div className="quote-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Quote size={14} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+          <span>{quotes[quoteIndex] || 'يا كريم، حلم كلية الطب بيتصنع في الساعات دي!'}</span>
         </div>
 
         {/* Action Controls */}
         <div className="focus-action-bar">
           {!isRunning ? (
-            <button className="btn btn-primary" onClick={onStartTimer} style={{ padding: '12px 28px', fontSize: 16 }}>
-              <span>▶ بدء جلسة التركيز</span>
+            <button className="btn btn-primary" onClick={onStartTimer} style={{ padding: '12px 28px', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Play size={16} fill="currentColor" />
+              <span>بدء جلسة التركيز</span>
             </button>
           ) : (
-            <button className="btn" onClick={onPauseTimer} style={{ padding: '12px 24px', fontSize: 15, borderColor: 'var(--warning)', color: 'var(--warning)' }}>
-              <span>⏸ إيقاف مؤقت</span>
+            <button className="btn" onClick={onPauseTimer} style={{ padding: '12px 24px', fontSize: 15, borderColor: 'var(--warning)', color: 'var(--warning)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Pause size={16} />
+              <span>إيقاف مؤقت</span>
             </button>
           )}
 
@@ -133,14 +142,23 @@ export const FocusView: React.FC<FocusViewProps> = ({
             className="btn"
             onClick={handleFinish}
             disabled={elapsedSeconds === 0}
-            style={{ padding: '12px 24px', fontSize: 15, borderColor: 'var(--success)', color: 'var(--success)' }}
+            style={{ padding: '12px 24px', fontSize: 15, borderColor: 'var(--success)', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 8 }}
           >
-            <span>⏹ إنهاء وحفظ الجلسة</span>
+            <CheckCircle2 size={16} />
+            <span>إنهاء وحفظ الجلسة</span>
           </button>
 
-          <button className="btn" onClick={onOpenBreak} style={{ padding: '12px 20px', fontSize: 14 }}>
-            <span>☕ استراحة بومودورو</span>
+          <button className="btn" onClick={onOpenBreak} style={{ padding: '12px 20px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Coffee size={15} style={{ color: 'var(--accent-primary)' }} />
+            <span>استراحة بومودورو</span>
           </button>
+
+          {onOpenManualSession && (
+            <button className="btn" onClick={onOpenManualSession} style={{ padding: '12px 20px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Clock size={15} style={{ color: 'var(--accent-secondary)' }} />
+              <span>تسجيل جلسة يدوية</span>
+            </button>
+          )}
         </div>
       </div>
     </section>

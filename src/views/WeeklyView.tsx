@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Subject, WeeklyTask } from '../types';
+import {
+  Calendar,
+  CalendarCheck,
+  Plus,
+  Image,
+  Flame,
+  Zap,
+  Building2,
+  FileCheck,
+  Pencil,
+  Trash2,
+  CheckCircle2,
+  Layers
+} from 'lucide-react';
 
 interface WeeklyViewProps {
   tasks: WeeklyTask[];
@@ -8,6 +22,7 @@ interface WeeklyViewProps {
   completedTaskIds: Set<string | number>;
   onToggleTask: (taskId: string | number) => void;
   onOpenNewTaskModal: () => void;
+  onOpenEditTask: (task: WeeklyTask) => void;
   onDeleteTask?: (taskId: string | number) => void;
 }
 
@@ -17,6 +32,7 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
   completedTaskIds,
   onToggleTask,
   onOpenNewTaskModal,
+  onOpenEditTask,
   onDeleteTask
 }) => {
   const [selectedDay, setSelectedDay] = useState<string>('all');
@@ -65,13 +81,33 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
   const getPriorityBadge = (priority?: string) => {
     switch (priority) {
       case 'urgent':
-        return <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'rgba(239, 83, 80, 0.2)', color: 'var(--danger)', fontWeight: 700 }}>عاجل 🔥</span>;
+        return (
+          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'rgba(239, 83, 80, 0.15)', color: 'var(--danger)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Flame size={11} />
+            <span>عاجل</span>
+          </span>
+        );
       case 'high':
-        return <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'rgba(245, 158, 11, 0.2)', color: 'var(--warning)', fontWeight: 700 }}>هام ⚡</span>;
+        return (
+          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'rgba(245, 158, 11, 0.15)', color: 'var(--warning)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Zap size={11} />
+            <span>هام</span>
+          </span>
+        );
       case 'class':
-        return <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'rgba(56, 189, 248, 0.2)', color: 'var(--accent-secondary)', fontWeight: 700 }}>سنتر / حصة 🏛️</span>;
+        return (
+          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'rgba(56, 189, 248, 0.15)', color: 'var(--accent-secondary)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Building2 size={11} />
+            <span>سنتر / حصة</span>
+          </span>
+        );
       case 'exam':
-        return <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'rgba(167, 139, 250, 0.2)', color: '#a78bfa', fontWeight: 700 }}>امتحان 📝</span>;
+        return (
+          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'rgba(167, 139, 250, 0.15)', color: '#a78bfa', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <FileCheck size={11} />
+            <span>امتحان</span>
+          </span>
+        );
       default:
         return null;
     }
@@ -84,12 +120,13 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
           <div>
             <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span>📅 جدول المهام الأسبوعية والمواعيد</span>
+              <CalendarCheck size={20} style={{ color: 'var(--accent-primary)' }} />
+              <span>جدول المهام الأسبوعية والمواعيد</span>
               <span className="tabular" style={{ fontSize: 13, color: 'var(--accent-primary)', background: 'var(--bg-elevated)', padding: '2px 10px', borderRadius: 'var(--radius-full)' }}>
                 {completedCount} من {totalCount} منجز ({completionPct}%)
               </span>
             </h2>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
               متابعة الدروس الأونلاين والسناتر والمذاكرة أولاً بأول لتفادي تراكم المواد.
             </p>
           </div>
@@ -100,10 +137,12 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
               onClick={() => setShowPoster(!showPoster)}
               style={{ borderColor: showPoster ? 'var(--accent-primary)' : 'var(--border-subtle)', color: showPoster ? 'var(--accent-primary)' : 'var(--text-muted)' }}
             >
-              <span>🖼️ {showPoster ? 'إخفاء بوستر المتراكم' : 'عرض بوستر المتراكم (43611.png)'}</span>
+              <Image size={13} />
+              <span>{showPoster ? 'إخفاء بوستر المتراكم' : 'عرض بوستر المتراكم'}</span>
             </button>
             <button className="btn btn-primary btn-sm" onClick={onOpenNewTaskModal}>
-              <span>➕ إضافة مهمة جديدة</span>
+              <Plus size={14} />
+              <span>إضافة مهمة جديدة</span>
             </button>
           </div>
         </div>
@@ -119,7 +158,7 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
         <div className="card" style={{ marginBottom: 24, overflow: 'hidden', padding: 0 }}>
           <div style={{ padding: '14px 20px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-primary)', display: 'inline-block' }} />
+              <Layers size={16} style={{ color: 'var(--accent-primary)' }} />
               <strong style={{ fontSize: 14, color: 'var(--text-main)' }}>
                 صورة جدول المتراكم التفاعلية (اضغط على أي مهمة في الصورة لتحديدها)
               </strong>
@@ -129,9 +168,9 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
               <button
                 className="btn btn-sm"
                 onClick={() => setShowOverlaysOnPoster(!showOverlaysOnPoster)}
-                style={{ padding: '2px 10px', fontSize: 11 }}
+                style={{ padding: '3px 10px', fontSize: 11 }}
               >
-                {showOverlaysOnPoster ? 'مفعل ✅' : 'معطل ❌'}
+                {showOverlaysOnPoster ? 'مفعل' : 'معطل'}
               </button>
             </div>
           </div>
@@ -164,16 +203,20 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
                           width: `${ov.width}%`,
                           height: `${ov.height}%`,
                           cursor: 'pointer',
-                          borderRadius: 4,
-                          transition: 'all 0.2s ease',
-                          background: isDone ? 'rgba(16, 185, 129, 0.45)' : 'rgba(56, 189, 248, 0.15)',
-                          border: isDone ? '2px solid #10b981' : '1px solid rgba(56, 189, 248, 0.35)',
+                          borderRadius: 6,
+                          background: isDone ? 'rgba(16, 185, 129, 0.45)' : 'rgba(255, 255, 255, 0.1)',
+                          border: isDone ? '2px solid #10b981' : '1px dashed rgba(255, 255, 255, 0.3)',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center'
+                          justifyContent: 'center',
+                          transition: 'all 0.15s ease'
                         }}
                       >
-                        {isDone && <span style={{ fontSize: 13, color: '#fff', fontWeight: 900 }}>✓</span>}
+                        {isDone && (
+                          <div style={{ background: '#10b981', color: '#fff', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <CheckCircle2 size={16} />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -184,9 +227,9 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
         </div>
       )}
 
-      {/* Filter Tabs & Day Selector */}
+      {/* Days Tabs Filter */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {days.map((d) => {
             const count = d.id === 'all'
               ? tasks.length
@@ -196,7 +239,6 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
                 key={d.id}
                 className={`btn btn-sm ${selectedDay === d.id ? 'btn-primary' : ''}`}
                 onClick={() => setSelectedDay(d.id)}
-                style={{ fontSize: 12 }}
               >
                 <span>{d.label}</span>
                 <span className="tabular" style={{ fontSize: 11, opacity: 0.8 }}>({count})</span>
@@ -238,7 +280,11 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
                 className="log-item"
                 style={{
                   opacity: isDone ? 0.65 : 1,
-                  background: isDone ? 'rgba(255, 255, 255, 0.02)' : 'var(--bg-surface)'
+                  background: isDone ? 'rgba(255, 255, 255, 0.02)' : 'var(--bg-surface)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -276,15 +322,23 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => onOpenEditTask(task)}
+                    title="تعديل المهمة"
+                    style={{ padding: '4px 8px', color: 'var(--text-main)', borderColor: 'var(--border-subtle)' }}
+                  >
+                    <Pencil size={12} />
+                  </button>
                   {onDeleteTask && (
                     <button
                       className="btn btn-sm"
                       onClick={() => onDeleteTask(task.id)}
                       title="حذف المهمة"
-                      style={{ color: 'var(--danger)', padding: '4px 8px' }}
+                      style={{ color: 'var(--danger)', borderColor: 'rgba(239, 83, 80, 0.25)', padding: '4px 8px' }}
                     >
-                      ✕
+                      <Trash2 size={12} />
                     </button>
                   )}
                 </div>

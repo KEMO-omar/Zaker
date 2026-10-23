@@ -1,5 +1,16 @@
 import React from 'react';
 import { ThemeType, ViewTab } from '../types';
+import {
+  RotateCw,
+  Clock,
+  Zap,
+  Download,
+  Bot,
+  Palette,
+  ShieldCheck,
+  CheckCircle2,
+  FileDown
+} from 'lucide-react';
 
 interface HeaderProps {
   currentTab: ViewTab;
@@ -16,6 +27,7 @@ interface HeaderProps {
   isSyncing: boolean;
   onTriggerEmergencySync: () => void;
   onTriggerManualSync: () => void;
+  onInstallPwa: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,7 +40,8 @@ export const Header: React.FC<HeaderProps> = ({
   syncCountdown,
   isSyncing,
   onTriggerEmergencySync,
-  onTriggerManualSync
+  onTriggerManualSync,
+  onInstallPwa
 }) => {
   const allHours = Math.floor(allTimeMinutes / 60);
   const allMins = Math.round(allTimeMinutes % 60);
@@ -37,11 +50,29 @@ export const Header: React.FC<HeaderProps> = ({
   const countdownSecs = syncCountdown % 60;
   const countdownFormatted = `${countdownMins < 10 ? '0' : ''}${countdownMins}:${countdownSecs < 10 ? '0' : ''}${countdownSecs}`;
 
+  const handleExportBackup = () => {
+    try {
+      const rawSessions = localStorage.getItem('kareem_sessions');
+      const backupData = {
+        exportedAt: new Date().toISOString(),
+        sessions: rawSessions ? JSON.parse(rawSessions) : [],
+        allTimeMinutes
+      };
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `kareem_study_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {}
+  };
+
   return (
     <header className="app-header">
       <div className="brand-wrap">
         <div className="brand-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20"/>
             <path d="M12 6a6 6 0 1 1 0 12 4 4 0 0 1 0-8"/>
@@ -49,9 +80,9 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         <div>
           <div className="brand-title">
-            SHAPAP <span style={{ fontWeight: 400, opacity: 0.7 }}>| مساحة كريم</span>
+            SHAPAP <span style={{ fontWeight: 400, opacity: 0.6 }}>| مساحة كريم</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span className="brand-sub">نظام التركيز والإنتاجية الدراسي</span>
             <button
               id="cloudStatusIndicator"
@@ -61,26 +92,18 @@ export const Header: React.FC<HeaderProps> = ({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 4,
-                fontSize: 10,
-                padding: '2px 8px',
-                borderRadius: 12,
-                background: isSyncing ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16,185,129,0.12)',
+                gap: 5,
+                fontSize: 11,
+                padding: '3px 10px',
+                borderRadius: 20,
+                background: isSyncing ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)',
                 color: isSyncing ? '#f59e0b' : '#10b981',
                 fontWeight: 700,
-                border: 'none',
+                border: `1px solid ${isSyncing ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
                 cursor: 'pointer'
               }}
             >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: isSyncing ? '#f59e0b' : '#10b981',
-                  display: 'inline-block'
-                }}
-              />
+              <RotateCw size={11} className={isSyncing ? 'animate-spin' : ''} />
               <span>{isSyncing ? 'جاري المزامنة...' : 'متصل بالسحابة'}</span>
             </button>
             <span
@@ -88,7 +111,8 @@ export const Header: React.FC<HeaderProps> = ({
               className="sync-timer-badge"
               title="تحديث دوري كل 60 دقيقة لقاعدة البيانات لحفظ كافة التعديلات، أو اضغط الزر الطارئ للإرسال فوراً"
             >
-              <span>⏱️ القادمة:</span>
+              <Clock size={12} style={{ color: 'var(--text-muted)' }} />
+              <span>القادمة:</span>
               <strong className="tabular">{countdownFormatted}</strong>
             </span>
           </div>
@@ -101,10 +125,33 @@ export const Header: React.FC<HeaderProps> = ({
           id="emergencySyncHeaderBtn"
           className="btn btn-sm btn-emergency-pulse"
           onClick={onTriggerEmergencySync}
-          title="إرسال فوري للبيانات واستدعاء طارئ للمراقب (تلقائياً كل ساعة)"
+          title="إرسال فوري للبيانات واستدعاء طارئ للمراقب"
         >
-          <span className="emergency-pulse-dot" />
-          <span>🚨 إرسال واستدعاء طارئ</span>
+          <Zap size={14} style={{ color: 'var(--danger)' }} />
+          <span>استدعاء طارئ</span>
+        </button>
+
+        {/* PWA Install Button for Chrome / Mobile */}
+        <button
+          id="pwaInstallHeaderBtn"
+          className="btn btn-sm"
+          onClick={onInstallPwa}
+          title="تثبيت التطبيق على الكمبيوتر أو الموبايل للعمل بدون نت"
+          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-main)' }}
+        >
+          <Download size={13} style={{ color: 'var(--accent-primary)' }} />
+          <span>تثبيت التطبيق</span>
+        </button>
+
+        {/* Export Backup JSON Button */}
+        <button
+          className="btn btn-sm"
+          onClick={handleExportBackup}
+          title="تحميل نسخة احتياطية كاملة من كافة جلساتك ومذاكرتك كملف JSON"
+          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-main)' }}
+        >
+          <FileDown size={13} style={{ color: 'var(--accent-secondary)' }} />
+          <span>تصدير نسخة (JSON)</span>
         </button>
 
         {/* AI Supervisor Mood Quick Action */}
@@ -114,10 +161,11 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => onSelectTab('aiSupervisorView')}
           title="المراقب الأكاديمي وإدارة الوقت"
         >
-          <span style={{ fontSize: 14 }}>{aiMood.avatar}</span>
+          <Bot size={14} style={{ color: 'var(--accent-primary)' }} />
           <span>
             المراقب: <strong style={{ color: 'var(--accent-primary)' }}>{aiMood.label}</strong>
           </span>
+          <span className="tabular" style={{ fontSize: 11, color: 'var(--text-muted)' }}>({aiMood.score}%)</span>
         </button>
 
         {/* All-Time Metric Badge */}
@@ -133,31 +181,32 @@ export const Header: React.FC<HeaderProps> = ({
             border: '1px solid var(--border-subtle)',
             padding: '6px 14px',
             borderRadius: 'var(--radius-sm)',
-            color: 'var(--accent-primary)'
+            color: 'var(--text-main)'
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20"/>
-          </svg>
+          <Clock size={13} style={{ color: 'var(--accent-primary)' }} />
           <span>
-            كله في كله: <strong className="tabular">{allHours}h {allMins < 10 ? `0${allMins}` : allMins}m</strong>
+            كله في كله: <strong className="tabular" style={{ color: 'var(--accent-primary)' }}>{allHours}h {allMins < 10 ? `0${allMins}` : allMins}m</strong>
           </span>
         </div>
 
         {/* Theme Selection */}
-        <select
-          id="themeSelect"
-          className="btn btn-sm"
-          value={theme}
-          onChange={(e) => onThemeChange(e.target.value as ThemeType)}
-          aria-label="اختيار المظهر"
-        >
-          <option value="default">🌿 نور الساج الهادئ (افتراضي)</option>
-          <option value="indigo">🌌 نيلي نايت ديب</option>
-          <option value="warm-sand">☕ رمل دافئ كلاسيك</option>
-          <option value="minimal-light">☀️ ضوء نهاري مريح</option>
-        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+          <Palette size={14} style={{ color: 'var(--text-muted)' }} />
+          <select
+            id="themeSelect"
+            className="btn btn-sm"
+            value={theme}
+            onChange={(e) => onThemeChange(e.target.value as ThemeType)}
+            aria-label="اختيار المظهر"
+            style={{ paddingRight: 8, paddingLeft: 8 }}
+          >
+            <option value="default">ساج هادئ (افتراضي)</option>
+            <option value="indigo">نيلي نايت ديب</option>
+            <option value="warm-sand">رمل دافئ كلاسيك</option>
+            <option value="minimal-light">ضوء نهاري مريح</option>
+          </select>
+        </div>
       </div>
     </header>
   );
