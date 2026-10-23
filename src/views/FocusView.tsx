@@ -7,7 +7,8 @@ import {
   CheckCircle2,
   Coffee,
   Quote,
-  Clock
+  Clock,
+  RotateCcw
 } from 'lucide-react';
 
 interface FocusViewProps {
@@ -21,6 +22,7 @@ interface FocusViewProps {
   onStartTimer: () => void;
   onPauseTimer: () => void;
   onFinishSession: () => void;
+  onCancelSession?: () => void;
   onOpenBreak: () => void;
   onOpenManualSession?: () => void;
   quotes: string[];
@@ -37,6 +39,7 @@ export const FocusView: React.FC<FocusViewProps> = ({
   onStartTimer,
   onPauseTimer,
   onFinishSession,
+  onCancelSession,
   onOpenBreak,
   onOpenManualSession,
   quotes
@@ -118,6 +121,25 @@ export const FocusView: React.FC<FocusViewProps> = ({
           {timeFormatted}
         </div>
 
+        {/* Live Cloud Sync Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, color: 'var(--text-muted)', margin: '6px 0 16px' }}>
+          <span style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: isRunning ? 'var(--success)' : elapsedSeconds > 0 ? 'var(--warning)' : 'var(--border-subtle)',
+            boxShadow: isRunning ? '0 0 8px var(--success)' : 'none',
+            display: 'inline-block'
+          }} />
+          <span style={{ fontWeight: 600 }}>
+            {isRunning
+              ? 'الجلسة جارية ومحفوظة سحابياً في Firebase (تستمر حتى لو أغلقت الموقع أو المتصفح)'
+              : elapsedSeconds > 0
+              ? 'الجلسة متوقفة مؤقتاً ومحفوظة سحابياً'
+              : 'جاهز لبدء الجلسة والحفظ السحابي الفوري'}
+          </span>
+        </div>
+
         {/* Ambient Motivational Quote */}
         <div className="quote-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <Quote size={14} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
@@ -147,6 +169,17 @@ export const FocusView: React.FC<FocusViewProps> = ({
             <CheckCircle2 size={16} />
             <span>إنهاء وحفظ الجلسة</span>
           </button>
+
+          {onCancelSession && elapsedSeconds > 0 && (
+            <button
+              className="btn"
+              onClick={onCancelSession}
+              style={{ padding: '12px 18px', fontSize: 14, borderColor: 'var(--danger)', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <RotateCcw size={15} />
+              <span>إلغاء / تصفير</span>
+            </button>
+          )}
 
           <button className="btn" onClick={onOpenBreak} style={{ padding: '12px 20px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Coffee size={15} style={{ color: 'var(--accent-primary)' }} />

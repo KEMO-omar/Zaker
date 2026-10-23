@@ -84,11 +84,58 @@ export const AISupervisorView: React.FC<AISupervisorViewProps> = ({
     setChatMessages((prev) => [...prev, { sender: 'user', text, time: timeNow }]);
     setIsSending(true);
 
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const currentDayOfWeek = now.getDay();
+    const diffToSaturday = (currentDayOfWeek + 1) % 7;
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToSaturday).getTime();
+
+    let todayMins = 0;
+    let weekMins = 0;
+    const subjTimes: Record<string, number> = {};
+    subjects.forEach((s) => { subjTimes[s.id] = 0; });
+    sessions.forEach((s) => {
+      const ts = s.tsStart || (s.date ? new Date(s.date).getTime() : 0);
+      const m = s.minutes || 0;
+      if (ts >= startOfToday) todayMins += m;
+      if (ts >= startOfWeek) weekMins += m;
+      if (s.entries) {
+        s.entries.forEach((e) => {
+          if (e.subj && subjTimes[e.subj] !== undefined) {
+            subjTimes[e.subj] += m / s.entries.length;
+          }
+        });
+      } else if (s.subjId && subjTimes[s.subjId] !== undefined) {
+        subjTimes[s.subjId] += m;
+      }
+    });
+
+    const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
+    const sleepMins = 420;
+    const elapsedAwakeMins = Math.max(minutesSinceMidnight - (now.getHours() < 7 ? 0 : sleepMins), 0);
+    const wastedMins = Math.max(elapsedAwakeMins - todayMins, 0);
+
     const context = {
+      todayStudyMins: todayMins,
+      todayMins,
+      weekMins,
+      wastedMins,
+      subjTimes,
       aiMood,
       examsCount: exams.length,
       tasksCount: weeklyTasks.length,
       completedCount: completedTaskIds.size,
+      exams: exams.map((e) => ({
+        id: e.id,
+        subjId: e.subjId,
+        teacher: e.teacher,
+        topic: e.topic,
+        score: e.score,
+        total: e.total,
+        pct: e.pct || Math.round((e.score / e.total) * 100),
+        date: e.date
+      })),
+      pendingTasks: weeklyTasks.filter((t) => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))),
       lastReport: auditReport ? auditReport.slice(0, 300) : ''
     };
 

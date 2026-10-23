@@ -4,6 +4,8 @@ import {
   DEFAULT_SUBJECTS,
   fetchDbData,
   saveDbData,
+  saveActiveSession,
+  fetchActiveSession,
   callAiMonitor,
   callAiExamReaction,
   callAiSchedule,
@@ -73,6 +75,7 @@ export const App: React.FC = () => {
   const [taskNote, setTaskNote] = useState<string>('');
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const timerRef = useRef<any>(null);
+  const sessionStartTimeRef = useRef<number | null>(null);
 
   // AI Watchdog & Mood State
   const [aiMood, setAiMood] = useState<{
@@ -230,6 +233,28 @@ export const App: React.FC = () => {
           setTheme(db.theme);
         }
       }
+
+      // Check active running session from Firebase / LocalStorage
+      try {
+        const active = await fetchActiveSession();
+        if (active && active.startTime) {
+          if (active.subjId) setActiveSubjId(active.subjId);
+          if (active.taskNote) setTaskNote(active.taskNote);
+
+          if (active.isRunning) {
+            const now = Date.now();
+            const elapsed = Math.max(Math.floor((now - active.startTime) / 1000), 0);
+            setElapsedSeconds(elapsed);
+            sessionStartTimeRef.current = active.startTime;
+            setIsRunning(true);
+          } else {
+            const pausedSec = active.pausedElapsed !== undefined ? active.pausedElapsed : Math.max(Math.floor((Date.now() - active.startTime) / 1000), 0);
+            setElapsedSeconds(pausedSec);
+            sessionStartTimeRef.current = Date.now() - pausedSec * 1000;
+            setIsRunning(false);
+          }
+        }
+      } catch (err) {}
     }
     loadInitialData();
   }, []);
@@ -263,11 +288,20 @@ export const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [sessions, exemptions, weeklyTasks, completedTaskIds, lectures, exams, customAiInstructions]);
 
-  // Focus Stopwatch Interval
+  // Focus Stopwatch Interval - calculates accurate elapsed time against sessionStartTimeRef
   useEffect(() => {
     if (isRunning) {
+      if (!sessionStartTimeRef.current) {
+        sessionStartTimeRef.current = Date.now() - elapsedSeconds * 1000;
+      }
       timerRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
+        if (sessionStartTimeRef.current) {
+          const now = Date.now();
+          const realElapsed = Math.floor((now - sessionStartTimeRef.current) / 1000);
+          setElapsedSeconds(realElapsed);
+        } else {
+          setElapsedSeconds((prev) => prev + 1);
+        }
       }, 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -275,7 +309,7 @@ export const App: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isRunning]);
+  }, [isRunning, elapsedSeconds]);
 
   // Trigger Sync with Server
   const triggerAutoSync = useCallback(async () => {
@@ -609,14 +643,31 @@ export const App: React.FC = () => {
     setTimeout(() => triggerAutoSync(), 400);
   };
 
-  // Focus Timer actions
+  // Focus Timer actions with instant Firebase and LocalStorage sync
   const handleStartTimer = () => {
+    const now = Date.now();
+    const stTime = sessionStartTimeRef.current || (now - elapsedSeconds * 1000);
+    sessionStartTimeRef.current = stTime;
     setIsRunning(true);
-    showToast('بدأت جلسة التركيز! استعن بالله');
+    saveActiveSession({
+      isRunning: true,
+      startTime: stTime,
+      subjId: activeSubjId,
+      taskNote: taskNote
+    });
+    showToast('بدأت جلسة التركيز وتم حفظها سحابياً في Firebase ⚡');
   };
 
   const handlePauseTimer = () => {
     setIsRunning(false);
+    saveActiveSession({
+      isRunning: false,
+      startTime: sessionStartTimeRef.current || Date.now(),
+      subjId: activeSubjId,
+      taskNote: taskNote,
+      pausedElapsed: elapsedSeconds
+    });
+    showToast('تم إيقاف الجلسة مؤقتاً وحفظ حالتها سحابياً');
   };
 
   const handleFinishSession = () => {
@@ -643,8 +694,10 @@ export const App: React.FC = () => {
 
     setIsRunning(false);
     setElapsedSeconds(0);
+    sessionStartTimeRef.current = null;
     setTaskNote('');
-    showToast(`تم حفظ الجلسة (${mins} دقيقة) بنجاح ⚡`);
+    saveActiveSession(null);
+    showToast(`تم إنهاء وحفظ الجلسة (${mins} دقيقة) بنجاح ⚡`);
 
     saveDbData({
       sessions: updatedSessions,
@@ -656,6 +709,39 @@ export const App: React.FC = () => {
       subjects,
       customAiInstructions
     });
+  };
+
+  const handleCancelSession = () => {
+    setIsRunning(false);
+    setElapsedSeconds(0);
+    sessionStartTimeRef.current = null;
+    setTaskNote('');
+    saveActiveSession(null);
+    showToast('تم إلغاء الجلسة وتصفير العداد');
+  };
+
+  const handleSelectSubject = (id: string) => {
+    setActiveSubjId(id);
+    if (isRunning && sessionStartTimeRef.current) {
+      saveActiveSession({
+        isRunning: true,
+        startTime: sessionStartTimeRef.current,
+        subjId: id,
+        taskNote: taskNote
+      });
+    }
+  };
+
+  const handleTaskNoteChange = (note: string) => {
+    setTaskNote(note);
+    if (isRunning && sessionStartTimeRef.current) {
+      saveActiveSession({
+        isRunning: true,
+        startTime: sessionStartTimeRef.current,
+        subjId: activeSubjId,
+        taskNote: note
+      });
+    }
   };
 
   // AI Schedule Generator Action
@@ -842,14 +928,15 @@ export const App: React.FC = () => {
           <FocusView
             subjects={subjects}
             activeSubjId={activeSubjId}
-            onSelectSubject={setActiveSubjId}
+            onSelectSubject={handleSelectSubject}
             taskNote={taskNote}
-            onTaskNoteChange={setTaskNote}
+            onTaskNoteChange={handleTaskNoteChange}
             isRunning={isRunning}
             elapsedSeconds={elapsedSeconds}
             onStartTimer={handleStartTimer}
             onPauseTimer={handlePauseTimer}
             onFinishSession={handleFinishSession}
+            onCancelSession={handleCancelSession}
             onOpenBreak={() => setIsBreakOpen(true)}
             onOpenManualSession={() => setIsManualSessionOpen(true)}
             quotes={quotes}
