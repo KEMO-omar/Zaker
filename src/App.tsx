@@ -30,7 +30,8 @@ import {
   ExemptionModal,
   AiScheduleModal,
   InterrogationModal,
-  ManualSessionModal
+  ManualSessionModal,
+  PwaInstallModal
 } from './components/Modals';
 
 import { DashboardView } from './views/DashboardView';
@@ -126,29 +127,56 @@ export const App: React.FC = () => {
   const [interrogationText, setInterrogationText] = useState<string | null>(null);
   const [isInterrogating, setIsInterrogating] = useState(false);
 
-  // PWA Install State for Chrome
+  // PWA Install State for Chrome & Mobile
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
+    // Check if app is already running as installed standalone PWA
+    const checkInstalled = () => {
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true;
+      setIsInstalled(isStandalone);
+    };
+    checkInstalled();
+
     const handler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
+    const installedHandler = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+      showToast('⚡ تم تثبيت تطبيق شباب بنجاح على جهازك!');
+    };
+
     window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', installedHandler);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installedHandler);
+    };
   }, []);
 
   const handleInstallPwa = async () => {
     if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      if (choice.outcome === 'accepted') {
-        showToast('تم تثبيت التطبيق بنجاح على جهازك!');
-        setDeferredPrompt(null);
+      try {
+        await deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice && choice.outcome === 'accepted') {
+          showToast('⚡ تم تثبيت التطبيق بنجاح على جهازك!');
+          setDeferredPrompt(null);
+          setIsInstalled(true);
+          return;
+        }
+      } catch (e) {
+        console.warn('Install prompt error:', e);
       }
-    } else {
-      showToast('للتثبيت في كروم: اضغط على القائمة (⋮) ثم "تثبيت التطبيق" أو "Install App"');
     }
+    // Open comprehensive installation guide modal
+    setIsInstallModalOpen(true);
   };
 
   // Sync Timer
@@ -1069,6 +1097,18 @@ export const App: React.FC = () => {
         onClose={() => setIsManualSessionOpen(false)}
         subjects={subjects}
         onSave={handleSaveManualSession}
+      />
+
+      <PwaInstallModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        onNativeInstall={() => {
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+          }
+        }}
+        isInstallable={!!deferredPrompt}
+        isInstalled={isInstalled}
       />
     </div>
   );

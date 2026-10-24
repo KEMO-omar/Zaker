@@ -1525,3 +1525,172 @@ export const ManualSessionModal: React.FC<ManualSessionModalProps> = ({
   );
 };
 
+// ================= PWA INSTALL MODAL =================
+interface PwaInstallModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onNativeInstall: () => void;
+  isInstallable: boolean;
+  isInstalled: boolean;
+}
+
+export const PwaInstallModal: React.FC<PwaInstallModalProps> = ({
+  isOpen,
+  onClose,
+  onNativeInstall,
+  isInstallable,
+  isInstalled
+}) => {
+  const [deviceTab, setDeviceTab] = useState<'android' | 'ios' | 'pc'>('android');
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined') {
+      const ua = navigator.userAgent.toLowerCase();
+      if (/iphone|ipad|ipod/.test(ua)) {
+        setDeviceTab('ios');
+      } else if (/android/.test(ua)) {
+        setDeviceTab('android');
+      } else {
+        setDeviceTab('pc');
+      }
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 10000 }}>
+      <div
+        className="modal-box"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 520, width: '92%', borderRadius: 16, padding: '24px 20px', border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
+          <img
+            src="logo.png"
+            alt="شباب STUDY HUB"
+            style={{ width: 56, height: 56, borderRadius: 14, border: '1px solid var(--border-subtle)', objectFit: 'contain' }}
+          />
+          <div>
+            <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+              تثبيت شباب STUDY HUB كتطبيق 📱
+            </h3>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
+              منصة المذاكرة الخاصة بـ د. كريم عمر (ثانوية عامة علمي)
+            </p>
+          </div>
+        </div>
+
+        {isInstalled ? (
+          <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', borderRadius: 10, padding: 14, marginBottom: 16, textAlign: 'center' }}>
+            <span style={{ color: '#10b981', fontWeight: 800, fontSize: 15 }}>
+              ✓ التطبيق مثبت بالفعل ويعمل بكامل طاقته بدون إنترنت!
+            </span>
+          </div>
+        ) : isInstallable ? (
+          <div style={{ marginBottom: 18 }}>
+            <button
+              className="btn btn-primary"
+              onClick={onNativeInstall}
+              style={{ width: '100%', padding: '12px 18px', fontSize: 15, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(56, 189, 248, 0.35)' }}
+            >
+              <span>⚡ تثبيت التطبيق الآن بنقرة واحدة</span>
+            </button>
+            <p style={{ fontSize: 11, textAlign: 'center', color: 'var(--text-muted)', marginTop: 6 }}>
+              سيتم إضافة التطبيق فوراً لشاشتك الرئيسية كأنه تطبيق من متجر التطبيقات.
+            </p>
+          </div>
+        ) : null}
+
+        {/* Device selector tabs */}
+        <div style={{ display: 'flex', gap: 6, background: 'var(--bg-elevated)', padding: 4, borderRadius: 10, marginBottom: 16 }}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setDeviceTab('android')}
+            style={{ flex: 1, fontSize: 12, fontWeight: 700, background: deviceTab === 'android' ? 'var(--accent-primary)' : 'transparent', color: deviceTab === 'android' ? '#000' : 'var(--text-muted)' }}
+          >
+            أندرويد (كروم)
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setDeviceTab('ios')}
+            style={{ flex: 1, fontSize: 12, fontWeight: 700, background: deviceTab === 'ios' ? 'var(--accent-primary)' : 'transparent', color: deviceTab === 'ios' ? '#000' : 'var(--text-muted)' }}
+          >
+            آيفون / آيباد (سفاري)
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setDeviceTab('pc')}
+            style={{ flex: 1, fontSize: 12, fontWeight: 700, background: deviceTab === 'pc' ? 'var(--accent-primary)' : 'transparent', color: deviceTab === 'pc' ? '#000' : 'var(--text-muted)' }}
+          >
+            كمبيوتر / لابتوب
+          </button>
+        </div>
+
+        {/* Step-by-step instructions */}
+        <div style={{ background: 'var(--bg-elevated)', borderRadius: 12, padding: 14, fontSize: 13, lineHeight: 1.7, color: 'var(--text-main)' }}>
+          {deviceTab === 'android' && (
+            <div>
+              <div style={{ fontWeight: 800, color: 'var(--accent-primary)', marginBottom: 6 }}>خطوات التثبيت في متصفح كروم للأندرويد:</div>
+              <ol style={{ paddingRight: 20, margin: 0 }}>
+                <li>اضغط على زر <strong>القائمة (الثلاث نقاط العمودية ⋮)</strong> في أعلى يمين المتصفح.</li>
+                <li>اختر <strong>"تثبيت التطبيق" (Install app)</strong> أو <strong>"الإضافة إلى الشاشة الرئيسية" (Add to Home screen)</strong>.</li>
+                <li>اضغط على <strong>"تثبيت"</strong>، وستظهر أيقونة المنصة فوراً على شاشة هاتفك مع باقي التطبيقات.</li>
+              </ol>
+            </div>
+          )}
+
+          {deviceTab === 'ios' && (
+            <div>
+              <div style={{ fontWeight: 800, color: 'var(--accent-primary)', marginBottom: 6 }}>خطوات التثبيت على آيفون / آيباد (Safari):</div>
+              <ol style={{ paddingRight: 20, margin: 0 }}>
+                <li>افتح الموقع في متصفح <strong>Safari</strong>.</li>
+                <li>اضغط على زر <strong>المشاركة</strong> (مربع مع سهم لأعلى <span style={{ fontSize: 14 }}>⎋</span> أسفل الشاشة).</li>
+                <li>مرر للأسفل واضغط على <strong>"إضافة إلى الشاشة الرئيسية" (Add to Home Screen ⊞)</strong>.</li>
+                <li>اضغط على <strong>"إضافة" (Add)</strong> أعلى اليمين.</li>
+              </ol>
+            </div>
+          )}
+
+          {deviceTab === 'pc' && (
+            <div>
+              <div style={{ fontWeight: 800, color: 'var(--accent-primary)', marginBottom: 6 }}>خطوات التثبيت على الكمبيوتر (Chrome أو Edge):</div>
+              <ol style={{ paddingRight: 20, margin: 0 }}>
+                <li>اضغط على أيقونة <strong>التثبيت (⊕ أو كمبيوتر مع سهم)</strong> الموجودة داخل شريط العنوان في أعلى المتصفح.</li>
+                <li>أو اضغط على زر <strong>(⋮)</strong> ثم اختر <strong>"تثبيت شباب STUDY HUB"</strong>.</li>
+                <li>سيفتح التطبيق في نافذة مستقلة وسريعة بدون شريط المتصفح كأنه برنامج مثبت على الويندوز!</li>
+              </ol>
+            </div>
+          )}
+        </div>
+
+        {/* Features badge */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14, fontSize: 11, color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: '#10b981' }}>✓</span> يعمل بدون نت (Offline Ready)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: '#10b981' }}>✓</span> حفظ الجلسات والعدادات تلقائياً
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: '#10b981' }}>✓</span> بدون إعلانات وبسرعة خيالية
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: '#10b981' }}>✓</span> شاشة كاملة كتطبيق أصلي
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18 }}>
+          <button type="button" className="btn btn-sm" onClick={onClose} style={{ padding: '6px 20px', fontWeight: 700 }}>
+            إغلاق
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
