@@ -1,31 +1,31 @@
 {
-  "id": "/",
-  "name": "SHAPAP | منصة كريم للمذاكرة وإدارة الوقت ⚡",
-  "short_name": "SHAPAP",
-  "description": "منصة متابعة المذاكرة وإدارة الوقت بالذكاء الاصطناعي مع المراقب الذكي وحساب نسب الامتحانات ومزامنة البيانات.",
-  "start_url": "/",
-  "scope": "/",
+  "id": "./",
+  "name": "شباب STUDY HUB | منصة كريم للمذاكرة وإدارة الوقت ⚡",
+  "short_name": "شباب",
+  "description": "منصة كريم عمر سيد للمذاكرة وإدارة الوقت بالذكاء الاصطناعي مع المراقب الأكاديمي ومتابعة الامتحانات وقاعدة الـ 95%.",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#0f1416",
-  "theme_color": "#0f1416",
+  "background_color": "#0b1219",
+  "theme_color": "#0b1219",
   "orientation": "any",
   "lang": "ar",
   "dir": "rtl",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-maskable-512.png",
+      "src": "./icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

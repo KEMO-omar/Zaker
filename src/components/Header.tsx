@@ -71,16 +71,26 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="app-header">
       <div className="brand-wrap">
-        <div className="brand-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20"/>
-            <path d="M12 6a6 6 0 1 1 0 12 4 4 0 0 1 0-8"/>
-          </svg>
+        <div className="brand-icon" style={{
+          background: 'transparent',
+          padding: 0,
+          overflow: 'hidden',
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          border: '1px solid var(--border-subtle)',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <img src="./logo.png" alt="شباب STUDY HUB" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <div>
-          <div className="brand-title">
-            SHAPAP <span style={{ fontWeight: 400, opacity: 0.6 }}>| مساحة كريم</span>
+          <div className="brand-title" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 900 }}>شباب</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-primary)', letterSpacing: 0.5 }}>STUDY HUB</span>
+            <span style={{ fontWeight: 400, opacity: 0.65, fontSize: 13 }}>| د. كريم عمر</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span className="brand-sub">نظام التركيز والإنتاجية الدراسي</span>
