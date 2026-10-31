@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Subject, WeeklyTask } from '../types';
+import { Subject, WeeklyTask, Session, ExamRecord, Lecture } from '../types';
+import { PastWeeksAnalytics } from '../components/PastWeeksAnalytics';
 import {
   Calendar,
   CalendarCheck,
@@ -13,7 +14,8 @@ import {
   Pencil,
   Trash2,
   CheckCircle2,
-  Layers
+  Layers,
+  BarChart3
 } from 'lucide-react';
 
 interface WeeklyViewProps {
@@ -24,6 +26,10 @@ interface WeeklyViewProps {
   onOpenNewTaskModal: () => void;
   onOpenEditTask: (task: WeeklyTask) => void;
   onDeleteTask?: (taskId: string | number) => void;
+  sessions?: Session[];
+  exams?: ExamRecord[];
+  lectures?: Lecture[];
+  onStartFocus?: (subjId: string) => void;
 }
 
 export const WeeklyView: React.FC<WeeklyViewProps> = ({
@@ -33,8 +39,13 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
   onToggleTask,
   onOpenNewTaskModal,
   onOpenEditTask,
-  onDeleteTask
+  onDeleteTask,
+  sessions = [],
+  exams = [],
+  lectures = [],
+  onStartFocus
 }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'tasks' | 'history'>('tasks');
   const [selectedDay, setSelectedDay] = useState<string>('all');
   const [selectedSubj, setSelectedSubj] = useState<string>('all');
   const [showPoster, setShowPoster] = useState<boolean>(true);
@@ -147,15 +158,54 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="stat-progress-bar" style={{ marginTop: 14, height: 6 }}>
-          <div className="stat-progress-fill" style={{ width: `${completionPct}%`, background: 'linear-gradient(90deg, var(--accent-secondary), var(--accent-primary))' }} />
+        {/* Sub-tab navigation: Weekly Tasks vs Past Weeks Analytics */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 16, borderTop: '1px solid var(--border-subtle)', paddingTop: 14 }}>
+          <button
+            className={`btn btn-sm ${activeSubTab === 'tasks' ? 'btn-primary' : ''}`}
+            onClick={() => setActiveSubTab('tasks')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+          >
+            <CalendarCheck size={14} />
+            <span>مهام وجدول الأسبوع</span>
+          </button>
+          <button
+            className={`btn btn-sm ${activeSubTab === 'history' ? 'btn-primary' : ''}`}
+            onClick={() => setActiveSubTab('history')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontWeight: 700,
+              background: activeSubTab === 'history' ? 'var(--accent-primary)' : 'rgba(56, 189, 248, 0.1)',
+              borderColor: activeSubTab === 'history' ? 'var(--accent-primary)' : 'rgba(56, 189, 248, 0.3)',
+              color: activeSubTab === 'history' ? '#000' : 'var(--accent-secondary)'
+            }}
+          >
+            <BarChart3 size={14} />
+            <span>مخطط وأرشيف الأسابيع السابقة (ساعات الأيام) ⚡</span>
+          </button>
         </div>
       </div>
 
-      {/* Interactive 4-Day Backlog Poster Section */}
-      {showPoster && (
-        <div className="card" style={{ marginBottom: 24, overflow: 'hidden', padding: 0 }}>
+      {/* Render Past Weeks Analytics when activeSubTab is 'history' */}
+      {activeSubTab === 'history' && (
+        <PastWeeksAnalytics
+          sessions={sessions}
+          subjects={subjects}
+          exams={exams}
+          weeklyTasks={tasks}
+          completedTaskIds={completedTaskIds}
+          lectures={lectures}
+          onStartFocus={onStartFocus}
+        />
+      )}
+
+      {/* Render Tasks view when activeSubTab is 'tasks' */}
+      {activeSubTab === 'tasks' && (
+        <>
+          {/* Interactive 4-Day Backlog Poster Section */}
+          {showPoster && (
+            <div className="card" style={{ marginBottom: 24, overflow: 'hidden', padding: 0 }}>
           <div style={{ padding: '14px 20px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Layers size={16} style={{ color: 'var(--accent-primary)' }} />
@@ -347,6 +397,8 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
           })
         )}
       </div>
+        </>
+      )}
     </section>
   );
 };

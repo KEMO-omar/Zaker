@@ -24,10 +24,16 @@ import {
 interface BreakModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onResumeStudy?: () => void;
   breakDurationMinutes?: number;
 }
 
-export const BreakModal: React.FC<BreakModalProps> = ({ isOpen, onClose, breakDurationMinutes = 5 }) => {
+export const BreakModal: React.FC<BreakModalProps> = ({
+  isOpen,
+  onClose,
+  onResumeStudy,
+  breakDurationMinutes = 5
+}) => {
   const [secondsLeft, setSecondsLeft] = useState(breakDurationMinutes * 60);
 
   useEffect(() => {
@@ -62,13 +68,124 @@ export const BreakModal: React.FC<BreakModalProps> = ({ isOpen, onClose, breakDu
         استراحة ذكية (بومودورو)
       </h2>
       <p style={{ color: 'var(--text-muted)', fontSize: 14, maxWidth: 440, lineHeight: 1.6 }}>
-        تنفس بعمق، تحرك قليلاً، اشرب ماءً، وتجنب الشاشات والمشتتات حتى يعود تركيزك في أعلى مستوياته.
+        تنفس بعمق، تحرك قليلاً، اشرب ماءً، وتجنب الشاشات حتى يعود تركيزك في أعلى مستوياته.
       </p>
+      <div style={{
+        margin: '10px 0',
+        padding: '6px 14px',
+        borderRadius: 20,
+        background: 'rgba(16, 185, 129, 0.12)',
+        color: 'var(--success)',
+        fontSize: 12,
+        fontWeight: 700
+      }}>
+        ⏱️ مؤقت المذاكرة متوقف ومجمد تماماً — وقت الاستراحة لا يُحسب ضمن وقت المذاكرة
+      </div>
       <div className="break-clock tabular">{timeFormatted}</div>
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button className="btn btn-primary" onClick={onClose}>
-          إنهاء الاستراحة والعودة للتركيز
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            onClose();
+            if (onResumeStudy) onResumeStudy();
+          }}
+          style={{ padding: '10px 20px', fontWeight: 700 }}
+        >
+          إنهاء الاستراحة واستئناف المذاكرة فوراً ⚡
         </button>
+        <button
+          className="btn"
+          onClick={onClose}
+          style={{ padding: '10px 18px', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}
+        >
+          إغلاق (إبقاء المؤقت متوقفاً)
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ================= CERTIFICATE VIEWER MODAL =================
+export interface CertificateViewerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  exam: ExamRecord | null;
+}
+
+export const CertificateViewerModal: React.FC<CertificateViewerModalProps> = ({ isOpen, onClose, exam }) => {
+  if (!isOpen || !exam) return null;
+  const imageSrc = exam.certificateImage || exam.certificateUrl;
+
+  return (
+    <div className="modal-overlay show" onClick={onClose} style={{ zIndex: 1100 }}>
+      <div
+        className="modal-box"
+        style={{ maxWidth: 680, width: '92%', maxHeight: '90vh', overflowY: 'auto' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Award size={20} style={{ color: 'var(--warning)' }} />
+            <span>شهادة التكريم والتقدير 🏆</span>
+          </div>
+          <button className="btn btn-sm" onClick={onClose} style={{ padding: '4px 10px' }}>
+            ✕ إغلاق
+          </button>
+        </div>
+
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-main)', margin: '4px 0' }}>
+            {exam.certificateTitle || `شهادة تفوق: ${exam.topic}`}
+          </h3>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            الطالب: <strong>كريم عمر سيد</strong> • المدرس: <strong>{exam.teacher}</strong> • التاريخ: <span className="tabular">{exam.date}</span>
+          </p>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 8, background: 'rgba(16, 185, 129, 0.12)', padding: '4px 14px', borderRadius: 20 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--success)' }}>
+              الدرجة المحققة: {exam.score} من {exam.total} ({exam.pct || Math.round((exam.score / exam.total) * 100)}%)
+            </span>
+          </div>
+        </div>
+
+        {imageSrc ? (
+          <div style={{ textAlign: 'center', background: '#070b0b', padding: 12, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', marginBottom: 16 }}>
+            <img
+              src={imageSrc}
+              alt="شهادة التقدير"
+              style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
+            />
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: 30, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)' }}>
+            لم يتم رفع صورة للشهادة، ولكن تم توثيقها بالاسم والدرجة ضمن سجل الأوائل.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          {exam.certificateUrl && (
+            <a
+              href={exam.certificateUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-sm"
+              style={{ color: 'var(--accent-primary)', borderColor: 'var(--border-subtle)' }}
+            >
+              فتح الرابط الأصلي للشهادة ↗
+            </a>
+          )}
+          {exam.certificateImage && (
+            <a
+              href={exam.certificateImage}
+              download={`shahada_karim_${exam.subjId}_${exam.date}.png`}
+              className="btn btn-sm btn-primary"
+            >
+              تحميل صورة الشهادة ⬇
+            </a>
+          )}
+          <button className="btn btn-sm" onClick={onClose} style={{ marginRight: 'auto' }}>
+            تم الاطلاع
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -92,7 +209,31 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
 
+  // Certificate fields
+  const [hasCert, setHasCert] = useState(false);
+  const [certificateTitle, setCertificateTitle] = useState('');
+  const [certificateUrl, setCertificateUrl] = useState('');
+  const [certificateImage, setCertificateImage] = useState<string>('');
+
   if (!isOpen) return null;
+
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 8 * 1024 * 1024) {
+        alert('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 8 ميجابايت.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setCertificateImage(reader.result);
+          setHasCert(true);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +247,10 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
       total: Number(total),
       examType,
       date,
-      notes: notes.trim()
+      notes: notes.trim(),
+      certificateTitle: hasCert ? (certificateTitle.trim() || `شهادة تفوق في ${topic.trim()}`) : undefined,
+      certificateUrl: hasCert && certificateUrl.trim() ? certificateUrl.trim() : undefined,
+      certificateImage: hasCert && certificateImage ? certificateImage : undefined
     });
     onClose();
   };
@@ -117,7 +261,7 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
 
   return (
     <div className="modal-overlay show" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <FilePlus size={18} style={{ color: 'var(--accent-primary)' }} />
           <span>تسجيل نتيجة امتحان جديد</span>
@@ -240,6 +384,89 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
             </div>
           </div>
 
+          {/* Certificate Attachment Section */}
+          <div style={{
+            marginTop: 14,
+            padding: 12,
+            background: hasCert ? 'rgba(245, 158, 11, 0.08)' : 'var(--bg-elevated)',
+            border: `1px solid ${hasCert ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-subtle)'}`,
+            borderRadius: 'var(--radius-sm)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasCert ? 10 : 0 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={hasCert}
+                  onChange={(e) => setHasCert(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: 'var(--warning)' }}
+                />
+                <Award size={16} style={{ color: 'var(--warning)' }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)' }}>
+                  إرفاق شهادة تقدير / تفوق لهذا الامتحان 🏆
+                </span>
+              </label>
+            </div>
+
+            {hasCert && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>عنوان الشهادة (اختياري):</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ margin: 0, fontSize: 12 }}
+                    placeholder="مثال: شهادة المركز الأول في كويز الفيزياء الشامل"
+                    value={certificateTitle}
+                    onChange={(e) => setCertificateTitle(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>رفع صورة الشهادة من جهازك:</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="input-field"
+                      style={{ margin: 0, padding: 4, fontSize: 11 }}
+                      onChange={handleImageFile}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>أو رابط الشهادة المباشر:</label>
+                    <input
+                      type="url"
+                      className="input-field"
+                      style={{ margin: 0, fontSize: 12 }}
+                      placeholder="https://..."
+                      value={certificateUrl}
+                      onChange={(e) => setCertificateUrl(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {certificateImage && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <img
+                      src={certificateImage}
+                      alt="معاينة الشهادة"
+                      style={{ width: 60, height: 45, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border-subtle)' }}
+                    />
+                    <span style={{ fontSize: 11, color: 'var(--success)' }}>✓ تم تجهيز صورة الشهادة بنجاح</span>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => setCertificateImage('')}
+                      style={{ padding: '2px 8px', fontSize: 10, color: 'var(--danger)' }}
+                    >
+                      إزالة الصورة
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
             <button type="button" className="btn" onClick={onClose}>إلغاء</button>
             <button type="submit" className="btn btn-primary">
@@ -279,6 +506,12 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
   const [date, setDate] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Certificate fields
+  const [hasCert, setHasCert] = useState(false);
+  const [certificateTitle, setCertificateTitle] = useState('');
+  const [certificateUrl, setCertificateUrl] = useState('');
+  const [certificateImage, setCertificateImage] = useState<string>('');
+
   useEffect(() => {
     if (exam) {
       setSubjId(exam.subjId);
@@ -289,10 +522,34 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
       setExamType(exam.examType || 'امتحان شامل');
       setDate(exam.date);
       setNotes(exam.notes || '');
+
+      const certExists = Boolean(exam.certificateImage || exam.certificateUrl || exam.certificateTitle);
+      setHasCert(certExists);
+      setCertificateTitle(exam.certificateTitle || '');
+      setCertificateUrl(exam.certificateUrl || '');
+      setCertificateImage(exam.certificateImage || '');
     }
   }, [exam]);
 
   if (!isOpen || !exam) return null;
+
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 8 * 1024 * 1024) {
+        alert('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 8 ميجابايت.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setCertificateImage(reader.result);
+          setHasCert(true);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -312,7 +569,10 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
       pct,
       examType,
       date,
-      notes: notes.trim()
+      notes: notes.trim(),
+      certificateTitle: hasCert ? (certificateTitle.trim() || `شهادة تفوق في ${topic.trim()}`) : undefined,
+      certificateUrl: hasCert && certificateUrl.trim() ? certificateUrl.trim() : undefined,
+      certificateImage: hasCert && certificateImage ? certificateImage : undefined
     });
     onClose();
   };
@@ -323,11 +583,11 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
 
   return (
     <div className="modal-overlay show" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Pencil size={18} style={{ color: 'var(--accent-primary)' }} />
-            <span>تعديل بيانات الامتحان</span>
+            <span>تعديل بيانات الامتحان والشهادة</span>
           </div>
           <button
             type="button"
@@ -450,6 +710,89 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
                 onChange={(e) => setNotes(e.target.value)}
               />
             </div>
+          </div>
+
+          {/* Certificate Attachment Section in Edit */}
+          <div style={{
+            marginTop: 14,
+            padding: 12,
+            background: hasCert ? 'rgba(245, 158, 11, 0.08)' : 'var(--bg-elevated)',
+            border: `1px solid ${hasCert ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-subtle)'}`,
+            borderRadius: 'var(--radius-sm)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasCert ? 10 : 0 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={hasCert}
+                  onChange={(e) => setHasCert(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: 'var(--warning)' }}
+                />
+                <Award size={16} style={{ color: 'var(--warning)' }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)' }}>
+                  إرفاق شهادة تقدير / تفوق لهذا الامتحان 🏆
+                </span>
+              </label>
+            </div>
+
+            {hasCert && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>عنوان الشهادة (اختياري):</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ margin: 0, fontSize: 12 }}
+                    placeholder="مثال: شهادة المركز الأول في كويز الفيزياء الشامل"
+                    value={certificateTitle}
+                    onChange={(e) => setCertificateTitle(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>رفع صورة الشهادة من جهازك:</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="input-field"
+                      style={{ margin: 0, padding: 4, fontSize: 11 }}
+                      onChange={handleImageFile}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>أو رابط الشهادة المباشر:</label>
+                    <input
+                      type="url"
+                      className="input-field"
+                      style={{ margin: 0, fontSize: 12 }}
+                      placeholder="https://..."
+                      value={certificateUrl}
+                      onChange={(e) => setCertificateUrl(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {certificateImage && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <img
+                      src={certificateImage}
+                      alt="معاينة الشهادة"
+                      style={{ width: 60, height: 45, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border-subtle)' }}
+                    />
+                    <span style={{ fontSize: 11, color: 'var(--success)' }}>✓ توجد صورة شهادة مرفقة</span>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => setCertificateImage('')}
+                      style={{ padding: '2px 8px', fontSize: 10, color: 'var(--danger)' }}
+                    >
+                      إزالة الصورة
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
@@ -1036,6 +1379,14 @@ export const EditSubjectsModal: React.FC<EditSubjectsModalProps> = ({
     });
   };
 
+  const handleNotebookChange = (index: number, url: string) => {
+    setLocalSubjects((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], notebookUrl: url.trim() };
+      return copy;
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(localSubjects);
@@ -1044,13 +1395,13 @@ export const EditSubjectsModal: React.FC<EditSubjectsModalProps> = ({
 
   return (
     <div className="modal-overlay show" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Sliders size={18} style={{ color: 'var(--accent-primary)' }} />
-          <span>تعديل الأهداف اليومية للمواد</span>
+          <span>تعديل الأهداف اليومية وروابط نوت بوك المواد</span>
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-          حدد عدد دقائق المذاكرة المستهدفة يومياً لكل مادة وفقاً لجدولك الدراسي.
+          حدد دقائق المذاكرة اليومية وروابط Google NotebookLM المساعدة لكل مادة.
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -1062,33 +1413,62 @@ export const EditSubjectsModal: React.FC<EditSubjectsModalProps> = ({
                   key={s.id}
                   style={{
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 14px',
+                    flexDirection: 'column',
+                    gap: 8,
+                    padding: '12px 14px',
                     background: 'var(--bg-elevated)',
                     borderRadius: 'var(--radius-sm)',
                     border: '1px solid var(--border-subtle)'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
-                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-main)' }}>{s.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-main)' }}>{s.name}</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <input
+                        type="number"
+                        step="15"
+                        min="15"
+                        max="360"
+                        className="input-field tabular"
+                        style={{ width: 85, margin: 0, padding: '4px 8px', textAlign: 'center' }}
+                        value={s.targetMinutes}
+                        onChange={(e) => handleMinutesChange(idx, Number(e.target.value))}
+                      />
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        دقيقة ({hours}h)
+                      </span>
+                    </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input
-                      type="number"
-                      step="15"
-                      min="15"
-                      max="360"
-                      className="input-field tabular"
-                      style={{ width: 90, margin: 0, padding: '4px 8px', textAlign: 'center' }}
-                      value={s.targetMinutes}
-                      onChange={(e) => handleMinutesChange(idx, Number(e.target.value))}
-                    />
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      دقيقة ({hours}h)
-                    </span>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>
+                      رابط دفتر المادة في Google NotebookLM:
+                    </label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="url"
+                        className="input-field"
+                        style={{ margin: 0, fontSize: 11, padding: '4px 8px' }}
+                        value={s.notebookUrl || ''}
+                        onChange={(e) => handleNotebookChange(idx, e.target.value)}
+                        placeholder="https://notebook.google.com/notebook/..."
+                      />
+                      {s.notebookUrl && (
+                        <a
+                          href={s.notebookUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-sm"
+                          style={{ fontSize: 11, padding: '4px 10px', flexShrink: 0, color: 'var(--accent-primary)' }}
+                        >
+                          فتح ↗
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -1097,7 +1477,7 @@ export const EditSubjectsModal: React.FC<EditSubjectsModalProps> = ({
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
             <button type="button" className="btn" onClick={onClose}>إلغاء</button>
-            <button type="submit" className="btn btn-primary">حفظ الأهداف</button>
+            <button type="submit" className="btn btn-primary">حفظ الأهداف والروابط</button>
           </div>
         </form>
       </div>

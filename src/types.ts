@@ -4,6 +4,7 @@ export interface Subject {
   color: string;
   targetMinutes: number;
   icon: string;
+  notebookUrl?: string;
 }
 
 export interface SessionEntry {
@@ -76,6 +77,9 @@ export interface ExamRecord {
   examType: string;
   date: string;
   notes?: string;
+  certificateUrl?: string;
+  certificateImage?: string;
+  certificateTitle?: string;
 }
 
 export type ThemeType = 'default' | 'indigo' | 'warm-sand' | 'minimal-light';

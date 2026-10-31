@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Subject, ExamRecord } from '../types';
+import { CertificateViewerModal } from '../components/Modals';
 import {
   Award,
   AlertTriangle,
@@ -11,7 +12,9 @@ import {
   CheckCircle2,
   RefreshCw,
   Search,
-  BookOpen
+  BookOpen,
+  Image,
+  ExternalLink
 } from 'lucide-react';
 
 interface ExamsViewProps {
@@ -37,6 +40,9 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 }) => {
   const [selectedSubj, setSelectedSubj] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedCertExam, setSelectedCertExam] = useState<ExamRecord | null>(null);
+
+  const certExams = exams.filter((e) => Boolean(e.certificateImage || e.certificateUrl || e.certificateTitle));
 
   const filteredExams = exams.filter((e) => {
     if (selectedSubj !== 'all' && e.subjId !== selectedSubj) return false;
@@ -142,6 +148,92 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
         </div>
       </div>
 
+      {/* Honors & Certificates Gallery (معرض شهادات التكريم والتفوق) */}
+      {certExams.length > 0 && (
+        <div className="card" style={{
+          marginBottom: 20,
+          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(16, 185, 129, 0.05))',
+          border: '1px solid rgba(245, 158, 11, 0.3)'
+        }}>
+          <div className="card-header" style={{ marginBottom: 12 }}>
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Award size={18} style={{ color: 'var(--warning)' }} />
+              <span style={{ fontSize: 16, fontWeight: 800 }}>معرض شهادات التكريم والتفوق ({certExams.length}) 🏆</span>
+            </div>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>توثيق رسمي لإنجازات أوائل الجمهورية</span>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+            gap: 12
+          }}>
+            {certExams.map((ce) => {
+              const subj = subjects.find((s) => s.id === ce.subjId);
+              const img = ce.certificateImage || ce.certificateUrl;
+
+              return (
+                <div
+                  key={ce.id}
+                  onClick={() => setSelectedCertExam(ce)}
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: 12,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--warning)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
+                >
+                  {img ? (
+                    <div style={{ height: 120, background: '#0b1212', borderRadius: 4, overflow: 'hidden', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img src={img} alt="شهادة" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  ) : (
+                    <div style={{ height: 90, background: 'rgba(245, 158, 11, 0.08)', borderRadius: 4, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--warning)' }}>
+                      <Award size={36} />
+                    </div>
+                  )}
+
+                  <div>
+                    <strong style={{ fontSize: 13, color: 'var(--text-main)', display: 'block', marginBottom: 4 }}>
+                      {ce.certificateTitle || `شهادة تفوق: ${ce.topic}`}
+                    </strong>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: subj?.color || 'var(--accent-primary)', fontWeight: 700 }}>{subj?.name}</span>
+                      <span className="tabular">{ce.score}/{ce.total}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {ce.teacher}
+                    </div>
+                  </div>
+
+                  <button
+                    className="btn btn-sm"
+                    style={{
+                      marginTop: 8,
+                      width: '100%',
+                      background: 'rgba(245, 158, 11, 0.12)',
+                      color: 'var(--warning)',
+                      borderColor: 'rgba(245, 158, 11, 0.3)',
+                      fontSize: 11,
+                      fontWeight: 700
+                    }}
+                  >
+                    عرض الشهادة بالحجم الكامل ↗
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* AI Diagnostic Output Banner */}
       {auditDiagnostic && (
         <div className="card" style={{ marginBottom: 20, background: 'var(--bg-elevated)', border: '1px solid var(--border-active)' }}>
@@ -204,6 +296,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             const pct = exam.pct || Math.round((exam.score / exam.total) * 100);
             const isTargetMet = pct >= 95;
             const subj = subjects.find((s) => s.id === exam.subjId);
+            const hasCert = Boolean(exam.certificateImage || exam.certificateUrl || exam.certificateTitle);
 
             return (
               <div
@@ -214,7 +307,9 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '14px 18px'
+                  padding: '14px 18px',
+                  flexWrap: 'wrap',
+                  gap: 12
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -246,6 +341,26 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                       <span style={{ fontSize: 11, background: 'var(--bg-elevated)', padding: '2px 8px', borderRadius: 4, color: 'var(--text-muted)' }}>
                         {exam.examType || 'امتحان شامل'}
                       </span>
+                      {hasCert && (
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => setSelectedCertExam(exam)}
+                          style={{
+                            background: 'rgba(245, 158, 11, 0.12)',
+                            borderColor: 'rgba(245, 158, 11, 0.4)',
+                            color: 'var(--warning)',
+                            padding: '2px 8px',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          <Award size={12} />
+                          <span>شهادة مرفقة 🏆</span>
+                        </button>
+                      )}
                     </div>
 
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -276,11 +391,23 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                     </div>
                   </div>
 
+                  {hasCert && (
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => setSelectedCertExam(exam)}
+                      title="عرض شهادة التكريم"
+                      style={{ padding: '6px 10px', color: 'var(--warning)', borderColor: 'rgba(245, 158, 11, 0.4)' }}
+                    >
+                      <Award size={13} />
+                      <span>الشهادة</span>
+                    </button>
+                  )}
+
                   {/* Edit Exam Button */}
                   <button
                     className="btn btn-sm"
                     onClick={() => onOpenEditExam(exam)}
-                    title="تعديل الامتحان"
+                    title="تعديل الامتحان والشهادة"
                     style={{ padding: '6px 10px', color: 'var(--text-main)', borderColor: 'var(--border-subtle)' }}
                   >
                     <Pencil size={13} />
@@ -302,6 +429,13 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
           })
         )}
       </div>
+
+      {/* Certificate Viewer Modal */}
+      <CertificateViewerModal
+        isOpen={Boolean(selectedCertExam)}
+        onClose={() => setSelectedCertExam(null)}
+        exam={selectedCertExam}
+      />
     </section>
   );
 };

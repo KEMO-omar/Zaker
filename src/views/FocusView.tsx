@@ -8,7 +8,8 @@ import {
   Coffee,
   Quote,
   Clock,
-  RotateCcw
+  RotateCcw,
+  BookOpen
 } from 'lucide-react';
 
 interface FocusViewProps {
@@ -108,12 +109,35 @@ export const FocusView: React.FC<FocusViewProps> = ({
           />
         </div>
 
-        {/* Active Badge */}
-        <div style={{ marginTop: 12 }}>
-          <div className="focus-subject-badge" style={{ borderColor: activeSubj.color, color: activeSubj.color }}>
+        {/* Active Badge & NotebookLM Link */}
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="focus-subject-badge" style={{ borderColor: activeSubj.color, color: activeSubj.color, margin: 0 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: activeSubj.color }} />
             <span>جلسة: {activeSubj.name}</span>
           </div>
+
+          {activeSubj.notebookUrl && (
+            <a
+              href={activeSubj.notebookUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-sm"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'rgba(56, 189, 248, 0.12)',
+                color: 'var(--accent-secondary)',
+                borderColor: 'rgba(56, 189, 248, 0.35)',
+                fontWeight: 700,
+                fontSize: 12,
+                padding: '4px 12px'
+              }}
+            >
+              <BookOpen size={13} />
+              <span>فتح دفتر {activeSubj.name} في Google NotebookLM ↗</span>
+            </a>
+          )}
         </div>
 
         {/* Big Clock Display */}

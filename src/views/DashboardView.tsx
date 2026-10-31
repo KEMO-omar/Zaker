@@ -1,6 +1,7 @@
 import React from 'react';
-import { Subject, Session, Exemption, ExamRecord, WeeklyTask } from '../types';
+import { Subject, Session, Exemption, ExamRecord, WeeklyTask, Lecture } from '../types';
 import { Visualizer } from '../components/Visualizer';
+import { PastWeeksAnalytics } from '../components/PastWeeksAnalytics';
 import {
   Clock,
   Calendar,
@@ -20,7 +21,9 @@ import {
   Trophy,
   TrendingUp,
   Plus,
-  History
+  History,
+  BookOpen,
+  BarChart3
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -30,6 +33,7 @@ interface DashboardViewProps {
   exams: ExamRecord[];
   weeklyTasks: WeeklyTask[];
   completedTaskIds: Set<string | number>;
+  lectures?: Lecture[];
   customAiInstructions: string;
   onSaveCustomInstructions: (text: string) => void;
   onStartFocus: (subjId: string) => void;
@@ -58,6 +62,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   exams,
   weeklyTasks,
   completedTaskIds,
+  lectures = [],
   customAiInstructions,
   onSaveCustomInstructions,
   onStartFocus,
@@ -486,10 +491,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
               return (
                 <div key={s.id} style={{ background: 'var(--bg-elevated)', padding: '12px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
                       <strong style={{ fontSize: 14, color: 'var(--text-main)' }}>{s.name}</strong>
+                      {s.notebookUrl && (
+                        <a
+                          href={s.notebookUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`فتح دفتر ${s.name} في Google NotebookLM`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            fontSize: 11,
+                            padding: '2px 7px',
+                            borderRadius: 4,
+                            background: 'rgba(56, 189, 248, 0.1)',
+                            color: 'var(--accent-secondary)',
+                            border: '1px solid rgba(56, 189, 248, 0.25)',
+                            textDecoration: 'none',
+                            fontWeight: 600
+                          }}
+                        >
+                          <BookOpen size={11} />
+                          <span>NotebookLM ↗</span>
+                        </a>
+                      )}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                       <strong className="tabular" style={{ color: 'var(--text-main)' }}>{hours}h</strong> من {targetHours}h ({pct}%)
@@ -570,6 +599,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             />
           </div>
         </div>
+      </div>
+
+      {/* Advanced Visual Stats & Past Weeks Deep Dive */}
+      <div style={{ marginTop: 24 }}>
+        <PastWeeksAnalytics
+          sessions={sessions}
+          subjects={subjects}
+          exams={exams}
+          weeklyTasks={weeklyTasks}
+          completedTaskIds={completedTaskIds}
+          lectures={lectures}
+          onStartFocus={onStartFocus}
+        />
       </div>
     </section>
   );

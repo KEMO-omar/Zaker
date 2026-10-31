@@ -11,7 +11,8 @@ import {
   callAiSchedule,
   callAiExamAudit,
   callAiInterrogate,
-  fetchQuotes
+  fetchQuotes,
+  calculateDynamicSupervisorMood
 } from './services/api';
 
 import { Header } from './components/Header';
@@ -203,6 +204,17 @@ export const App: React.FC = () => {
       const localTheme = localStorage.getItem('kareem_theme') as ThemeType;
       if (localTheme) setTheme(localTheme);
 
+      try {
+        const rawTasks = localStorage.getItem('kareem_weekly_tasks');
+        if (rawTasks) setWeeklyTasks(JSON.parse(rawTasks));
+        const rawCompleted = localStorage.getItem('kareem_completed_task_ids');
+        if (rawCompleted) setCompletedTaskIds(new Set(JSON.parse(rawCompleted)));
+        const rawLectures = localStorage.getItem('kareem_lectures');
+        if (rawLectures) setLectures(JSON.parse(rawLectures));
+        const rawExams = localStorage.getItem('kareem_exams');
+        if (rawExams) setExams(JSON.parse(rawExams));
+      } catch (e) {}
+
       // Server DB
       const db = await fetchDbData();
       if (db) {
@@ -239,17 +251,21 @@ export const App: React.FC = () => {
         if (Array.isArray(db.exemptions)) {
           setExemptions(db.exemptions);
         }
-        if (Array.isArray(db.weeklyTasks)) {
+        if (Array.isArray(db.weeklyTasks) && db.weeklyTasks.length > 0) {
           setWeeklyTasks(db.weeklyTasks);
+          try { localStorage.setItem('kareem_weekly_tasks', JSON.stringify(db.weeklyTasks)); } catch (e) {}
         }
         if (Array.isArray(db.completedTaskIds)) {
           setCompletedTaskIds(new Set(db.completedTaskIds));
+          try { localStorage.setItem('kareem_completed_task_ids', JSON.stringify(db.completedTaskIds)); } catch (e) {}
         }
-        if (Array.isArray(db.lectures)) {
+        if (Array.isArray(db.lectures) && db.lectures.length > 0) {
           setLectures(db.lectures);
+          try { localStorage.setItem('kareem_lectures', JSON.stringify(db.lectures)); } catch (e) {}
         }
-        if (Array.isArray(db.exams)) {
+        if (Array.isArray(db.exams) && db.exams.length > 0) {
           setExams(db.exams);
+          try { localStorage.setItem('kareem_exams', JSON.stringify(db.exams)); } catch (e) {}
         }
         if (db.customAiInstructions) {
           setCustomAiInstructions(db.customAiInstructions);
@@ -302,6 +318,19 @@ export const App: React.FC = () => {
     localStorage.setItem('kareem_theme', theme);
   }, [theme]);
 
+  // Dynamically calculate supervisor mood from real activity & inactivity streak across subjects
+  useEffect(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    let todayMins = 0;
+    sessions.forEach((s) => {
+      const ts = s.tsStart || (s.date ? new Date(s.date).getTime() : 0);
+      if (ts >= startOfToday) todayMins += s.minutes || 0;
+    });
+    const dynamicMood = calculateDynamicSupervisorMood(sessions, exams, todayMins);
+    setAiMood(dynamicMood);
+  }, [sessions, exams]);
+
   // Sync Countdown Timer (60 mins)
   useEffect(() => {
     const timer = setInterval(() => {
@@ -316,7 +345,7 @@ export const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [sessions, exemptions, weeklyTasks, completedTaskIds, lectures, exams, customAiInstructions]);
 
-  // Focus Stopwatch Interval - calculates accurate elapsed time against sessionStartTimeRef
+  // Focus Stopwatch Interval - strictly active only while isRunning is true, freezes when paused
   useEffect(() => {
     if (isRunning) {
       if (!sessionStartTimeRef.current) {
@@ -327,31 +356,36 @@ export const App: React.FC = () => {
           const now = Date.now();
           const realElapsed = Math.floor((now - sessionStartTimeRef.current) / 1000);
           setElapsedSeconds(realElapsed);
-        } else {
-          setElapsedSeconds((prev) => prev + 1);
         }
       }, 1000);
     } else {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     }
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, [isRunning, elapsedSeconds]);
+  }, [isRunning]);
 
   // Trigger Sync with Server
-  const triggerAutoSync = useCallback(async () => {
+  const triggerAutoSync = useCallback(async (overrides?: any) => {
     setIsSyncing(true);
-    const success = await saveDbData({
-      sessions,
-      exemptions,
-      weeklyTasks,
-      completedTaskIds: Array.from(completedTaskIds),
-      lectures,
-      exams,
-      subjects,
-      customAiInstructions
-    });
+    const dataToSave = {
+      sessions: overrides?.sessions ?? sessions,
+      exemptions: overrides?.exemptions ?? exemptions,
+      weeklyTasks: overrides?.weeklyTasks ?? weeklyTasks,
+      completedTaskIds: overrides?.completedTaskIds ?? Array.from(completedTaskIds),
+      lectures: overrides?.lectures ?? lectures,
+      exams: overrides?.exams ?? exams,
+      subjects: overrides?.subjects ?? subjects,
+      customAiInstructions: overrides?.customAiInstructions ?? customAiInstructions
+    };
+    const success = await saveDbData(dataToSave);
     setIsSyncing(false);
     return success;
   }, [sessions, exemptions, weeklyTasks, completedTaskIds, lectures, exams, subjects, customAiInstructions]);
@@ -397,32 +431,9 @@ export const App: React.FC = () => {
     const analysis = await callAiMonitor(studyData, customAiInstructions, forceFresh);
     setAuditReport(analysis);
 
-    // Update dynamic mood based on results
-    if (todayMins >= 240) {
-      setAiMood({
-        avatar: '🦁',
-        label: 'أسطوري وفخور',
-        score: 95,
-        reason: 'إنجاز بطولي في المذاكرة وساعات متقدمة!',
-        speech: 'عاش يا دكتور كريم! مجموعك وأداؤك اليوم مشرف وعلى طريق أوائل الجمهورية. استمر بنفس القوة ولا تتنازل!'
-      });
-    } else if (todayMins >= 120) {
-      setAiMood({
-        avatar: '🌿',
-        label: 'إيجابي ومتقدم',
-        score: 75,
-        reason: 'مستوى طيب ولكن باقي الساعات بحاجة لتركيز مضاعف.',
-        speech: 'خطوة ممتازة يا كريم، بس حلم الطب محتاج ندوس أكتر. قدامك لسه ساعات في اليوم لازم تستغلها!'
-      });
-    } else {
-      setAiMood({
-        avatar: '⚠️',
-        label: 'محاسبة وعتاب حار',
-        score: 45,
-        reason: 'فاقد زمني كبير وتأخر في تحقيق الساعات المطلوبة.',
-        speech: 'مزاكرتش ليه ليه لحد دلوقتي يا كريم؟! الساعات بتضيع من حلمك وتعب أهلك! اقفل كل المشتتات وابدأ فوراً!'
-      });
-    }
+    // Dynamic supervisor mood directly calculated from real sessions, exams, and inactivity
+    const dynamicMood = calculateDynamicSupervisorMood(sessions, exams, todayMins);
+    setAiMood(dynamicMood);
 
     setIsAuditing(false);
   };
@@ -455,9 +466,13 @@ export const App: React.FC = () => {
         next.add(strId);
         if (!isNaN(numId)) next.add(numId);
       }
+      const arr = Array.from(next);
+      try {
+        localStorage.setItem('kareem_completed_task_ids', JSON.stringify(arr));
+      } catch (e) {}
+      triggerAutoSync({ completedTaskIds: arr });
       return next;
     });
-    setTimeout(() => triggerAutoSync(), 400);
   };
 
   // Add Task
@@ -469,9 +484,13 @@ export const App: React.FC = () => {
       text: taskData.text,
       priority: taskData.priority
     };
-    setWeeklyTasks((prev) => [newTask, ...prev]);
-    showToast('تمت إضافة المهمة بنجاح!');
-    setTimeout(() => triggerAutoSync(), 400);
+    const updated = [newTask, ...weeklyTasks];
+    setWeeklyTasks(updated);
+    try {
+      localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('تمت إضافة المهمة وحفظها في القاعدة بنجاح!');
+    triggerAutoSync({ weeklyTasks: updated });
   };
 
   // Edit Task
@@ -481,25 +500,35 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateTask = (updatedTask: WeeklyTask) => {
-    setWeeklyTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
-    showToast('تم حفظ تعديلات المهمة بنجاح!');
-    setTimeout(() => triggerAutoSync(), 400);
+    const updated = weeklyTasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
+    setWeeklyTasks(updated);
+    try {
+      localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('تم حفظ تعديلات المهمة في القاعدة بنجاح!');
+    triggerAutoSync({ weeklyTasks: updated });
   };
 
   // Delete Task
   const handleDeleteTask = (taskId: string | number) => {
-    setWeeklyTasks((prev) => prev.filter((t) => t.id !== taskId));
-    showToast('تم حذف المهمة');
-    setTimeout(() => triggerAutoSync(), 400);
+    const updated = weeklyTasks.filter((t) => t.id !== taskId);
+    setWeeklyTasks(updated);
+    try {
+      localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('تم حذف المهمة من القاعدة');
+    triggerAutoSync({ weeklyTasks: updated });
   };
 
   // Lecture Toggle
   const handleToggleLecture = (lecId: string) => {
-    setLectures((prev) =>
-      prev.map((l) => (l.id === lecId ? { ...l, isDone: !l.isDone } : l))
-    );
-    showToast('تم تحديث حالة المحاضرة');
-    setTimeout(() => triggerAutoSync(), 400);
+    const updated = lectures.map((l) => (l.id === lecId ? { ...l, isDone: !l.isDone } : l));
+    setLectures(updated);
+    try {
+      localStorage.setItem('kareem_lectures', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('تم تحديث حالة المحاضرة وحفظها في القاعدة');
+    triggerAutoSync({ lectures: updated });
   };
 
   // Add Lecture
@@ -509,9 +538,13 @@ export const App: React.FC = () => {
       id: `lec_${Date.now()}`,
       isDone: false
     };
-    setLectures((prev) => [newLec, ...prev]);
-    showToast('تمت إضافة المحاضرة بنجاح');
-    setTimeout(() => triggerAutoSync(), 400);
+    const updated = [newLec, ...lectures];
+    setLectures(updated);
+    try {
+      localStorage.setItem('kareem_lectures', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('تمت إضافة المحاضرة وحفظها في القاعدة بنجاح');
+    triggerAutoSync({ lectures: updated });
   };
 
   // Edit Lecture
@@ -521,15 +554,23 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateLecture = (updatedLecture: Lecture) => {
-    setLectures((prev) => prev.map((l) => (l.id === updatedLecture.id ? updatedLecture : l)));
-    showToast('تم حفظ تعديلات المحاضرة بنجاح!');
-    setTimeout(() => triggerAutoSync(), 400);
+    const updated = lectures.map((l) => (l.id === updatedLecture.id ? updatedLecture : l));
+    setLectures(updated);
+    try {
+      localStorage.setItem('kareem_lectures', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('تم حفظ تعديلات المحاضرة في القاعدة بنجاح!');
+    triggerAutoSync({ lectures: updated });
   };
 
   const handleDeleteLecture = (id: string) => {
-    setLectures((prev) => prev.filter((l) => l.id !== id));
-    showToast('تم حذف المحاضرة');
-    setTimeout(() => triggerAutoSync(), 400);
+    const updated = lectures.filter((l) => l.id !== id);
+    setLectures(updated);
+    try {
+      localStorage.setItem('kareem_lectures', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('تم حذف المحاضرة من القاعدة');
+    triggerAutoSync({ lectures: updated });
   };
 
   // Add Exam
@@ -541,12 +582,16 @@ export const App: React.FC = () => {
       pct
     };
 
-    setExams((prev) => [newExam, ...prev]);
-    showToast('تم تسجيل نتيجة الامتحان!');
+    const updated = [newExam, ...exams];
+    setExams(updated);
+    try {
+      localStorage.setItem('kareem_exams', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('تم تسجيل وحفظ نتيجة الامتحان والشهادة في القاعدة!');
 
     // Call instant AI reaction
-    const currentAvg = exams.length > 0
-      ? Math.round(exams.reduce((a, b) => a + (b.pct || 0), 0) / exams.length)
+    const currentAvg = updated.length > 0
+      ? Math.round(updated.reduce((a, b) => a + (b.pct || 0), 0) / updated.length)
       : pct;
 
     const res = await callAiExamReaction(newExam, currentAvg, customAiInstructions);
@@ -554,7 +599,7 @@ export const App: React.FC = () => {
     setExamReactionText(res.reaction);
     setIsExamReactionOpen(true);
 
-    setTimeout(() => triggerAutoSync(), 400);
+    triggerAutoSync({ exams: updated });
   };
 
   // Edit Exam
@@ -564,16 +609,24 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateExam = (updatedExam: ExamRecord) => {
-    setExams((prev) => prev.map((e) => (e.id === updatedExam.id ? updatedExam : e)));
-    showToast('تم حفظ تعديلات الامتحان بنجاح!');
-    setTimeout(() => triggerAutoSync(), 400);
+    const updated = exams.map((e) => (e.id === updatedExam.id ? updatedExam : e));
+    setExams(updated);
+    try {
+      localStorage.setItem('kareem_exams', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('تم حفظ تعديلات الامتحان والشهادة في القاعدة!');
+    triggerAutoSync({ exams: updated });
   };
 
   // Delete Exam
   const handleDeleteExam = (id: string) => {
-    setExams((prev) => prev.filter((e) => e.id !== id));
-    showToast('تم حذف سجل الامتحان');
-    setTimeout(() => triggerAutoSync(), 400);
+    const updated = exams.filter((e) => e.id !== id);
+    setExams(updated);
+    try {
+      localStorage.setItem('kareem_exams', JSON.stringify(updated));
+    } catch (e) {}
+    showToast('تم حذف سجل الامتحان من القاعدة');
+    triggerAutoSync({ exams: updated });
   };
 
   // Save Subjects Targets
@@ -674,7 +727,9 @@ export const App: React.FC = () => {
   // Focus Timer actions with instant Firebase and LocalStorage sync
   const handleStartTimer = () => {
     const now = Date.now();
-    const stTime = sessionStartTimeRef.current || (now - elapsedSeconds * 1000);
+    // Strictly anchor sessionStartTimeRef to now minus the already accumulated study seconds.
+    // This guarantees that any time spent while paused or taking a break is NEVER counted as study time!
+    const stTime = now - (elapsedSeconds * 1000);
     sessionStartTimeRef.current = stTime;
     setIsRunning(true);
     saveActiveSession({
@@ -688,14 +743,24 @@ export const App: React.FC = () => {
 
   const handlePauseTimer = () => {
     setIsRunning(false);
+    // Clear sessionStartTimeRef so upon resume it will re-anchor cleanly to the exact frozen elapsedSeconds
+    sessionStartTimeRef.current = null;
     saveActiveSession({
       isRunning: false,
-      startTime: sessionStartTimeRef.current || Date.now(),
+      startTime: Date.now() - (elapsedSeconds * 1000),
       subjId: activeSubjId,
       taskNote: taskNote,
       pausedElapsed: elapsedSeconds
     });
-    showToast('تم إيقاف الجلسة مؤقتاً وحفظ حالتها سحابياً');
+    showToast('تم إيقاف الجلسة مؤقتاً وتجميد العداد وحفظ الحالة سحابياً');
+  };
+
+  const handleOpenBreak = () => {
+    // If the timer is actively running, freeze and pause it first so break time is strictly excluded from study time
+    if (isRunning) {
+      handlePauseTimer();
+    }
+    setIsBreakOpen(true);
   };
 
   const handleFinishSession = () => {
@@ -872,6 +937,7 @@ export const App: React.FC = () => {
             exams={exams}
             weeklyTasks={weeklyTasks}
             completedTaskIds={completedTaskIds}
+            lectures={lectures}
             customAiInstructions={customAiInstructions}
             onSaveCustomInstructions={handleSaveCustomInstructions}
             onStartFocus={(subjId) => {
@@ -922,6 +988,14 @@ export const App: React.FC = () => {
             onOpenNewTaskModal={() => setIsNewTaskModalOpen(true)}
             onOpenEditTask={handleOpenEditTask}
             onDeleteTask={handleDeleteTask}
+            sessions={sessions}
+            exams={exams}
+            lectures={lectures}
+            onStartFocus={(subjId) => {
+              setActiveSubjId(subjId);
+              setCurrentTab('focusView');
+              setIsRunning(true);
+            }}
           />
         )}
 
@@ -965,7 +1039,7 @@ export const App: React.FC = () => {
             onPauseTimer={handlePauseTimer}
             onFinishSession={handleFinishSession}
             onCancelSession={handleCancelSession}
-            onOpenBreak={() => setIsBreakOpen(true)}
+            onOpenBreak={handleOpenBreak}
             onOpenManualSession={() => setIsManualSessionOpen(true)}
             quotes={quotes}
           />
@@ -996,6 +1070,10 @@ export const App: React.FC = () => {
       <BreakModal
         isOpen={isBreakOpen}
         onClose={() => setIsBreakOpen(false)}
+        onResumeStudy={() => {
+          setIsBreakOpen(false);
+          handleStartTimer();
+        }}
       />
 
       <ExamModal
