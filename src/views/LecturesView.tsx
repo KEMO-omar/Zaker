@@ -10,7 +10,8 @@ import {
   Clock,
   Pencil,
   Trash2,
-  Check
+  Check,
+  Zap
 } from 'lucide-react';
 
 interface LecturesViewProps {
@@ -20,6 +21,7 @@ interface LecturesViewProps {
   onOpenNewLectureModal: () => void;
   onOpenEditLecture: (lecture: Lecture) => void;
   onDeleteLecture: (id: string) => void;
+  onStartFocus?: (subjId: string) => void;
 }
 
 export const LecturesView: React.FC<LecturesViewProps> = ({
@@ -28,7 +30,8 @@ export const LecturesView: React.FC<LecturesViewProps> = ({
   onToggleLecture,
   onOpenNewLectureModal,
   onOpenEditLecture,
-  onDeleteLecture
+  onDeleteLecture,
+  onStartFocus
 }) => {
   const [selectedSubj, setSelectedSubj] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'done'>('all');
@@ -207,15 +210,36 @@ export const LecturesView: React.FC<LecturesViewProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
-                  <button
-                    className={`btn btn-sm ${lec.isDone ? '' : 'btn-primary'}`}
-                    onClick={() => onToggleLecture(lec.id)}
-                    style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}
-                  >
-                    <Check size={13} />
-                    <span>{lec.isDone ? 'تم الاستماع والمذاكرة' : 'تمييز كمكتملة'}</span>
-                  </button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', paddingTop: 12, flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      className={`btn btn-sm ${lec.isDone ? '' : 'btn-primary'}`}
+                      onClick={() => onToggleLecture(lec.id)}
+                      style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <Check size={13} />
+                      <span>{lec.isDone ? 'تم الاستماع والمذاكرة' : 'تمييز كمكتملة'}</span>
+                    </button>
+                    {onStartFocus && !lec.isDone && (
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => onStartFocus(lec.subjId)}
+                        style={{
+                          fontSize: 11,
+                          padding: '4px 8px',
+                          color: 'var(--accent-secondary)',
+                          borderColor: 'rgba(56, 189, 248, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                        title="بدء جلسة تركيز لهذه المحاضرة"
+                      >
+                        <Zap size={11} fill="currentColor" />
+                        <span>ذاكر الآن</span>
+                      </button>
+                    )}
+                  </div>
                   <span style={{ fontSize: 11, color: lec.isDone ? 'var(--success)' : 'var(--warning)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
                     {lec.isDone ? (
                       <>

@@ -203,6 +203,50 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
       {/* Render Tasks view when activeSubTab is 'tasks' */}
       {activeSubTab === 'tasks' && (
         <>
+          {/* Official Schedule Quick Reference Card */}
+          <div className="card" style={{
+            marginBottom: 20,
+            padding: '14px 20px',
+            background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.07), rgba(167, 139, 250, 0.05))',
+            border: '1px solid rgba(56, 189, 248, 0.25)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Calendar size={16} style={{ color: 'var(--accent-secondary)' }} />
+                <strong style={{ fontSize: 14, color: 'var(--text-main)' }}>
+                  🗓️ جدول الحصص والسناتر المحدث (المواعيد الرسمية)
+                </strong>
+              </div>
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(56, 189, 248, 0.15)', color: 'var(--accent-secondary)', fontWeight: 700 }}>
+                تم تعديل الإنجليزي لـ (سبت وثلاثاء 7:00 م) 🚨
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: 12 }}>
+              <div style={{ background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+                <strong style={{ color: 'var(--accent-primary)' }}>السبت:</strong> سنتر إنجليزي (7:00 م) 🚨 + منصة عربي
+              </div>
+              <div style={{ background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+                <strong style={{ color: 'var(--accent-primary)' }}>الأحد:</strong> منصة فيزياء أ. محمد عبد المعبود
+              </div>
+              <div style={{ background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+                <strong style={{ color: 'var(--accent-primary)' }}>الإثنين:</strong> سنتر تاريخ الفشن (1:00 ظ)
+              </div>
+              <div style={{ background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+                <strong style={{ color: 'var(--accent-primary)' }}>الثلاثاء:</strong> سنتر إنجليزي (7:00 م) 🚨 + سنتر عربي (4:00 ع)
+              </div>
+              <div style={{ background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+                <strong style={{ color: 'var(--accent-primary)' }}>الأربعاء:</strong> منصة فيزياء أ. محمد عبد المعبود
+              </div>
+              <div style={{ background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+                <strong style={{ color: 'var(--accent-primary)' }}>الخميس:</strong> سنتر تاريخ (1:00 ظ) + 🏆 امتحان عربي الوحدة 2 (جوائز)
+              </div>
+              <div style={{ background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+                <strong style={{ color: 'var(--accent-primary)' }}>الجمعة:</strong> 🏆 امتحان إنجليزي شامل Unit 3 + ماراثون المتراكم
+              </div>
+            </div>
+          </div>
+
           {/* Interactive 4-Day Backlog Poster Section */}
           {showPoster && (
             <div className="card" style={{ marginBottom: 24, overflow: 'hidden', padding: 0 }}>
@@ -373,6 +417,27 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {onStartFocus && !isDone && (
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => onStartFocus(task.subjId)}
+                      title="بدء جلسة تركيز لهذه المهمة"
+                      style={{
+                        padding: '4px 10px',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        color: 'var(--accent-secondary)',
+                        borderColor: 'rgba(56, 189, 248, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 12,
+                        fontWeight: 700
+                      }}
+                    >
+                      <Zap size={12} fill="currentColor" />
+                      <span>ابدأ المذاكرة</span>
+                    </button>
+                  )}
                   <button
                     className="btn btn-sm"
                     onClick={() => onOpenEditTask(task)}

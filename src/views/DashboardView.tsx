@@ -23,7 +23,9 @@ import {
   Plus,
   History,
   BookOpen,
-  BarChart3
+  BarChart3,
+  ShieldAlert,
+  Grid
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -230,6 +232,62 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <section className="view-panel active">
+      {/* Emergency Rescue Triage & Overwhelm Breaker */}
+      <div style={{
+        marginBottom: 18,
+        padding: '14px 20px',
+        borderRadius: 14,
+        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(245, 158, 11, 0.10))',
+        border: '1px solid rgba(239, 68, 68, 0.35)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 14
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)', flexShrink: 0 }}>
+            <ShieldAlert size={22} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <strong style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-main)' }}>
+                🚨 خطة الإنقاذ والتعافي الفوري: سبرنت الـ 82 محاضرة والامتحانين ذوي الجوائز
+              </strong>
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(239, 68, 68, 0.2)', color: 'var(--danger)', fontWeight: 700 }}>
+                تم تحديث الجدول والمحاضرات ⚡
+              </span>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: 1.5 }}>
+              يا دكتور كريم: تم تنظيم الـ 82 محاضرة المتراكمة، وتحديث ميعاد سنتر الإنجليزي ليصبح <strong>السبت والثلاثاء 7:00 م</strong>، وإعداد خطة مكثفة لامتحاني الجوائز (إنجليزي Unit 3 + عربي الوحدة 2). ابدأ الآن بـ 25 دقيقة فقط لكسر الشلل!
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-sm"
+            onClick={() => onStartFocus(prioritySubjId)}
+            style={{
+              background: 'linear-gradient(90deg, #ef4444, #f59e0b)',
+              color: '#fff',
+              borderColor: 'transparent',
+              fontWeight: 800,
+              fontSize: 13,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 16px',
+              borderRadius: 8,
+              boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)'
+            }}
+          >
+            <Zap size={15} fill="currentColor" />
+            <span>ابدأ جلسة إنقاذ (25 دقيقة) في {prioritySubjName} ⚡</span>
+          </button>
+        </div>
+      </div>
+
       {/* 4 Core Counters Grid + Quick Action */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
         {/* 1. Today Counter */}
@@ -601,8 +659,54 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Advanced Visual Stats & Past Weeks Deep Dive */}
-      <div style={{ marginTop: 24 }}>
+      {/* Quick Access to Dedicated All-Time Study Consistency Matrix */}
+      <div className="card" style={{
+        marginTop: 24,
+        marginBottom: 16,
+        padding: '16px 20px',
+        background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(16, 185, 129, 0.06))',
+        border: '1px solid rgba(56, 189, 248, 0.25)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 14
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-secondary)' }}>
+            <Grid size={20} />
+          </div>
+          <div>
+            <strong style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>المصفوفة الكبرى لتاريخ المذاكرة الشاملة (كل الأيام المسجلة)</span>
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(56, 189, 248, 0.2)', color: 'var(--accent-secondary)', fontWeight: 700 }}>صفحة مستقلة ⚡</span>
+            </strong>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '3px 0 0', lineHeight: 1.4 }}>
+              تعرض مصفوفة شاملة لكل يوم ذاكرت فيه منذ بدء العام مع تخزين محلي واتصال عند الطلب بالفايربيس.
+            </p>
+          </div>
+        </div>
+
+        <button
+          className="btn btn-sm"
+          onClick={() => onNavigateToView('allTimeHeatmapView')}
+          style={{
+            background: 'var(--accent-primary)',
+            color: '#000',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 16px',
+            borderRadius: 8
+          }}
+        >
+          <span>فتح المصفوفة الكبرى لجميع الأيام ↗</span>
+        </button>
+      </div>
+
+      {/* Advanced Visual Stats & Past Weeks Deep Dive (35-Day Heatmap Kept Intact as Requested) */}
+      <div>
         <PastWeeksAnalytics
           sessions={sessions}
           subjects={subjects}

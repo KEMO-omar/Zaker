@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Subject, ExamRecord, WeeklyTask, Lecture } from '../types';
+import { compressImageFile } from '../services/imageUtils';
 import {
   Coffee,
   FileText,
@@ -214,30 +215,39 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
   const [certificateTitle, setCertificateTitle] = useState('');
   const [certificateUrl, setCertificateUrl] = useState('');
   const [certificateImage, setCertificateImage] = useState<string>('');
+  const [isCompressingImg, setIsCompressingImg] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 8 * 1024 * 1024) {
-        alert('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 8 ميجابايت.');
-        return;
+      try {
+        setIsCompressingImg(true);
+        const compressed = await compressImageFile(file, 1200, 1200, 0.82);
+        setCertificateImage(compressed);
+        setHasCert(true);
+      } catch (err) {
+        // Fallback to standard reader
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            setCertificateImage(reader.result);
+            setHasCert(true);
+          }
+        };
+        reader.readAsDataURL(file);
+      } finally {
+        setIsCompressingImg(false);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setCertificateImage(reader.result);
-          setHasCert(true);
-        }
-      };
-      reader.readAsDataURL(file);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (score === '' || total === '' || !topic.trim()) return;
+
+    const finalHasCert = hasCert || Boolean(certificateImage) || Boolean(certificateUrl.trim()) || Boolean(certificateTitle.trim());
 
     onSave({
       subjId,
@@ -248,9 +258,9 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
       examType,
       date,
       notes: notes.trim(),
-      certificateTitle: hasCert ? (certificateTitle.trim() || `شهادة تفوق في ${topic.trim()}`) : undefined,
-      certificateUrl: hasCert && certificateUrl.trim() ? certificateUrl.trim() : undefined,
-      certificateImage: hasCert && certificateImage ? certificateImage : undefined
+      certificateTitle: finalHasCert ? (certificateTitle.trim() || `شهادة تفوق في ${topic.trim()}`) : undefined,
+      certificateUrl: finalHasCert && certificateUrl.trim() ? certificateUrl.trim() : undefined,
+      certificateImage: finalHasCert && certificateImage ? certificateImage : undefined
     });
     onClose();
   };
@@ -531,23 +541,30 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
     }
   }, [exam]);
 
+  const [isCompressingImg, setIsCompressingImg] = useState(false);
+
   if (!isOpen || !exam) return null;
 
-  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 8 * 1024 * 1024) {
-        alert('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 8 ميجابايت.');
-        return;
+      try {
+        setIsCompressingImg(true);
+        const compressed = await compressImageFile(file, 1200, 1200, 0.82);
+        setCertificateImage(compressed);
+        setHasCert(true);
+      } catch (err) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            setCertificateImage(reader.result);
+            setHasCert(true);
+          }
+        };
+        reader.readAsDataURL(file);
+      } finally {
+        setIsCompressingImg(false);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setCertificateImage(reader.result);
-          setHasCert(true);
-        }
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -558,6 +575,8 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
     const numScore = Number(score);
     const numTotal = Number(total);
     const pct = numTotal > 0 ? Math.round((numScore / numTotal) * 100) : 0;
+
+    const finalHasCert = hasCert || Boolean(certificateImage) || Boolean(certificateUrl.trim()) || Boolean(certificateTitle.trim());
 
     onUpdate({
       ...exam,
@@ -570,9 +589,9 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
       examType,
       date,
       notes: notes.trim(),
-      certificateTitle: hasCert ? (certificateTitle.trim() || `شهادة تفوق في ${topic.trim()}`) : undefined,
-      certificateUrl: hasCert && certificateUrl.trim() ? certificateUrl.trim() : undefined,
-      certificateImage: hasCert && certificateImage ? certificateImage : undefined
+      certificateTitle: finalHasCert ? (certificateTitle.trim() || `شهادة تفوق في ${topic.trim()}`) : undefined,
+      certificateUrl: finalHasCert && certificateUrl.trim() ? certificateUrl.trim() : undefined,
+      certificateImage: finalHasCert && certificateImage ? certificateImage : undefined
     });
     onClose();
   };

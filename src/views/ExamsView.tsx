@@ -14,7 +14,8 @@ import {
   Search,
   BookOpen,
   Image,
-  ExternalLink
+  ExternalLink,
+  Trophy
 } from 'lucide-react';
 
 interface ExamsViewProps {
@@ -144,6 +145,81 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               <span>{lowScoringExams} امتحان</span>
               {lowScoringExams > 0 && <AlertTriangle size={16} />}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Upcoming Milestone Prize Exams (امتحانات قادمة ذات جوائز وتكريم) */}
+      <div className="card" style={{
+        marginBottom: 20,
+        background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.1), rgba(56, 189, 248, 0.08))',
+        border: '1px solid rgba(167, 139, 250, 0.35)',
+        padding: '16px 20px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(167, 139, 250, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a78bfa' }}>
+              <Trophy size={20} />
+            </div>
+            <div>
+              <strong style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>🎯 محطات الامتحانات الكبرى القادمة (امتحانات ذات جوائز وتكريم رسمي)</span>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(167, 139, 250, 0.25)', color: '#c4b5fd', fontWeight: 700 }}>فرصة التكريم</span>
+              </strong>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '3px 0 0' }}>
+                امتحانان حاسمان هذا الأسبوع لتثبيت مكانتك بين أوائل الجمهورية ورفع شهادات تفوق جديدة.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+          {/* 1. Arabic Unit 2 Exam */}
+          <div style={{
+            background: 'var(--bg-elevated)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: 10,
+            padding: '14px 16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Award size={14} />
+                <span>الخميس القادم • امتحان جوائز وتكريم</span>
+              </span>
+              <span className="tabular" style={{ fontSize: 11, background: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+                المستهدف: 95%+
+              </span>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-main)' }}>
+              امتحان اللغة العربية الشامل على الوحدة الثانية
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 0', lineHeight: 1.5 }}>
+              يشمل إعمال المشتقات (اسم فاعل، مفعول، مبالغة)، المصادر الصريحة والميمية، توكيد الأفعال، وبلاغة الإيجاز والإطناب.
+            </p>
+          </div>
+
+          {/* 2. English Unit 3 Exam */}
+          <div style={{
+            background: 'var(--bg-elevated)',
+            border: '1px solid rgba(56, 189, 248, 0.3)',
+            borderRadius: 10,
+            padding: '14px 16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={14} />
+                <span>الجمعة القادم • تقفيل 50/50</span>
+              </span>
+              <span className="tabular" style={{ fontSize: 11, background: 'rgba(56, 189, 248, 0.15)', color: 'var(--accent-secondary)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+                مستر أيمن عبد العاطي
+              </span>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-main)' }}>
+              امتحان اللغة الإنجليزية الشامل على Unit 3
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 0', lineHeight: 1.5 }}>
+              فرصة غلق ثغرات الامتحانات السابقة وقفل الـ 50/50 في أشكال المستقبل، المفردات، المتلازمات، والمقال.
+            </p>
           </div>
         </div>
       </div>

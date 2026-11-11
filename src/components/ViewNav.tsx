@@ -7,8 +7,9 @@ import {
   BookOpen,
   GraduationCap,
   Timer,
-  Hourglass,
-  History
+  History,
+  Grid,
+  Hourglass
 } from 'lucide-react';
 
 interface ViewNavProps {
@@ -81,6 +82,18 @@ export const ViewNav: React.FC<ViewNavProps> = ({ currentTab, onSelectTab }) => 
       >
         <History size={16} />
         <span>سجل الإنجازات</span>
+      </button>
+
+      <button
+        className={`tab-btn ${currentTab === 'allTimeHeatmapView' ? 'active' : ''}`}
+        onClick={() => onSelectTab('allTimeHeatmapView')}
+        style={{
+          borderLeft: currentTab === 'allTimeHeatmapView' ? 'none' : '1px solid var(--border-subtle)',
+          color: currentTab === 'allTimeHeatmapView' ? 'var(--accent-primary)' : undefined
+        }}
+      >
+        <Grid size={16} />
+        <span>المصفوفة الكبرى (كل الأيام) ⚡</span>
       </button>
     </nav>
   );

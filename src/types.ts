@@ -83,4 +83,4 @@ export interface ExamRecord {
 }
 
 export type ThemeType = 'default' | 'indigo' | 'warm-sand' | 'minimal-light';
-export type ViewTab = 'dashView' | 'aiSupervisorView' | 'weeklyView' | 'lecturesView' | 'examsView' | 'focusView' | 'wastedView' | 'logView';
+export type ViewTab = 'dashView' | 'aiSupervisorView' | 'weeklyView' | 'lecturesView' | 'examsView' | 'focusView' | 'wastedView' | 'logView' | 'allTimeHeatmapView';

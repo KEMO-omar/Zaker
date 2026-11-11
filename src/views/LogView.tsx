@@ -15,13 +15,15 @@ interface LogViewProps {
   subjects: Subject[];
   onDeleteSession: (id: string) => void;
   onOpenManualSession?: () => void;
+  onOpenAllTimeMatrix?: () => void;
 }
 
 export const LogView: React.FC<LogViewProps> = ({
   sessions,
   subjects,
   onDeleteSession,
-  onOpenManualSession
+  onOpenManualSession,
+  onOpenAllTimeMatrix
 }) => {
   const [selectedSubj, setSelectedSubj] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,16 +61,34 @@ export const LogView: React.FC<LogViewProps> = ({
               كافة جلسات المذاكرة الصافية مسجلة ومحفوظة بتفاصيلها وتاريخها.
             </p>
           </div>
-          {onOpenManualSession && (
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={onOpenManualSession}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
-            >
-              <Plus size={14} />
-              <span>تسجيل جلسة يدوية</span>
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {onOpenAllTimeMatrix && (
+              <button
+                className="btn btn-sm"
+                onClick={onOpenAllTimeMatrix}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontWeight: 700,
+                  borderColor: 'rgba(56, 189, 248, 0.4)',
+                  color: 'var(--accent-secondary)'
+                }}
+              >
+                <span>المصفوفة الكبرى لكل الأيام ⚡</span>
+              </button>
+            )}
+            {onOpenManualSession && (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={onOpenManualSession}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+              >
+                <Plus size={14} />
+                <span>تسجيل جلسة يدوية</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

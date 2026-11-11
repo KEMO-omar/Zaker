@@ -43,6 +43,7 @@ import { ExamsView } from './views/ExamsView';
 import { FocusView } from './views/FocusView';
 import { WastedView } from './views/WastedView';
 import { LogView } from './views/LogView';
+import { AllTimeMatrixView } from './views/AllTimeMatrixView';
 
 export const App: React.FC = () => {
   // Navigation & Theme
@@ -1008,6 +1009,11 @@ export const App: React.FC = () => {
             onOpenNewLectureModal={() => setIsNewLectureModalOpen(true)}
             onOpenEditLecture={handleOpenEditLecture}
             onDeleteLecture={handleDeleteLecture}
+            onStartFocus={(subjId) => {
+              setActiveSubjId(subjId);
+              setCurrentTab('focusView');
+              setIsRunning(true);
+            }}
           />
         )}
 
@@ -1062,6 +1068,26 @@ export const App: React.FC = () => {
             subjects={subjects}
             onDeleteSession={handleDeleteSession}
             onOpenManualSession={() => setIsManualSessionOpen(true)}
+            onOpenAllTimeMatrix={() => setCurrentTab('allTimeHeatmapView')}
+          />
+        )}
+
+        {/* VIEW 9: ALL-TIME STUDY MATRIX (DEDICATED PAGE) */}
+        {currentTab === 'allTimeHeatmapView' && (
+          <AllTimeMatrixView
+            sessions={sessions}
+            subjects={subjects}
+            onStartFocus={(subjId) => {
+              setActiveSubjId(subjId);
+              setCurrentTab('focusView');
+              setIsRunning(true);
+            }}
+            onSessionsUpdated={(updatedSessions) => {
+              setSessions(updatedSessions);
+              try {
+                localStorage.setItem('kareem_sessions', JSON.stringify(updatedSessions));
+              } catch (e) {}
+            }}
           />
         )}
       </main>

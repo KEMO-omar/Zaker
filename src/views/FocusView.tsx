@@ -9,7 +9,10 @@ import {
   Quote,
   Clock,
   RotateCcw,
-  BookOpen
+  BookOpen,
+  Zap,
+  Flame,
+  ShieldAlert
 } from 'lucide-react';
 
 interface FocusViewProps {
@@ -46,6 +49,7 @@ export const FocusView: React.FC<FocusViewProps> = ({
   quotes
 }) => {
   const [quoteIndex, setQuoteIndex] = useState(0);
+  const [isRescueActive, setIsRescueActive] = useState<boolean>(false);
 
   // Cycle quote every 15 seconds
   useEffect(() => {
@@ -58,6 +62,14 @@ export const FocusView: React.FC<FocusViewProps> = ({
 
   const activeSubj = subjects.find((s) => s.id === activeSubjId) || subjects[0];
 
+  const handleStartRescueSession = () => {
+    setIsRescueActive(true);
+    onTaskNoteChange(`🚨 جلسة إنقاذ طارئة: كسر حاجز التراكم في ${activeSubj.name} (25 دقيقة)`);
+    if (!isRunning) {
+      onStartTimer();
+    }
+  };
+
   const hours = Math.floor(elapsedSeconds / 3600);
   const minutes = Math.floor((elapsedSeconds % 3600) / 60);
   const seconds = elapsedSeconds % 60;
@@ -69,12 +81,65 @@ export const FocusView: React.FC<FocusViewProps> = ({
     try {
       confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
     } catch (e) {}
+    setIsRescueActive(false);
     onFinishSession();
   };
 
   return (
     <section className="view-panel active">
       <div className="focus-view">
+        {/* Emergency Rescue Kickstart Banner */}
+        <div style={{
+          maxWidth: 620,
+          width: '100%',
+          margin: '0 auto 16px',
+          padding: '12px 18px',
+          borderRadius: 12,
+          background: isRescueActive ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.15))' : 'rgba(255, 255, 255, 0.03)',
+          border: `1px solid ${isRescueActive ? 'rgba(239, 68, 68, 0.4)' : 'var(--border-subtle)'}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)', flexShrink: 0 }}>
+              <ShieldAlert size={18} />
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-main)' }}>
+                {isRescueActive ? '🚨 وضع الإنقاذ وكسر التراكم نشط الآن' : 'حاسس بتراكم ومش عارف تبدأ منين؟'}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {isRescueActive
+                  ? 'يا دكتور كريم: اهدأ تماماً.. ركز فقط في الـ 25 دقيقة دول وانسى بقية التراكم، خطوة بخطوة وهترجع للقمة!'
+                  : 'متفكرش في الـ 100 حاجة مرة واحدة! ابدأ جلسة إنقاذ 25 دقيقة فقط بدون تفكير لكسر الشلل النفسي'}
+              </div>
+            </div>
+          </div>
+          {!isRescueActive && !isRunning && (
+            <button
+              className="btn btn-sm"
+              onClick={handleStartRescueSession}
+              style={{
+                background: 'linear-gradient(90deg, #ef4444, #f59e0b)',
+                color: '#fff',
+                borderColor: 'transparent',
+                fontWeight: 800,
+                fontSize: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 14px'
+              }}
+            >
+              <Zap size={14} fill="currentColor" />
+              <span>ابدأ جلسة إنقاذ (25 دقيقة) ⚡</span>
+            </button>
+          )}
+        </div>
+
         {/* Top Controls: Subject Selection */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>المادة قيد المذاكرة:</span>
