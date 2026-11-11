@@ -162,7 +162,16 @@ export const LecturesView: React.FC<LecturesViewProps> = ({
                       {lec.code}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {lec.tag && (
+                      {(lec.tag === 'سنتر' || lec.type === 'center' || (lec.dueDay && lec.dueDay.includes('سنتر')) || (lec.packageName && lec.packageName.includes('سنتر'))) ? (
+                        <span style={{ fontSize: 10, color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+                          🏢 سنتر
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+                          💻 منصة
+                        </span>
+                      )}
+                      {lec.tag && lec.tag !== 'سنتر' && lec.tag !== 'منصة' && (
                         <span style={{ fontSize: 10, color: 'var(--text-muted)', background: 'rgba(255, 255, 255, 0.04)', padding: '2px 6px', borderRadius: 4 }}>
                           {lec.tag}
                         </span>

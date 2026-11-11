@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Subject, Session, Exemption, WeeklyTask, Lecture, ExamRecord, ThemeType, ViewTab } from './types';
+import { Subject, Session, Exemption, WeeklyTask, Lecture, ExamRecord, ThemeType, ViewTab, ArchivedWeek } from './types';
 import {
   DEFAULT_SUBJECTS,
   fetchDbData,
@@ -66,6 +66,7 @@ export const App: React.FC = () => {
   const [exemptions, setExemptions] = useState<Exemption[]>([]);
   const [weeklyTasks, setWeeklyTasks] = useState<WeeklyTask[]>([]);
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string | number>>(new Set());
+  const [archivedWeeks, setArchivedWeeks] = useState<ArchivedWeek[]>([]);
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [exams, setExams] = useState<ExamRecord[]>([]);
   const [customAiInstructions, setCustomAiInstructions] = useState<string>('');
@@ -210,6 +211,8 @@ export const App: React.FC = () => {
         if (rawTasks) setWeeklyTasks(JSON.parse(rawTasks));
         const rawCompleted = localStorage.getItem('kareem_completed_task_ids');
         if (rawCompleted) setCompletedTaskIds(new Set(JSON.parse(rawCompleted)));
+        const rawArchives = localStorage.getItem('kareem_archived_weeks');
+        if (rawArchives) setArchivedWeeks(JSON.parse(rawArchives));
         const rawLectures = localStorage.getItem('kareem_lectures');
         if (rawLectures) setLectures(JSON.parse(rawLectures));
         const rawExams = localStorage.getItem('kareem_exams');
@@ -259,6 +262,10 @@ export const App: React.FC = () => {
         if (Array.isArray(db.completedTaskIds)) {
           setCompletedTaskIds(new Set(db.completedTaskIds));
           try { localStorage.setItem('kareem_completed_task_ids', JSON.stringify(db.completedTaskIds)); } catch (e) {}
+        }
+        if (Array.isArray(db.archivedWeeks)) {
+          setArchivedWeeks(db.archivedWeeks);
+          try { localStorage.setItem('kareem_archived_weeks', JSON.stringify(db.archivedWeeks)); } catch (e) {}
         }
         if (Array.isArray(db.lectures) && db.lectures.length > 0) {
           setLectures(db.lectures);
@@ -519,6 +526,34 @@ export const App: React.FC = () => {
     } catch (e) {}
     showToast('تم حذف المهمة من القاعدة');
     triggerAutoSync({ weeklyTasks: updated });
+  };
+
+  // Bulk update all tasks
+  const handleUpdateAllTasks = (updated: WeeklyTask[]) => {
+    setWeeklyTasks(updated);
+    try {
+      localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
+    } catch (e) {}
+    triggerAutoSync({ weeklyTasks: updated });
+  };
+
+  // Archive Current Week
+  const handleArchiveWeek = (archive: ArchivedWeek, cleanTasks: WeeklyTask[]) => {
+    const updatedArchives = [archive, ...archivedWeeks];
+    setArchivedWeeks(updatedArchives);
+    setWeeklyTasks(cleanTasks);
+    setCompletedTaskIds(new Set());
+    try {
+      localStorage.setItem('kareem_archived_weeks', JSON.stringify(updatedArchives));
+      localStorage.setItem('kareem_weekly_tasks', JSON.stringify(cleanTasks));
+      localStorage.setItem('kareem_completed_task_ids', JSON.stringify([]));
+    } catch (e) {}
+    showToast('تمت أرشفة الأسبوع بنجاح وبدء أسبوع جديد نظيف!');
+    triggerAutoSync({
+      archivedWeeks: updatedArchives,
+      weeklyTasks: cleanTasks,
+      completedTaskIds: []
+    });
   };
 
   // Lecture Toggle
@@ -979,7 +1014,7 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* VIEW 3: WEEKLY TASKS & 4-DAY POSTER */}
+        {/* VIEW 3: WEEKLY TASKS & DYNAMIC INTERACTIVE BOARD */}
         {currentTab === 'weeklyView' && (
           <WeeklyView
             tasks={weeklyTasks}
@@ -989,6 +1024,9 @@ export const App: React.FC = () => {
             onOpenNewTaskModal={() => setIsNewTaskModalOpen(true)}
             onOpenEditTask={handleOpenEditTask}
             onDeleteTask={handleDeleteTask}
+            onUpdateAllTasks={handleUpdateAllTasks}
+            archivedWeeks={archivedWeeks}
+            onArchiveWeek={handleArchiveWeek}
             sessions={sessions}
             exams={exams}
             lectures={lectures}

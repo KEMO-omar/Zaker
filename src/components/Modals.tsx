@@ -1119,16 +1119,78 @@ interface NewLectureModalProps {
   onSave: (lecture: Omit<Lecture, 'id' | 'isDone'>) => void;
 }
 
+export const LECTURE_AUTOMATION_PRESETS = [
+  {
+    key: 'english',
+    label: 'إنجليزي (أ. أيمن عبد العاطي - سنتر السبت والثلاثاء 7:00 م)',
+    subjId: 'english',
+    teacher: 'أ. أيمن عبد العاطي (سنتر)',
+    dueDay: 'السبت والثلاثاء (الساعة 7:00 مساءً - سنتر)',
+    tag: 'سنتر',
+    type: 'center'
+  },
+  {
+    key: 'arabic_center',
+    label: 'عربي سنتر (أ. تقوى مرزوق - سنتر السبت والثلاثاء 4:00 ع)',
+    subjId: 'arabic',
+    teacher: 'أ. تقوى مرزوق (سنتر)',
+    dueDay: 'السبت والثلاثاء (الساعة 4:00 مساءً - سنتر)',
+    tag: 'سنتر',
+    type: 'center'
+  },
+  {
+    key: 'history',
+    label: 'تاريخ (أ. أحمد سمير - منصة الإثنين والخميس 1:00 ظ)',
+    subjId: 'history',
+    teacher: 'أ. أحمد سمير (منصة)',
+    dueDay: 'الإثنين والخميس (الساعة 1:00 ظهراً - منصة)',
+    tag: 'منصة',
+    type: 'platform'
+  },
+  {
+    key: 'physics',
+    label: 'فيزياء (أ. محمد عبد المعبود - منصة الأحد والأربعاء)',
+    subjId: 'physics',
+    teacher: 'أ. محمد عبد المعبود (منصة)',
+    dueDay: 'الأحد والأربعاء',
+    tag: 'منصة',
+    type: 'platform'
+  },
+  {
+    key: 'arabic_platform',
+    label: 'عربي منصة (أ. محمد صلاح - منصة السبت والثلاثاء)',
+    subjId: 'arabic',
+    teacher: 'أ. محمد صلاح (منصة)',
+    dueDay: 'السبت والثلاثاء',
+    tag: 'منصة',
+    type: 'platform'
+  }
+];
+
 export const NewLectureModal: React.FC<NewLectureModalProps> = ({ isOpen, onClose, subjects, onSave }) => {
+  const [selectedPreset, setSelectedPreset] = useState<string>('physics');
   const [code, setCode] = useState('المحاضرة (01)');
   const [title, setTitle] = useState('');
   const [details, setDetails] = useState('');
-  const [dueDay, setDueDay] = useState('الأحد / الأربعاء');
+  const [dueDay, setDueDay] = useState('الأحد والأربعاء');
   const [subjId, setSubjId] = useState('physics');
-  const [packageName, setPackageName] = useState('باقة الفيزياء');
-  const [tag, setTag] = useState('متاح الآن');
+  const [packageName, setPackageName] = useState('باقة الفيزياء (أ. محمد عبد المعبود)');
+  const [tag, setTag] = useState('منصة');
+  const [autoFilledNotice, setAutoFilledNotice] = useState<string>('تم تطبيق قاعدة الأتمتة للفيزياء (أ. محمد عبد المعبود)');
 
   if (!isOpen) return null;
+
+  const handleApplyPreset = (key: string) => {
+    setSelectedPreset(key);
+    const preset = LECTURE_AUTOMATION_PRESETS.find(p => p.key === key);
+    if (preset) {
+      setSubjId(preset.subjId);
+      setPackageName(preset.teacher);
+      setDueDay(preset.dueDay);
+      setTag(preset.tag);
+      setAutoFilledNotice(`تم التعرف التلقائي: ${preset.teacher} | ${preset.dueDay}`);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1141,22 +1203,47 @@ export const NewLectureModal: React.FC<NewLectureModalProps> = ({ isOpen, onClos
       subjId,
       packageName,
       tag,
-      type: 'lecture'
+      type: tag === 'سنتر' ? 'center' : 'platform'
     });
     onClose();
   };
 
   return (
     <div className="modal-overlay show" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 540 }}>
         <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <BookOpen size={18} style={{ color: 'var(--accent-primary)' }} />
-          <span>إضافة محاضرة منصة أو سنتر</span>
+          <span>إضافة محاضرة منصة أو سنتر (أتمتة ذكية)</span>
         </div>
         <form onSubmit={handleSubmit}>
+          {/* Smart Automation Rule Picker */}
+          <div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: 'rgba(86, 194, 166, 0.08)', border: '1px solid rgba(86, 194, 166, 0.25)' }}>
+            <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent-primary)', display: 'block', marginBottom: 6 }}>
+              ⚡ اختيار القاعدة الذكية للأتمتة التلقائية:
+            </label>
+            <select
+              className="input-field"
+              value={selectedPreset}
+              onChange={(e) => handleApplyPreset(e.target.value)}
+              style={{ fontWeight: 700, margin: 0 }}
+            >
+              {LECTURE_AUTOMATION_PRESETS.map(p => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            {autoFilledNotice && (
+              <div style={{ fontSize: 11, color: 'var(--accent-secondary)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Sparkles size={13} />
+                <span>{autoFilledNotice}</span>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>المادة:</label>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>المادة المقترنة:</label>
               <select className="input-field" value={subjId} onChange={(e) => setSubjId(e.target.value)}>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
@@ -1194,18 +1281,18 @@ export const NewLectureModal: React.FC<NewLectureModalProps> = ({ isOpen, onClos
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>مواعيد التنزيل / الحضور:</label>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>مواعيد التنزيل / الحضور (تلقائي):</label>
               <input type="text" className="input-field" value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>الباقة / المدرس:</label>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>المدرس / الباقة (تلقائي):</label>
               <input type="text" className="input-field" value={packageName} onChange={(e) => setPackageName(e.target.value)} />
             </div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
             <button type="button" className="btn" onClick={onClose}>إلغاء</button>
-            <button type="submit" className="btn btn-primary">إضافة المحاضرة</button>
+            <button type="submit" className="btn btn-primary">إضافة المحاضرة وحفظها</button>
           </div>
         </form>
       </div>
@@ -1296,6 +1383,31 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit}>
+          {/* Quick Preset Selector */}
+          <div style={{ marginBottom: 12, padding: 8, borderRadius: 8, background: 'rgba(86, 194, 166, 0.08)', border: '1px solid rgba(86, 194, 166, 0.2)' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-primary)', display: 'block', marginBottom: 4 }}>
+              ⚡ تطبيق قاعدة أتمتة المدرس والمواعيد:
+            </span>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {LECTURE_AUTOMATION_PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    setSubjId(p.subjId);
+                    setPackageName(p.teacher);
+                    setDueDay(p.dueDay);
+                    setTag(p.tag);
+                  }}
+                  style={{ fontSize: 10, padding: '2px 8px' }}
+                >
+                  {p.label.split(' - ')[0]}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>المادة:</label>

@@ -46,9 +46,25 @@ export interface WeeklyTask {
   subjId: string;
   text: string;
   priority?: 'class' | 'exam' | 'urgent' | 'high' | 'normal';
+  category?: 'center' | 'platform' | 'study' | 'exam' | 'manual';
+  teacher?: string;
+  time?: string;
+  slotIndex?: number; // 0 to 9
   isRolled?: boolean;
+  originalDayId?: string;
   contextInfo?: string;
   overlay?: TaskOverlay;
+}
+
+export interface ArchivedWeek {
+  id: string;
+  weekTitle: string;
+  archivedAt: string;
+  totalCount: number;
+  completedCount: number;
+  completionPct: number;
+  tasks: WeeklyTask[];
+  notes?: string;
 }
 
 export interface Lecture {
