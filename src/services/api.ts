@@ -72,6 +72,8 @@ function sanitizeFirebaseData(fb: any) {
     exemptions: toArray(fb.exemptions).sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)),
     weeklyTasks: toArray(fb.weeklyTasks),
     completedTaskIds: toArray(fb.completedTaskIds),
+    archivedWeeks: toArray(fb.archivedWeeks),
+    activeWeekStartKey: fb.activeWeekStartKey || '',
     lectures: toArray(fb.lectures),
     exams: toArray(fb.exams).sort((a: any, b: any) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()),
     subjects: subjectsWithNotebooks,
@@ -126,6 +128,8 @@ export async function saveDbData(data: {
   exemptions?: Exemption[];
   weeklyTasks?: WeeklyTask[];
   completedTaskIds?: (string | number)[];
+  archivedWeeks?: any[];
+  activeWeekStartKey?: string;
   lectures?: Lecture[];
   exams?: ExamRecord[];
   subjects?: Subject[];
@@ -174,6 +178,8 @@ export async function saveDbData(data: {
       fetch(`${FIREBASE_RTDB_URL}/sessions.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sessionsObj) }),
       fetch(`${FIREBASE_RTDB_URL}/exemptions.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(exemptionsObj) }),
       fetch(`${FIREBASE_RTDB_URL}/subjects.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.subjects)) }),
+      ...(data.archivedWeeks ? [fetch(`${FIREBASE_RTDB_URL}/archivedWeeks.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.archivedWeeks)) })] : []),
+      ...(data.activeWeekStartKey ? [fetch(`${FIREBASE_RTDB_URL}/activeWeekStartKey.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data.activeWeekStartKey) })] : []),
       fetch(`${FIREBASE_RTDB_URL}/customAiInstructions.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data.customAiInstructions || '') }),
       fetch(`${FIREBASE_RTDB_URL}/lastUpdated.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now()) })
     ]);
@@ -529,19 +535,44 @@ export async function callAiMonitor(studyData: any, customInstructions?: string,
   } catch (err) {}
 
   const todayHours = ((studyData?.todayStudyMins || 0) / 60).toFixed(1);
-  return `### ⚡ تقرير الرصد الحقيقي اللحظي لكريم عمر (المواد الأربعة)
+  const doneLecs = studyData?.completedLectures ?? 26;
+  const totalLecs = studyData?.totalLectures ?? 82;
+  const remLecs = totalLecs - doneLecs;
+  const lecsPct = Math.round((doneLecs / totalLecs) * 100);
 
-> "يا كريم.. مجموع تانية ثانوي مدمج مع تالتة، مفيش ثانية ولا درجة مسموح بتضييعها في الفيزياء أو العربي أو الإنجليزي أو التاريخ. حلم كلية الطب بيتصنع دلوقتي!"
+  return `### ⚡ تقرير الرصد والتشخيص الأكاديمي الشامل (د. كريم عمر) 🦁
 
-### 📊 تشخيص الموقف الفعلي للمواد:
-- **إنجاز اليوم:** مسجل <strong class="tabular">${todayHours} ساعة</strong>. المستهدف اليومي: 6 ساعات نقية.
-- **موقف المواد الأربعة والدرجات:**
-  1. **الفيزياء (أ. عبد المعبود):** 38/40 (96%) ✅ ممتاز، لكن محاضرات كمية التحرك 7 و 8 و 9 معلقة.
-  2. **اللغة العربية (أ. محمد صلاح ومس تقوى):** 96% و 95% ✅ مستقر، وشيت المشتقات بحاجة لإكمال.
-  3. **اللغة الإنجليزية (مستر أيمن):** كويز Unit 1 (92%) و Unit 2 (89%) كلاهما تحت شرط الـ 95%.
-  4. **التاريخ (مستر أحمد سمير):** أقل مادة في ساعات المذاكرة وكويزك 94% يحتاج صعود فوري للـ 95%+.
+> "يا كريم.. مجموع تانية ثانوي مدمج مع تالتة، مفيش ثانية ولا درجة مسموح بتضييعها في الفيزياء أو العربي أو الإنجليزي أو التاريخ. حلم كلية الطب البشري بيتصنع في لحظات التعب دي!"
 
-**القرار الفوري:** ركز على موازنة ساعاتك، واقفل جلسة تركيز 45 دقيقة الآن في المادة الأحق بالبدء! 🦁`;
+---
+
+### 📊 1. موقف محاضرات المنصات والسناتر الـ 82:
+- **المحاضرات المنجزة:** <strong class="tabular" style="color: var(--accent-primary);">${doneLecs} من ${totalLecs} محاضرة</strong> (${lecsPct}%).
+- **المتراكم المتبقي:** <strong class="tabular" style="color: var(--warning);">${remLecs} محاضرة</strong> تحتاج توزيعاً حاسماً على أيام الأسبوع الحالية لتصفيتها أولاً بأول.
+- **إنجاز اليوم المباشر:** مسجل <strong class="tabular">${todayHours} ساعة</strong>.
+
+---
+
+### 🗓️ 2. متابعة المواعيد المحدثة للمدرسين والسناتر:
+1. **اللغة الإنجليزية (أ. أيمن عبد العاطي):**
+   - **المواعيد الرسمية:** السبت والثلاثاء (الساعة 7:00 مساءً - سنتر).
+   - **الهدف الحاسم:** تقفيل امتحان **Unit 3 الشامل** بـ 50/50 ولا تراجع عن الـ 95%.
+2. **اللغة العربية (أ. تقوى مرزوق & أ. محمد صلاح):**
+   - **المواعيد:** سنتر أ. تقوى (السبت والثلاثاء 4:00 ع) + منصة أ. صلاح (السبت محاضرة / الثلاثاء واجب وكويز).
+   - **المهمة الكبرى:** الاستعداد التام لـ **امتحان عربي الوحدة الثانية الشامل (امتحان الجوائز والتكريم 🏆)**.
+3. **الفيزياء (أ. محمد عبد المعبود):**
+   - **المواعيد:** منصة الأحد والأربعاء.
+   - **الموقف:** درجاتك 96% ممتازة لكن محاضرات متجهات السرعة وقوانين الحركة بحاجة لإنهاء واجباتها دون تأجيل.
+4. **التاريخ (أ. أحمد سمير):**
+   - **المواعيد:** الإثنين والخميس (الساعة 1:00 ظهراً - سنتر/منصة).
+   - **التنبيه:** التاريخ أقل المواد زمناً في جدولك، ومطلوب رفع وتيرة المذاكرة للوصول لـ 95%+.
+
+---
+
+### 🚨 3. التوجيه التنفيذي العاجل للمراقب:
+1. افتح **جدول الأسبوع التفاعلي** واضغط **\`⚡ توزيع المحاضرات المتبقية آلياً\`** لملء الخانات بالمحاضرات المتراكمة.
+2. التزم بتقسيم بومودورو لليوم (50 دقيقة تركيز / 10 دقائق استراحة) لتصفية ما لا يقل عن 3 محاضرات اليوم.
+3. افتح **غرفة التركيز** حالاً وابدأ أول جلسة بدون أي مشتتات! 🦁`;
 }
 
 export async function callAiInterrogate(backlogData: any, customInstructions?: string): Promise<string> {

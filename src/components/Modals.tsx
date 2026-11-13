@@ -895,88 +895,287 @@ export const ExamReactionModal: React.FC<ExamReactionModalProps> = ({
   );
 };
 
+// ================= TASK CATEGORY DEFINITIONS =================
+const TASK_CATEGORIES: Array<{
+  id: NonNullable<WeeklyTask['category']>;
+  label: string;
+  emoji: string;
+  color: string;
+  bg: string;
+}> = [
+  { id: 'manual', label: 'مهمة خاصة / طارئة', emoji: '⚡', color: '#f97316', bg: 'rgba(249, 115, 22, 0.14)' },
+  { id: 'study', label: 'مذاكرة وحل شيت', emoji: '📖', color: '#10b981', bg: 'rgba(16, 185, 129, 0.14)' },
+  { id: 'platform', label: 'محاضرة للإنجاز', emoji: '💻', color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.14)' },
+  { id: 'review', label: 'مراجعة وتثبيت', emoji: '🔄', color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.14)' },
+  { id: 'center', label: 'سنتر / درس حضوري', emoji: '🏢', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.14)' },
+  { id: 'exam', label: 'امتحان / كويز', emoji: '🏆', color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.14)' }
+];
+
+const TASK_DAY_OPTIONS = [
+  { id: 'sat', label: 'السبت' },
+  { id: 'sun', label: 'الأحد' },
+  { id: 'mon', label: 'الاثنين' },
+  { id: 'tue', label: 'الثلاثاء' },
+  { id: 'wed', label: 'الأربعاء' },
+  { id: 'thu', label: 'الخميس' },
+  { id: 'fri', label: 'الجمعة' },
+  { id: 'backlog', label: 'المتراكم' }
+];
+
 // ================= NEW TASK MODAL =================
 interface NewTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   subjects: Subject[];
-  onSave: (task: { dayId: string; subjId: string; text: string; priority: WeeklyTask['priority'] }) => void;
+  onSave: (task: {
+    dayId: string;
+    subjId: string;
+    text: string;
+    priority: WeeklyTask['priority'];
+    category?: WeeklyTask['category'];
+    teacher?: string;
+    time?: string;
+    slotIndex?: number;
+    isUserAdded?: boolean;
+  }) => void;
 }
 
 export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, subjects, onSave }) => {
   const [dayId, setDayId] = useState('sat');
-  const [subjId, setSubjId] = useState('arabic');
+  const [subjId, setSubjId] = useState('physics');
+  const [category, setCategory] = useState<NonNullable<WeeklyTask['category']>>('manual');
   const [text, setText] = useState('');
-  const [priority, setPriority] = useState<WeeklyTask['priority']>('normal');
+  const [teacher, setTeacher] = useState('');
+  const [time, setTime] = useState('');
+  const [priority, setPriority] = useState<WeeklyTask['priority']>('high');
+  const [placeInBottomSlot, setPlaceInBottomSlot] = useState<boolean>(true);
 
   if (!isOpen) return null;
+
+  const selectedSubject = subjects.find(s => s.id === subjId);
+  const selectedCatObj = TASK_CATEGORIES.find(c => c.id === category);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
-    onSave({ dayId, subjId, text: text.trim(), priority });
+    onSave({
+      dayId,
+      subjId,
+      text: text.trim(),
+      priority: category === 'exam' ? 'exam' : category === 'center' ? 'class' : priority,
+      category,
+      teacher: teacher.trim() || undefined,
+      time: time.trim() || undefined,
+      slotIndex: placeInBottomSlot ? 9 : undefined,
+      isUserAdded: true
+    });
     setText('');
+    setTeacher('');
+    setTime('');
     onClose();
   };
 
   return (
     <div className="modal-overlay show" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Calendar size={18} style={{ color: 'var(--accent-primary)' }} />
-          <span>إضافة مهمة جديدة للجدول الأسبوعي</span>
+      <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Calendar size={18} style={{ color: 'var(--accent-primary)' }} />
+            <span>إضافة مهمة جديدة للجدول الأسبوعي</span>
+          </div>
+          {selectedSubject && selectedCatObj && (
+            <span style={{
+              fontSize: 11,
+              padding: '3px 10px',
+              borderRadius: 8,
+              background: selectedCatObj.bg,
+              color: selectedCatObj.color,
+              border: `1px solid ${selectedCatObj.color}40`,
+              fontWeight: 700
+            }}>
+              {selectedCatObj.emoji} {selectedSubject.name}
+            </span>
+          )}
         </div>
-        <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>اليوم المستهدف:</label>
-              <select className="input-field" value={dayId} onChange={(e) => setDayId(e.target.value)}>
-                <option value="sat">السبت</option>
-                <option value="sun">الأحد</option>
-                <option value="mon">الاثنين</option>
-                <option value="tue">الثلاثاء</option>
-                <option value="wed">الأربعاء</option>
-                <option value="thu">الخميس</option>
-                <option value="fri">الجمعة</option>
-                <option value="backlog">المتراكم (Backlog)</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>المادة:</label>
-              <select className="input-field" value={subjId} onChange={(e) => setSubjId(e.target.value)}>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Visual Subject Selector */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              1. اختر المادة الدراسية (ستظهر بلونها واسمها على البوستر):
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+              {subjects.map((s) => {
+                const active = subjId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSubjId(s.id)}
+                    style={{
+                      padding: '8px 6px',
+                      borderRadius: 10,
+                      border: `2px solid ${active ? s.color : 'var(--border-subtle)'}`,
+                      background: active ? `${s.color}22` : 'var(--bg-elevated)',
+                      color: active ? s.color : 'var(--text-main)',
+                      fontWeight: active ? 800 : 600,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
+                    <span>{s.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
+          {/* Visual Category Selector */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>نص المهمة:</label>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              2. تصنيف المهمة (يظهر كشارة مميزة على الجدول):
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {TASK_CATEGORIES.map((cat) => {
+                const active = category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    style={{
+                      padding: '8px 6px',
+                      borderRadius: 8,
+                      border: `1.5px solid ${active ? cat.color : 'var(--border-subtle)'}`,
+                      background: active ? cat.bg : 'var(--bg-elevated)',
+                      color: active ? cat.color : 'var(--text-muted)',
+                      fontWeight: active ? 800 : 600,
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 5
+                    }}
+                  >
+                    <span>{cat.emoji}</span>
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Target Day Chips */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              3. اليوم المستهدف:
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {TASK_DAY_OPTIONS.map((d) => {
+                const active = dayId === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setDayId(d.id)}
+                    className={`btn btn-sm ${active ? 'btn-primary' : ''}`}
+                    style={{ fontSize: 11, padding: '4px 10px' }}
+                  >
+                    {d.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Task Text */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              4. عنوان وتفاصيل المهمة:
+            </label>
             <input
               type="text"
               className="input-field"
-              placeholder="مثال: حل شيت الفيزياء على كمية التحرك"
+              placeholder="مثال: حل شيت الفيزياء على كمية التحرك أو مراجعة Unit 3"
               value={text}
               onChange={(e) => setText(e.target.value)}
               required
+              style={{ margin: 0 }}
             />
           </div>
 
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>مستوى الأولوية:</label>
-            <select className="input-field" value={priority} onChange={(e) => setPriority(e.target.value as any)}>
-              <option value="normal">عادي</option>
-              <option value="high">هام ومطلوب</option>
-              <option value="urgent">عاجل جداً</option>
-              <option value="class">موعد حصة / سنتر</option>
-              <option value="exam">امتحان أو كويز</option>
-            </select>
+          {/* Priority + Optional Details */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>الأولوية:</label>
+              <select className="input-field" value={priority} onChange={(e) => setPriority(e.target.value as any)} style={{ margin: 0, fontSize: 12 }}>
+                <option value="urgent">عاجل جداً 🚨</option>
+                <option value="high">هام ومطلوب ⭐</option>
+                <option value="normal">عادي</option>
+                <option value="exam">امتحان / كويز 🏆</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>المدرس (اختياري):</label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="مثال: أ. عبد المعبود"
+                value={teacher}
+                onChange={(e) => setTeacher(e.target.value)}
+                style={{ margin: 0, fontSize: 12 }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>الموعد (اختياري):</label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="مثال: 6:00 مساءً"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                style={{ margin: 0, fontSize: 12 }}
+              />
+            </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+          {/* Placement option: Bottom dedicated manual slot vs auto slot */}
+          {dayId !== 'backlog' && (
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              borderRadius: 8,
+              background: 'rgba(249, 115, 22, 0.08)',
+              border: '1px solid rgba(249, 115, 22, 0.25)',
+              cursor: 'pointer',
+              fontSize: 12
+            }}>
+              <input
+                type="checkbox"
+                checked={placeInBottomSlot}
+                onChange={(e) => setPlaceInBottomSlot(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: '#f97316' }}
+              />
+              <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                وضع المهمة في الخانة الأخيرة أسفل الجدول (الخانة اليدوية المخصصة) ⚡
+              </span>
+            </label>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
             <button type="button" className="btn" onClick={onClose}>إلغاء</button>
-            <button type="submit" className="btn btn-primary">إضافة المهمة</button>
+            <button type="submit" className="btn btn-primary">
+              حفظ وإظهار على الجدول ✓
+            </button>
           </div>
         </form>
       </div>
@@ -1004,14 +1203,20 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
 }) => {
   const [dayId, setDayId] = useState('sat');
   const [subjId, setSubjId] = useState('arabic');
+  const [category, setCategory] = useState<NonNullable<WeeklyTask['category']>>('study');
   const [text, setText] = useState('');
+  const [teacher, setTeacher] = useState('');
+  const [time, setTime] = useState('');
   const [priority, setPriority] = useState<WeeklyTask['priority']>('normal');
 
   useEffect(() => {
     if (task) {
       setDayId(task.dayId);
       setSubjId(task.subjId);
+      setCategory(task.category || 'study');
       setText(task.text);
+      setTeacher(task.teacher || '');
+      setTime(task.time || '');
       setPriority(task.priority || 'normal');
     }
   }, [task]);
@@ -1026,7 +1231,10 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
       ...task,
       dayId,
       subjId,
+      category,
       text: text.trim(),
+      teacher: teacher.trim() || undefined,
+      time: time.trim() || undefined,
       priority
     });
     onClose();
@@ -1034,11 +1242,11 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
 
   return (
     <div className="modal-overlay show" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Pencil size={18} style={{ color: 'var(--accent-primary)' }} />
-            <span>تعديل المهمة</span>
+            <span>تعديل بيانات وتصنيف المهمة</span>
           </div>
           <button
             type="button"
@@ -1054,27 +1262,96 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Visual Subject Selector */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              المادة الدراسية:
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+              {subjects.map((s) => {
+                const active = subjId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSubjId(s.id)}
+                    style={{
+                      padding: '8px 6px',
+                      borderRadius: 10,
+                      border: `2px solid ${active ? s.color : 'var(--border-subtle)'}`,
+                      background: active ? `${s.color}22` : 'var(--bg-elevated)',
+                      color: active ? s.color : 'var(--text-main)',
+                      fontWeight: active ? 800 : 600,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
+                    <span>{s.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Visual Category Selector */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              تصنيف المهمة:
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {TASK_CATEGORIES.map((cat) => {
+                const active = category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    style={{
+                      padding: '8px 6px',
+                      borderRadius: 8,
+                      border: `1.5px solid ${active ? cat.color : 'var(--border-subtle)'}`,
+                      background: active ? cat.bg : 'var(--bg-elevated)',
+                      color: active ? cat.color : 'var(--text-muted)',
+                      fontWeight: active ? 800 : 600,
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 5
+                    }}
+                  >
+                    <span>{cat.emoji}</span>
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>اليوم المستهدف:</label>
-              <select className="input-field" value={dayId} onChange={(e) => setDayId(e.target.value)}>
-                <option value="sat">السبت</option>
-                <option value="sun">الأحد</option>
-                <option value="mon">الاثنين</option>
-                <option value="tue">الثلاثاء</option>
-                <option value="wed">الأربعاء</option>
-                <option value="thu">الخميس</option>
-                <option value="fri">الجمعة</option>
-                <option value="backlog">المتراكم (Backlog)</option>
+              <select className="input-field" value={dayId} onChange={(e) => setDayId(e.target.value)} style={{ margin: 0 }}>
+                {TASK_DAY_OPTIONS.map(d => (
+                  <option key={d.id} value={d.id}>{d.label}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>المادة:</label>
-              <select className="input-field" value={subjId} onChange={(e) => setSubjId(e.target.value)}>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>مستوى الأولوية:</label>
+              <select className="input-field" value={priority} onChange={(e) => setPriority(e.target.value as any)} style={{ margin: 0 }}>
+                <option value="normal">عادي</option>
+                <option value="high">هام ومطلوب</option>
+                <option value="urgent">عاجل جداً 🚨</option>
+                <option value="class">موعد حصة / سنتر</option>
+                <option value="exam">امتحان أو كويز</option>
               </select>
             </div>
           </div>
@@ -1087,21 +1364,34 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
               value={text}
               onChange={(e) => setText(e.target.value)}
               required
+              style={{ margin: 0 }}
             />
           </div>
 
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>مستوى الأولوية:</label>
-            <select className="input-field" value={priority} onChange={(e) => setPriority(e.target.value as any)}>
-              <option value="normal">عادي</option>
-              <option value="high">هام ومطلوب</option>
-              <option value="urgent">عاجل جداً</option>
-              <option value="class">موعد حصة / سنتر</option>
-              <option value="exam">امتحان أو كويز</option>
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>المدرس:</label>
+              <input
+                type="text"
+                className="input-field"
+                value={teacher}
+                onChange={(e) => setTeacher(e.target.value)}
+                style={{ margin: 0, fontSize: 12 }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>الموعد:</label>
+              <input
+                type="text"
+                className="input-field"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                style={{ margin: 0, fontSize: 12 }}
+              />
+            </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
             <button type="button" className="btn" onClick={onClose}>إلغاء</button>
             <button type="submit" className="btn btn-primary">حفظ التعديلات</button>
           </div>

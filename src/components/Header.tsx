@@ -7,9 +7,8 @@ import {
   Download,
   Bot,
   Palette,
-  ShieldCheck,
-  CheckCircle2,
-  FileDown
+  FileDown,
+  Bell
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -28,6 +27,8 @@ interface HeaderProps {
   onTriggerEmergencySync: () => void;
   onTriggerManualSync: () => void;
   onInstallPwa: () => void;
+  unreadNotificationsCount?: number;
+  onOpenNotifications?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -41,7 +42,9 @@ export const Header: React.FC<HeaderProps> = ({
   isSyncing,
   onTriggerEmergencySync,
   onTriggerManualSync,
-  onInstallPwa
+  onInstallPwa,
+  unreadNotificationsCount = 0,
+  onOpenNotifications
 }) => {
   const allHours = Math.floor(allTimeMinutes / 60);
   const allMins = Math.round(allTimeMinutes % 60);
@@ -130,6 +133,41 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="header-actions">
+        {/* Smart Notifications & Check-ins Bell */}
+        {onOpenNotifications && (
+          <button
+            id="notificationsHeaderBtn"
+            className="btn btn-sm"
+            onClick={onOpenNotifications}
+            title="التنبيهات الذكية ورسائل الاطمئنان وجدول النهاردة"
+            style={{
+              position: 'relative',
+              borderColor: unreadNotificationsCount > 0 ? '#f59e0b' : 'var(--border-subtle)',
+              color: unreadNotificationsCount > 0 ? '#fbbf24' : 'var(--text-main)',
+              background: unreadNotificationsCount > 0 ? 'rgba(245, 158, 11, 0.12)' : undefined
+            }}
+          >
+            <Bell size={14} style={{ color: unreadNotificationsCount > 0 ? '#fbbf24' : 'var(--accent-primary)' }} />
+            <span>التنبيهات</span>
+            {unreadNotificationsCount > 0 && (
+              <span
+                className="tabular"
+                style={{
+                  background: '#ef4444',
+                  color: '#fff',
+                  borderRadius: '99px',
+                  fontSize: 10,
+                  fontWeight: 800,
+                  padding: '0 5px',
+                  lineHeight: '16px'
+                }}
+              >
+                {unreadNotificationsCount}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* Emergency Sync & Call Button */}
         <button
           id="emergencySyncHeaderBtn"

@@ -1,5 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Subject, Session, Exemption, WeeklyTask, Lecture, ExamRecord, ThemeType, ViewTab, ArchivedWeek } from './types';
+import { Subject, Session, Exemption, WeeklyTask, Lecture, ExamRecord, ThemeType, ViewTab, ArchivedWeek, SmartNotificationItem } from './types';
+import {
+  buildRandomizedWeeklySchedule,
+  getWeekStartSaturdayKey,
+  injectLectureIntoSchedule
+} from './utils/scheduleEngine';
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  NotificationPrefs,
+  buildCheckInNotification,
+  buildInactivity12hNotification,
+  buildPreExamNotification,
+  getHoursSinceLastSession,
+  triggerBrowserNotification
+} from './services/notifications';
+import { NotificationCenterModal } from './components/NotificationCenterModal';
 import {
   DEFAULT_SUBJECTS,
   fetchDbData,
@@ -67,11 +82,39 @@ export const App: React.FC = () => {
   const [weeklyTasks, setWeeklyTasks] = useState<WeeklyTask[]>([]);
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string | number>>(new Set());
   const [archivedWeeks, setArchivedWeeks] = useState<ArchivedWeek[]>([]);
+  const [activeWeekStartKey, setActiveWeekStartKey] = useState<string>(() => {
+    try {
+      return localStorage.getItem('kareem_active_week_key') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [dbLoaded, setDbLoaded] = useState<boolean>(false);
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [exams, setExams] = useState<ExamRecord[]>([]);
   const [customAiInstructions, setCustomAiInstructions] = useState<string>('');
   const [quotes, setQuotes] = useState<string[]>([]);
   const [isManualSessionOpen, setIsManualSessionOpen] = useState(false);
+
+  // Smart Notifications & Periodic Check-Ins State
+  const [notifications, setNotifications] = useState<SmartNotificationItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('kareem_smart_notifications');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [activePopupNotification, setActivePopupNotification] = useState<SmartNotificationItem | null>(null);
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPrefs>(() => {
+    try {
+      const saved = localStorage.getItem('kareem_notification_prefs');
+      return saved ? { ...DEFAULT_NOTIFICATION_PREFS, ...JSON.parse(saved) } : DEFAULT_NOTIFICATION_PREFS;
+    } catch {
+      return DEFAULT_NOTIFICATION_PREFS;
+    }
+  });
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState<boolean>(false);
 
   // Focus Timer State
   const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -217,6 +260,8 @@ export const App: React.FC = () => {
         if (rawLectures) setLectures(JSON.parse(rawLectures));
         const rawExams = localStorage.getItem('kareem_exams');
         if (rawExams) setExams(JSON.parse(rawExams));
+        const rawAudit = localStorage.getItem('kareem_audit_report');
+        if (rawAudit) setAuditReport(rawAudit);
       } catch (e) {}
 
       // Server DB
@@ -275,6 +320,10 @@ export const App: React.FC = () => {
           setExams(db.exams);
           try { localStorage.setItem('kareem_exams', JSON.stringify(db.exams)); } catch (e) {}
         }
+        if (db.activeWeekStartKey) {
+          setActiveWeekStartKey(db.activeWeekStartKey);
+          try { localStorage.setItem('kareem_active_week_key', db.activeWeekStartKey); } catch (e) {}
+        }
         if (db.customAiInstructions) {
           setCustomAiInstructions(db.customAiInstructions);
         }
@@ -285,6 +334,8 @@ export const App: React.FC = () => {
           setTheme(db.theme);
         }
       }
+
+      setDbLoaded(true);
 
       // Check active running session from Firebase / LocalStorage
       try {
@@ -339,6 +390,13 @@ export const App: React.FC = () => {
     setAiMood(dynamicMood);
   }, [sessions, exams]);
 
+  // Initial audit report generation
+  useEffect(() => {
+    if (!auditReport && (lectures.length > 0 || weeklyTasks.length > 0)) {
+      handleTriggerAiAudit();
+    }
+  }, [lectures.length, weeklyTasks.length, auditReport]);
+
   // Sync Countdown Timer (60 mins)
   useEffect(() => {
     const timer = setInterval(() => {
@@ -388,6 +446,8 @@ export const App: React.FC = () => {
       exemptions: overrides?.exemptions ?? exemptions,
       weeklyTasks: overrides?.weeklyTasks ?? weeklyTasks,
       completedTaskIds: overrides?.completedTaskIds ?? Array.from(completedTaskIds),
+      archivedWeeks: overrides?.archivedWeeks ?? archivedWeeks,
+      activeWeekStartKey: overrides?.activeWeekStartKey ?? activeWeekStartKey,
       lectures: overrides?.lectures ?? lectures,
       exams: overrides?.exams ?? exams,
       subjects: overrides?.subjects ?? subjects,
@@ -396,7 +456,151 @@ export const App: React.FC = () => {
     const success = await saveDbData(dataToSave);
     setIsSyncing(false);
     return success;
-  }, [sessions, exemptions, weeklyTasks, completedTaskIds, lectures, exams, subjects, customAiInstructions]);
+  }, [sessions, exemptions, weeklyTasks, completedTaskIds, archivedWeeks, activeWeekStartKey, lectures, exams, subjects, customAiInstructions]);
+
+  // Push helper for Smart Notifications
+  const pushSmartNotification = useCallback((item: SmartNotificationItem, fireNativePush = true) => {
+    setNotifications(prev => {
+      const next = [item, ...prev].slice(0, 40);
+      try { localStorage.setItem('kareem_smart_notifications', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+    setActivePopupNotification(item);
+    if (fireNativePush) {
+      triggerBrowserNotification(item.title, item.body);
+    }
+  }, []);
+
+  // AUTO-ROLLOVER & AUTO-ARCHIVE ON SATURDAY (when Friday ends & new Saturday week begins!)
+  useEffect(() => {
+    if (!dbLoaded) return;
+
+    const checkWeekRollover = () => {
+      const currentWeekKey = getWeekStartSaturdayKey();
+
+      if (!activeWeekStartKey) {
+        setActiveWeekStartKey(currentWeekKey);
+        try { localStorage.setItem('kareem_active_week_key', currentWeekKey); } catch (e) {}
+        return;
+      }
+
+      if (activeWeekStartKey !== currentWeekKey) {
+        // Archive previous finished week as-is (completed stays completed, uncompleted stays uncompleted in snapshot)
+        const total = weeklyTasks.length;
+        const done = weeklyTasks.filter(
+          t => completedTaskIds.has(t.id) || completedTaskIds.has(String(t.id))
+        ).length;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        const newArchive: ArchivedWeek = {
+          id: `auto_archive_${activeWeekStartKey}_${Date.now()}`,
+          weekTitle: `أسبوع ${activeWeekStartKey}`,
+          weekKey: activeWeekStartKey,
+          archivedAt: new Date().toISOString(),
+          totalCount: total,
+          completedCount: done,
+          completionPct: pct,
+          tasks: [...weeklyTasks]
+        };
+
+        const updatedArchives = total > 0 ? [newArchive, ...archivedWeeks] : archivedWeeks;
+        const freshWeekTasks = buildRandomizedWeeklySchedule({
+          lectures,
+          preserveUserTasks: []
+        });
+
+        setArchivedWeeks(updatedArchives);
+        setWeeklyTasks(freshWeekTasks);
+        setCompletedTaskIds(new Set());
+        setActiveWeekStartKey(currentWeekKey);
+
+        try {
+          localStorage.setItem('kareem_archived_weeks', JSON.stringify(updatedArchives));
+          localStorage.setItem('kareem_weekly_tasks', JSON.stringify(freshWeekTasks));
+          localStorage.setItem('kareem_completed_task_ids', JSON.stringify([]));
+          localStorage.setItem('kareem_active_week_key', currentWeekKey);
+        } catch (e) {}
+
+        triggerAutoSync({
+          archivedWeeks: updatedArchives,
+          weeklyTasks: freshWeekTasks,
+          completedTaskIds: [],
+          activeWeekStartKey: currentWeekKey
+        });
+
+        pushSmartNotification({
+          id: `notif_week_${Date.now()}`,
+          type: 'week_rollover',
+          title: '🎉 أسبوع جديد بدأ (السبت)! تم الأرشفة والتجهيز تلقائياً',
+          body: `تمت أرشفة الأسبوع السابق (${done}/${total} مهمة) وبدأنا أسبوعك الجديد بجدول عشوائي طازج من محاضراتك والسناتر الحضورية، مع ترك الخانة الأخيرة أسفل كل يوم فارغة لإضافاتك!`,
+          timestamp: Date.now(),
+          read: false,
+          actionTab: 'weeklyView'
+        });
+      }
+    };
+
+    checkWeekRollover();
+    const interval = setInterval(checkWeekRollover, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [dbLoaded, activeWeekStartKey, weeklyTasks, completedTaskIds, archivedWeeks, lectures, triggerAutoSync, pushSmartNotification]);
+
+  // SMART ALERTS & PERIODIC CHECK-INS ENGINE (12h Inactivity + Pre-Exam + Morning/Periodic Tasks Check-in)
+  const runSmartNotificationsCheck = useCallback((forceCheckIn = false, forceAlerts = false) => {
+    const now = Date.now();
+
+    // 1. Check 12-hour study inactivity alert (cooldown 2 hours unless forced)
+    if (notificationPrefs.inactivity12hAlert) {
+      const last12hAlert = Number(localStorage.getItem('kareem_last_12h_alert') || 0);
+      if (forceAlerts || now - last12hAlert >= 2 * 60 * 60 * 1000) {
+        const alert12h = buildInactivity12hNotification(sessions);
+        if (alert12h) {
+          localStorage.setItem('kareem_last_12h_alert', String(now));
+          pushSmartNotification(alert12h);
+        }
+      }
+    }
+
+    // 2. Check upcoming exam alert (cooldown 4 hours unless forced)
+    if (notificationPrefs.preExamAlert) {
+      const lastExamAlert = Number(localStorage.getItem('kareem_last_exam_alert') || 0);
+      if (forceAlerts || now - lastExamAlert >= 4 * 60 * 60 * 1000) {
+        const examAlert = buildPreExamNotification(weeklyTasks, completedTaskIds, subjects, exams);
+        if (examAlert) {
+          localStorage.setItem('kareem_last_exam_alert', String(now));
+          pushSmartNotification(examAlert);
+        }
+      }
+    }
+
+    // 3. Periodic / Morning Check-in containing Today's Tasks (prioritizing user-added tasks)
+    if (notificationPrefs.enabled && notificationPrefs.morningCheckIn) {
+      const lastCheckIn = Number(localStorage.getItem('kareem_last_checkin_alert') || 0);
+      const intervalMs = Math.max(15, notificationPrefs.intervalMinutes) * 60 * 1000;
+      if (forceCheckIn || now - lastCheckIn >= intervalMs) {
+        localStorage.setItem('kareem_last_checkin_alert', String(now));
+        const checkIn = buildCheckInNotification(weeklyTasks, completedTaskIds, subjects);
+        pushSmartNotification(checkIn);
+      }
+    }
+  }, [notificationPrefs, sessions, weeklyTasks, completedTaskIds, subjects, exams, pushSmartNotification]);
+
+  useEffect(() => {
+    if (!dbLoaded) return;
+    const bootTimer = setTimeout(() => {
+      runSmartNotificationsCheck(false, false);
+    }, 2500);
+
+    const intervalMs = Math.max(5, Math.min(notificationPrefs.intervalMinutes, 60)) * 60 * 1000;
+    const periodicTimer = setInterval(() => {
+      runSmartNotificationsCheck(false, false);
+    }, intervalMs);
+
+    return () => {
+      clearTimeout(bootTimer);
+      clearInterval(periodicTimer);
+    };
+  }, [dbLoaded, notificationPrefs.intervalMinutes, runSmartNotificationsCheck]);
 
   // Emergency Sync & Call
   const handleTriggerEmergencySync = async () => {
@@ -427,17 +631,26 @@ export const App: React.FC = () => {
 
     const pendingTasksCount = weeklyTasks.filter((t) => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))).length;
     const completedTodayCount = completedTaskIds.size;
+    const totalLectures = lectures.length || 82;
+    const completedLectures = lectures.filter((l) => l.isDone).length;
+    const remainingLectures = totalLectures - completedLectures;
 
     const studyData = {
       todayStudyMins: todayMins,
       examsCount: exams.length,
       pendingTasksCount,
       completedTodayCount,
+      totalLectures,
+      completedLectures,
+      remainingLectures,
       examsAvg: exams.length > 0 ? Math.round(exams.reduce((a, b) => a + (b.pct || Math.round((b.score / b.total) * 100)), 0) / exams.length) : 0
     };
 
     const analysis = await callAiMonitor(studyData, customAiInstructions, forceFresh);
     setAuditReport(analysis);
+    try {
+      localStorage.setItem('kareem_audit_report', analysis);
+    } catch (e) {}
 
     // Dynamic supervisor mood directly calculated from real sessions, exams, and inactivity
     const dynamicMood = calculateDynamicSupervisorMood(sessions, exams, todayMins);
@@ -483,21 +696,36 @@ export const App: React.FC = () => {
     });
   };
 
-  // Add Task
-  const handleSaveNewTask = (taskData: { dayId: string; subjId: string; text: string; priority: WeeklyTask['priority'] }) => {
+  // Add Task (preserving category, teacher, time, bottom manual slot placement, and user priority)
+  const handleSaveNewTask = (taskData: {
+    dayId: string;
+    subjId: string;
+    text: string;
+    priority: WeeklyTask['priority'];
+    category?: WeeklyTask['category'];
+    teacher?: string;
+    time?: string;
+    slotIndex?: number;
+    isUserAdded?: boolean;
+  }) => {
     const newTask: WeeklyTask = {
-      id: Date.now(),
+      id: `task_user_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
       dayId: taskData.dayId,
       subjId: taskData.subjId,
       text: taskData.text,
-      priority: taskData.priority
+      priority: taskData.priority,
+      category: taskData.category || 'manual',
+      teacher: taskData.teacher,
+      time: taskData.time,
+      slotIndex: taskData.slotIndex,
+      isUserAdded: taskData.isUserAdded ?? true
     };
     const updated = [newTask, ...weeklyTasks];
     setWeeklyTasks(updated);
     try {
       localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
     } catch (e) {}
-    showToast('تمت إضافة المهمة وحفظها في القاعدة بنجاح!');
+    showToast('تمت إضافة المهمة بتصنيفها وإظهارها على الجدول بنجاح! ✓');
     triggerAutoSync({ weeklyTasks: updated });
   };
 
@@ -567,20 +795,23 @@ export const App: React.FC = () => {
     triggerAutoSync({ lectures: updated });
   };
 
-  // Add Lecture
+  // Add Lecture (auto-injecting newly added lecture into weekly schedule)
   const handleSaveNewLecture = (lecData: Omit<Lecture, 'id' | 'isDone'>) => {
     const newLec: Lecture = {
       ...lecData,
       id: `lec_${Date.now()}`,
       isDone: false
     };
-    const updated = [newLec, ...lectures];
-    setLectures(updated);
+    const updatedLectures = [newLec, ...lectures];
+    const updatedTasks = injectLectureIntoSchedule(weeklyTasks, newLec);
+    setLectures(updatedLectures);
+    setWeeklyTasks(updatedTasks);
     try {
-      localStorage.setItem('kareem_lectures', JSON.stringify(updated));
+      localStorage.setItem('kareem_lectures', JSON.stringify(updatedLectures));
+      localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updatedTasks));
     } catch (e) {}
-    showToast('تمت إضافة المحاضرة وحفظها في القاعدة بنجاح');
-    triggerAutoSync({ lectures: updated });
+    showToast('تمت إضافة المحاضرة وإدراجها تلقائياً في الجدول الأسبوعي! ⚡');
+    triggerAutoSync({ lectures: updatedLectures, weeklyTasks: updatedTasks });
   };
 
   // Edit Lecture
@@ -950,11 +1181,71 @@ export const App: React.FC = () => {
         onTriggerEmergencySync={handleTriggerEmergencySync}
         onTriggerManualSync={handleTriggerManualSync}
         onInstallPwa={handleInstallPwa}
+        unreadNotificationsCount={notifications.filter(n => !n.read).length}
+        onOpenNotifications={() => setIsNotificationCenterOpen(true)}
       />
 
       <main className="container">
         {/* Navigation Tabs */}
         <ViewNav currentTab={currentTab} onSelectTab={setCurrentTab} />
+
+        {/* Smart Companion Periodic Check-In / Alert Banner */}
+        {activePopupNotification && (
+          <div
+            className="card"
+            style={{
+              marginBottom: 16,
+              padding: '14px 18px',
+              background: activePopupNotification.type === 'inactivity_12h'
+                ? 'rgba(239, 68, 68, 0.12)'
+                : activePopupNotification.type === 'exam_alert'
+                  ? 'rgba(139, 92, 246, 0.12)'
+                  : 'rgba(16, 185, 129, 0.10)',
+              border: `1.5px solid ${
+                activePopupNotification.type === 'inactivity_12h'
+                  ? 'rgba(239, 68, 68, 0.45)'
+                  : activePopupNotification.type === 'exam_alert'
+                    ? 'rgba(139, 92, 246, 0.45)'
+                    : 'rgba(16, 185, 129, 0.45)'
+              }`
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <strong style={{ fontSize: 15, color: 'var(--text-main)', display: 'block', marginBottom: 4 }}>
+                  {activePopupNotification.title}
+                </strong>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>
+                  {activePopupNotification.body}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={() => {
+                      setCurrentTab(activePopupNotification.actionTab || 'focusView');
+                      setActivePopupNotification(null);
+                    }}
+                  >
+                    {activePopupNotification.actionTab === 'weeklyView' ? 'عرض جدول النهاردة 📋' : 'ابدأ المذاكرة الآن ⚡'}
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => setIsNotificationCenterOpen(true)}
+                  >
+                    مركز التنبيهات والرسائل 🔔
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => setActivePopupNotification(null)}
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    إخفاء
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Active Running Session Alert Banner */}
         <ActiveSessionBanner
@@ -1027,6 +1318,7 @@ export const App: React.FC = () => {
             onUpdateAllTasks={handleUpdateAllTasks}
             archivedWeeks={archivedWeeks}
             onArchiveWeek={handleArchiveWeek}
+            onOpenNotificationsCenter={() => setIsNotificationCenterOpen(true)}
             sessions={sessions}
             exams={exams}
             lectures={lectures}
@@ -1251,6 +1543,38 @@ export const App: React.FC = () => {
         }}
         isInstallable={!!deferredPrompt}
         isInstalled={isInstalled}
+      />
+
+      <NotificationCenterModal
+        isOpen={isNotificationCenterOpen}
+        onClose={() => setIsNotificationCenterOpen(false)}
+        notifications={notifications}
+        prefs={notificationPrefs}
+        onUpdatePrefs={(next) => {
+          setNotificationPrefs(next);
+          try { localStorage.setItem('kareem_notification_prefs', JSON.stringify(next)); } catch (e) {}
+          showToast('تم حفظ إعدادات التنبيهات والرسائل الدورية ✓');
+        }}
+        onMarkAllRead={() => {
+          const marked = notifications.map(n => ({ ...n, read: true }));
+          setNotifications(marked);
+          try { localStorage.setItem('kareem_smart_notifications', JSON.stringify(marked)); } catch (e) {}
+        }}
+        onClearAll={() => {
+          setNotifications([]);
+          try { localStorage.setItem('kareem_smart_notifications', JSON.stringify([])); } catch (e) {}
+        }}
+        onTriggerTestCheckIn={() => {
+          const checkIn = buildCheckInNotification(weeklyTasks, completedTaskIds, subjects);
+          pushSmartNotification(checkIn, true);
+          showToast('🔔 تم إرسال رسالة الاطمئنان بمهام النهاردة!');
+        }}
+        onRunAlertsNow={() => {
+          runSmartNotificationsCheck(false, true);
+          showToast('⚡ تم فحص إنذار الـ 12 ساعة والامتحانات القريبة');
+        }}
+        onNavigateToTab={(tab) => setCurrentTab(tab)}
+        hoursSinceLastSession={getHoursSinceLastSession(sessions)}
       />
     </div>
   );

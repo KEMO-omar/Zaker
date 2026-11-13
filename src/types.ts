@@ -46,11 +46,12 @@ export interface WeeklyTask {
   subjId: string;
   text: string;
   priority?: 'class' | 'exam' | 'urgent' | 'high' | 'normal';
-  category?: 'center' | 'platform' | 'study' | 'exam' | 'manual';
+  category?: 'center' | 'platform' | 'study' | 'exam' | 'manual' | 'review';
   teacher?: string;
   time?: string;
-  slotIndex?: number; // 0 to 9
+  slotIndex?: number; // 0 to 9 (Slot 9 is reserved for user's bottom manual entry)
   isRolled?: boolean;
+  isUserAdded?: boolean;
   originalDayId?: string;
   contextInfo?: string;
   overlay?: TaskOverlay;
@@ -59,12 +60,23 @@ export interface WeeklyTask {
 export interface ArchivedWeek {
   id: string;
   weekTitle: string;
+  weekKey?: string;
   archivedAt: string;
   totalCount: number;
   completedCount: number;
   completionPct: number;
   tasks: WeeklyTask[];
   notes?: string;
+}
+
+export interface SmartNotificationItem {
+  id: string;
+  type: 'checkin' | 'inactivity_12h' | 'exam_alert' | 'week_rollover' | 'manual_focus';
+  title: string;
+  body: string;
+  timestamp: number;
+  read: boolean;
+  actionTab?: ViewTab;
 }
 
 export interface Lecture {

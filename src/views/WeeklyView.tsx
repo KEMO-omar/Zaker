@@ -25,6 +25,7 @@ interface WeeklyViewProps {
   onStartFocus?: (subjId: string) => void;
   archivedWeeks?: ArchivedWeek[];
   onArchiveWeek?: (archive: ArchivedWeek, cleanTasks: WeeklyTask[]) => void;
+  onOpenNotificationsCenter?: () => void;
 }
 
 export const WeeklyView: React.FC<WeeklyViewProps> = ({
@@ -41,7 +42,8 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
   lectures = [],
   onStartFocus,
   archivedWeeks = [],
-  onArchiveWeek
+  onArchiveWeek,
+  onOpenNotificationsCenter
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'tasks' | 'history'>('tasks');
 
@@ -56,11 +58,11 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
               <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span>نظام الجداول الأسبوعية والأتمتة الذكية</span>
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(86, 194, 166, 0.15)', color: 'var(--accent-primary)', fontWeight: 700 }}>
-                  محدث ومربوط بالبوستر التفاعلي
+                  تجدد تلقائي كل سبت + أرشفة ذكية
                 </span>
               </h2>
               <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                توزيع مواعيد السناتر والمنصات وتوليد صورة الجدول المحدث وحساب بومودورو اليومي.
+                توزيع عشوائي لمحاضراتك والسناتر الحضورية مع إبقاء الخانة الأخيرة أسفل كل يوم لمهامك اليدوية.
               </p>
             </div>
           </div>
@@ -108,6 +110,8 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
           onUpdateAllTasks={onUpdateAllTasks}
           archivedWeeks={archivedWeeks}
           onArchiveWeek={onArchiveWeek}
+          lectures={lectures}
+          onOpenNotificationsCenter={onOpenNotificationsCenter}
         />
       )}
 
