@@ -197,17 +197,33 @@ interface ExamModalProps {
   isOpen: boolean;
   onClose: () => void;
   subjects: Subject[];
-  onSave: (exam: Omit<ExamRecord, 'id' | 'pct'>) => void;
+  onSave: (exam: Omit<ExamRecord, 'id' | 'pct'>) => Promise<void> | void;
 }
+
+const getTodayLocalDate = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const getDefaultTeacherForSubj = (s: string) => {
+  if (s === 'physics') return 'أ. محمد عبد المعبود (منصة أونلاين)';
+  if (s === 'arabic') return 'أ. محمد صلاح / مس تقوى';
+  if (s === 'english') return 'مستر أيمن عبد العاطي';
+  if (s === 'history') return 'مستر أحمد سمير';
+  return 'أستاذ المادة';
+};
 
 export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects, onSave }) => {
   const [subjId, setSubjId] = useState('physics');
-  const [teacher, setTeacher] = useState('أ. محمد عبد المعبود');
+  const [teacher, setTeacher] = useState('أ. محمد عبد المعبود (منصة أونلاين)');
   const [topic, setTopic] = useState('');
   const [score, setScore] = useState<number | ''>(48);
   const [total, setTotal] = useState<number | ''>(50);
   const [examType, setExamType] = useState('امتحان شامل');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getTodayLocalDate);
   const [notes, setNotes] = useState('');
 
   // Certificate fields
@@ -216,53 +232,106 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
   const [certificateUrl, setCertificateUrl] = useState('');
   const [certificateImage, setCertificateImage] = useState<string>('');
   const [isCompressingImg, setIsCompressingImg] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      const initialSubj = subjects[0]?.id ? (subjects.some(s => s.id === 'physics') ? 'physics' : subjects[0].id) : 'physics';
+      setSubjId(initialSubj);
+      setTeacher(getDefaultTeacherForSubj(initialSubj));
+      setTopic('');
+      setScore(48);
+      setTotal(50);
+      setExamType('امتحان شامل');
+      setDate(getTodayLocalDate());
+      setNotes('');
+      setHasCert(false);
+      setCertificateTitle('');
+      setCertificateUrl('');
+      setCertificateImage('');
+      setIsCompressingImg(false);
+      setIsSaving(false);
+      setFormError('');
+    }
+  }, [isOpen, subjects]);
 
   if (!isOpen) return null;
 
   const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      try {
-        setIsCompressingImg(true);
-        const compressed = await compressImageFile(file, 1200, 1200, 0.82);
-        setCertificateImage(compressed);
-        setHasCert(true);
-      } catch (err) {
-        // Fallback to standard reader
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === 'string') {
-            setCertificateImage(reader.result);
-            setHasCert(true);
-          }
-        };
-        reader.readAsDataURL(file);
-      } finally {
+    e.target.value = '';
+    if (!file) return;
+
+    setFormError('');
+    setIsCompressingImg(true);
+    try {
+      const compressed = await compressImageFile(file, 1100, 1100, 0.78);
+      setCertificateImage(compressed);
+      setHasCert(true);
+      setIsCompressingImg(false);
+    } catch (err) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setCertificateImage(reader.result);
+          setHasCert(true);
+        }
         setIsCompressingImg(false);
-      }
+      };
+      reader.onerror = () => {
+        setFormError('تعذر قراءة ملف الصورة المختار. جرب صورة أخرى.');
+        setIsCompressingImg(false);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (score === '' || total === '' || !topic.trim()) return;
+    if (isCompressingImg || isSaving) return;
 
+    const cleanTopic = topic.trim();
+    const numScore = Number(score);
+    const numTotal = Number(total);
+
+    if (!cleanTopic) {
+      setFormError('من فضلك اكتب موضوع أو اسم الامتحان.');
+      return;
+    }
+    if (score === '' || total === '' || Number.isNaN(numScore) || Number.isNaN(numTotal) || numTotal <= 0) {
+      setFormError('تأكد من إدخال الدرجة المحققة والدرجة الكلية بشكل صحيح.');
+      return;
+    }
+    if (numScore < 0) {
+      setFormError('الدرجة المحققة لا يمكن أن تكون أقل من صفر.');
+      return;
+    }
+
+    setFormError('');
     const finalHasCert = hasCert || Boolean(certificateImage) || Boolean(certificateUrl.trim()) || Boolean(certificateTitle.trim());
 
-    onSave({
-      subjId,
-      teacher: teacher.trim() || 'أستاذ المادة',
-      topic: topic.trim(),
-      score: Number(score),
-      total: Number(total),
-      examType,
-      date,
-      notes: notes.trim(),
-      certificateTitle: finalHasCert ? (certificateTitle.trim() || `شهادة تفوق في ${topic.trim()}`) : undefined,
-      certificateUrl: finalHasCert && certificateUrl.trim() ? certificateUrl.trim() : undefined,
-      certificateImage: finalHasCert && certificateImage ? certificateImage : undefined
-    });
-    onClose();
+    try {
+      setIsSaving(true);
+      await onSave({
+        subjId,
+        teacher: teacher.trim() || 'أستاذ المادة',
+        topic: cleanTopic,
+        score: numScore,
+        total: numTotal,
+        examType,
+        date: date || getTodayLocalDate(),
+        notes: notes.trim(),
+        certificateTitle: finalHasCert ? (certificateTitle.trim() || `شهادة تفوق في ${cleanTopic}`) : undefined,
+        certificateUrl: finalHasCert && certificateUrl.trim() ? certificateUrl.trim() : undefined,
+        certificateImage: finalHasCert && certificateImage ? certificateImage : undefined
+      });
+      onClose();
+    } catch (err) {
+      setFormError('حدث خطأ أثناء حفظ الامتحان. حاول مرة أخرى.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const calculatedPct = score !== '' && total !== '' && Number(total) > 0
@@ -270,13 +339,13 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
     : 0;
 
   return (
-    <div className="modal-overlay show" onClick={onClose}>
+    <div className="modal-overlay show" onClick={() => { if (!isSaving) onClose(); }}>
       <div className="modal-box" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <FilePlus size={18} style={{ color: 'var(--accent-primary)' }} />
           <span>تسجيل نتيجة امتحان جديد</span>
         </div>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>المادة الدراسية:</label>
             <select
@@ -336,7 +405,8 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
               <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>الدرجة المحققة:</label>
               <input
                 type="number"
-                step="0.5"
+                step="any"
+                min={0}
                 className="input-field tabular"
                 value={score}
                 onChange={(e) => setScore(e.target.value === '' ? '' : Number(e.target.value))}
@@ -347,7 +417,8 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
               <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>الدرجة الكلية:</label>
               <input
                 type="number"
-                step="0.5"
+                step="any"
+                min={1}
                 className="input-field tabular"
                 value={total}
                 onChange={(e) => setTotal(e.target.value === '' ? '' : Number(e.target.value))}
@@ -445,7 +516,7 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>أو رابط الشهادة المباشر:</label>
                     <input
-                      type="url"
+                      type="text"
                       className="input-field"
                       style={{ margin: 0, fontSize: 12 }}
                       placeholder="https://..."
@@ -454,6 +525,12 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
                     />
                   </div>
                 </div>
+
+                {isCompressingImg && (
+                  <div style={{ fontSize: 12, color: 'var(--accent-primary)', fontWeight: 700 }}>
+                    ⏳ جاري ضغط وتجهيز صورة الشهادة...
+                  </div>
+                )}
 
                 {certificateImage && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
@@ -477,10 +554,25 @@ export const ExamModal: React.FC<ExamModalProps> = ({ isOpen, onClose, subjects,
             )}
           </div>
 
+          {formError && (
+            <div style={{
+              marginTop: 12,
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(239, 83, 80, 0.12)',
+              border: '1px solid rgba(239, 83, 80, 0.4)',
+              color: 'var(--danger)',
+              fontSize: 12,
+              fontWeight: 700
+            }}>
+              ⚠️ {formError}
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-            <button type="button" className="btn" onClick={onClose}>إلغاء</button>
-            <button type="submit" className="btn btn-primary">
-              حفظ الامتحان وتحليل المراقب
+            <button type="button" className="btn" onClick={onClose} disabled={isSaving}>إلغاء</button>
+            <button type="submit" className="btn btn-primary" disabled={isCompressingImg || isSaving}>
+              {isCompressingImg ? 'جاري تجهيز الصورة...' : isSaving ? 'جاري الحفظ...' : 'حفظ الامتحان وتحليل المراقب'}
             </button>
           </div>
         </form>
@@ -547,30 +639,34 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
 
   const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      try {
-        setIsCompressingImg(true);
-        const compressed = await compressImageFile(file, 1200, 1200, 0.82);
-        setCertificateImage(compressed);
-        setHasCert(true);
-      } catch (err) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === 'string') {
-            setCertificateImage(reader.result);
-            setHasCert(true);
-          }
-        };
-        reader.readAsDataURL(file);
-      } finally {
+    e.target.value = '';
+    if (!file) return;
+
+    setIsCompressingImg(true);
+    try {
+      const compressed = await compressImageFile(file, 1100, 1100, 0.78);
+      setCertificateImage(compressed);
+      setHasCert(true);
+      setIsCompressingImg(false);
+    } catch (err) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setCertificateImage(reader.result);
+          setHasCert(true);
+        }
         setIsCompressingImg(false);
-      }
+      };
+      reader.onerror = () => {
+        setIsCompressingImg(false);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (score === '' || total === '' || !topic.trim()) return;
+    if (isCompressingImg || score === '' || total === '' || !topic.trim() || Number(total) <= 0) return;
 
     const numScore = Number(score);
     const numTotal = Number(total);
@@ -587,7 +683,7 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
       total: numTotal,
       pct,
       examType,
-      date,
+      date: date || getTodayLocalDate(),
       notes: notes.trim(),
       certificateTitle: finalHasCert ? (certificateTitle.trim() || `شهادة تفوق في ${topic.trim()}`) : undefined,
       certificateUrl: finalHasCert && certificateUrl.trim() ? certificateUrl.trim() : undefined,
@@ -622,7 +718,7 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>المادة الدراسية:</label>
             <select
@@ -674,7 +770,8 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
               <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>الدرجة المحققة:</label>
               <input
                 type="number"
-                step="0.5"
+                step="any"
+                min={0}
                 className="input-field tabular"
                 value={score}
                 onChange={(e) => setScore(e.target.value === '' ? '' : Number(e.target.value))}
@@ -685,7 +782,8 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
               <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>الدرجة الكلية:</label>
               <input
                 type="number"
-                step="0.5"
+                step="any"
+                min={1}
                 className="input-field tabular"
                 value={total}
                 onChange={(e) => setTotal(e.target.value === '' ? '' : Number(e.target.value))}
@@ -782,7 +880,7 @@ export const EditExamModal: React.FC<EditExamModalProps> = ({
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>أو رابط الشهادة المباشر:</label>
                     <input
-                      type="url"
+                      type="text"
                       className="input-field"
                       style={{ margin: 0, fontSize: 12 }}
                       placeholder="https://..."
@@ -2089,6 +2187,8 @@ interface InterrogationModalProps {
   undoneLecturesCount: number;
   backlogTasksCount: number;
   lowExamsCount: number;
+  prioritySubjId?: string;
+  prioritySubjName?: string;
 }
 
 export const InterrogationModal: React.FC<InterrogationModalProps> = ({
@@ -2101,7 +2201,9 @@ export const InterrogationModal: React.FC<InterrogationModalProps> = ({
   onStartEmergencyFocus,
   undoneLecturesCount,
   backlogTasksCount,
-  lowExamsCount
+  lowExamsCount,
+  prioritySubjId = 'physics',
+  prioritySubjName = 'فيزياء'
 }) => {
   if (!isOpen) return null;
 
@@ -2175,11 +2277,11 @@ export const InterrogationModal: React.FC<InterrogationModalProps> = ({
               className="btn btn-primary btn-sm"
               onClick={() => {
                 onClose();
-                onStartEmergencyFocus('physics');
+                onStartEmergencyFocus(prioritySubjId);
               }}
             >
               <Zap size={13} />
-              <span>بدء جلسة إنقاذ 50 دقيقة (فيزياء)</span>
+              <span>بدء جلسة إنقاذ 50 دقيقة ({prioritySubjName})</span>
             </button>
             <button className="btn btn-sm" onClick={onClose}>
               إغلاق

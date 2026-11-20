@@ -1,9 +1,7 @@
-// SHAPAP Progressive Web App Service Worker (v3.0 - Kareem Workspace)
-const CACHE_NAME = 'shapap-pwa-v3.0';
+// SHAPAP Progressive Web App Service Worker (v4.0 - Kareem Workspace)
+const CACHE_NAME = 'shapap-pwa-v4.0';
 
 const PRECACHE_ASSETS = [
-  './',
-  './index.html',
   './manifest.webmanifest',
   './manifest.json',
   './icon-192.png',
@@ -16,7 +14,7 @@ const PRECACHE_ASSETS = [
   './og-image.png'
 ];
 
-// Install: Cache critical shell files safely
+// Install: Cache critical shell icons safely
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
@@ -32,7 +30,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate: Clean old caches and take control immediately
+// Activate: Clean ALL old caches (such as v3.0 with stale Vite chunks) and take control immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -45,12 +43,22 @@ self.addEventListener('activate', (event) => {
 
 // Fetch handler (Required for Chrome PWA installability)
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') {
     return;
   }
 
   const url = new URL(event.request.url);
+
+  // 0. Never cache Vite dev modules, source files, or versioned dependency chunks
+  if (
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.startsWith('/@') ||
+    url.searchParams.has('v') ||
+    /\.(tsx?|jsx?|mjs)(\?|$)/.test(url.pathname)
+  ) {
+    return;
+  }
 
   // 1. Navigation requests (HTML pages) -> Network first, fallback to cached index.html
   if (event.request.mode === 'navigate') {
@@ -89,7 +97,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Static assets & Google Fonts -> Cache First, update in background
+  // 3. Static production assets & Google Fonts -> Cache First, update in background
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)

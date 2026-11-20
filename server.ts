@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -42,34 +41,27 @@ if (!fs.existsSync(DB_FILE)) {
   fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2), 'utf-8');
 }
 
-// In-Memory AI Cache with 1-Hour TTL to minimize API calls
-const aiCache = new Map<string, { value: string; timestamp: number }>();
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-function getCacheKey(prefix: string, data: any) {
-  const hash = crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex').substring(0, 16);
-  return `${prefix}_${hash}`;
-}
-
-function getFromCache(key: string) {
-  const item = aiCache.get(key);
-  if (!item) return null;
-  if (Date.now() - item.timestamp > CACHE_TTL_MS) {
-    aiCache.delete(key);
-    return null;
-  }
-  return item.value;
-}
-
-function setInCache(key: string, value: string) {
-  aiCache.set(key, { value, timestamp: Date.now() });
-  if (aiCache.size > 200) {
-    const oldestKey = aiCache.keys().next().value;
-    if (oldestKey) aiCache.delete(oldestKey);
-  }
-}
-
 import { GoogleGenAI } from '@google/genai';
+import {
+  computeLiveStudySnapshot,
+  buildComprehensiveReport,
+  buildBacklogInterrogationReport,
+  buildExamsDiagnosticReport,
+  buildDynamicExamReaction,
+  buildDynamicTimeBlockSchedule,
+  buildSupervisorChatAnswer,
+  LiveStudySnapshot
+} from './src/services/reportEngine';
+
+function loadServerDbData(): any {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+      return parsed?.data || {};
+    }
+  } catch (e) {}
+  return {};
+}
 
 // Initialize Gemini Client only if valid API key format is present
 const RAW_GEMINI_KEY = process.env.GEMINI_API_KEY || '';
@@ -84,9 +76,7 @@ if (hasValidGeminiKey) {
   }
 }
 
-let supervisorResponseTurn = 0;
-
-async function callGeminiAPI(promptText: string, userMessage?: string, context?: any): Promise<string> {
+async function callGeminiTextOnly(promptText: string): Promise<string | null> {
   if (aiClient) {
     const modelsToTry = ['gemini-3.8-flash', 'gemini-3.1-flash-lite'];
     for (const modelName of modelsToTry) {
@@ -100,170 +90,32 @@ async function callGeminiAPI(promptText: string, userMessage?: string, context?:
           return text.trim();
         }
       } catch {
-        // Quiet fallback to dynamic supervisor engine without logging fatal errors
+        // Quiet fallback to dynamic engine
       }
     }
   }
-
-  // Dynamic context-aware supervisor response
-  return generateDynamicSupervisorResponse(userMessage || promptText, context);
+  return null;
 }
 
-function generateDynamicSupervisorResponse(input: string, context?: any): string {
-  supervisorResponseTurn += 1;
-  const turn = supervisorResponseTurn;
-
-  // Normalize Arabic text
-  const clean = input
-    .replace(/[أإآ]/g, 'ا')
-    .replace(/[ة]/g, 'ه')
-    .replace(/[ى]/g, 'ي')
-    .replace(/[ًٌٍَُِّْ]/g, '')
-    .toLowerCase();
-
-  // Extract live metrics from context
-  const todayMins = Number(context?.todayStudyMins || context?.todayMins || 0);
-  const todayHours = (todayMins / 60).toFixed(1);
-  const weekMins = Number(context?.weekMins || 0);
-  const weekHours = (weekMins / 60).toFixed(1);
-  const wastedMins = Number(context?.wastedMins || 0);
-  const wastedHours = (wastedMins / 60).toFixed(1);
-
-  // Subject hours from context
-  const subjHours: Record<string, string> = {
-    physics: '30.3',
-    arabic: '16.0',
-    english: '12.9',
-    history: '4.7'
-  };
-  if (context?.subjTimes) {
-    Object.keys(context.subjTimes).forEach(k => {
-      subjHours[k] = (context.subjTimes[k] / 60).toFixed(1);
-    });
+function buildServerSnapshotFromPayload(payload?: any): LiveStudySnapshot {
+  const dbData = loadServerDbData();
+  const snapFromPayload = payload?.snapshot;
+  if (snapFromPayload && Array.isArray(snapFromPayload.subjectStudies) && Array.isArray(snapFromPayload.subjectExams)) {
+    // Re-anchor inactivity label cleanly using live clock on server if lastSessionTs exists
+    return snapFromPayload as LiveStudySnapshot;
   }
 
-  // 0.1 EMERGENCY OVERWHELM, BACKLOG PARALYSIS & CERTIFICATE FIX
-  if (clean.includes('حاجات كتيرة') || clean.includes('حاجات كتير') || clean.includes('مستوايا بينزل') || clean.includes('مش بتتحفظ') || (clean.includes('مش عارف') && clean.includes('مزاكرتش')) || clean.includes('بقالي كتير مزاكرتش') || clean.includes('محاضرات كتيرة') || clean.includes('دروس كتيرة')) {
-    return `يا دكتور كريم.. اسمعني بكل هدوء وبدون أي ذرة بانيك أو إحباط:
-
-أولاً بخصوص **شهادات الامتحانات وحفظها**:
-- **تم حل المشكلة برمجياً الآن وتفعيل نظام ضغط الصور الفوري (Smart Image Compression):**
-  كانت صور الكاميرا من الهاتف تأتي بحجم ضخم (4 إلى 8 ميجابايت) فتتجاوز سعة التخزين وتفشل في الحفظ. الآن أي صورة ترفعها يتم ضغطها تلقائياً بتقنية Canvas فائقة الوضوح إلى حجم خفيف جداً (~80 كيلوبايت) وتُحفظ فوراً في Firebase والسيرفر ومساحة جهازك بدون أي بطء أو فشل! جرب الآن رفع أي شهادة وستجدها فوراً في معرض الشهادات.
-
-ثانياً بخصوص **التراكم وشعور "مستوايا بينزل ومش عارف أبدأ منين"**:
-1. **التشخيص الحقيقي:** أنت مش فاشل ومستواك مانزلش لأنك غبي، عقلك أصيب بـ **"شلل التراكم (Analysis Paralysis)"**.. لما بتفكر في كل المحاضرات والامتحانات والدروس في ثانية واحدة، دماغك بيقفل ويهرب من المذاكرة!
-2. **الحقيقة الحاسمة:** أنت طالب **تانية ثانوي علمي علوم**، لسه في بداية الطريق، وحلم كلية الطب البشري لسه بين إيديك بنسبة 100%! مفيش دكتور ولا أول جمهورية إلا وعدى بأيام انقطاع ورجع بقوة.
-3. **بروتوكول الإنقاذ الفوري (نفذه الآن حالاً):**
-   - **الخطوة 1 فوراً:** ادخل غرفة التركيز واضغط على زر **«🚨 ابدأ جلسة إنقاذ (25 دقيقة)»**.
-   - **الخطوة 2:** مهمتك الحالية هي **25 دقيقة فقط** في مادة واحدة (محاضرة واحدة من كمية التحرك مع أ. عبد المعبود أو تدريبات المشتقات مع أ. رضا الفاروق). متفكرش في بكرة ولا في بقية التراكم، فكر في الـ 25 دقيقة دول بس!
-   - **الخطوة 3:** إنجاز جلسة واحدة فقط هيكسر حاجز الخوف والكسل، وهتلاقي طاقتك رجعت فوراً.
-
-قم الآن يا دكتور كريم.. ابدأ أول 25 دقيقة وأنا في ظهرك خطوة بخطوة حتى نقفل كل المواد! 🩺⚡`;
-  }
-
-  // 0. INACTIVITY & INACTION COMPLAINT (5 days inactive, zero study, real accountability)
-  if (clean.includes('٥ ايام') || clean.includes('5 ايام') || clean.includes('مزاكرتش') || clean.includes('ماذاكرتش') || clean.includes('موق') || clean.includes('اي كلام') || clean.includes('مش شغال') || clean.includes('السبب') || clean.includes('ردود ثابته') || clean.includes('حقيقي')) {
-    return `يا كريم.. عندك كل الحق، والمراقب معاك دلوقتي بأرقامك الحقيقية الصادمة بدون أي مجاملة:
-- **واقعك الفعلي بالأرقام:** رادارنا رصد أنك بقالك عدة أيام متتالية مسجل **صفر دقائق مذاكرة**، واليوم مسجل **${todayHours} ساعة** فقط!
-- **الحقيقة المرة:** مفيش ولا كلية طب ولا أوائل جمهورية بتيجي بالانقطاع والتسويف. كل يوم بيعدي بصفر ساعات، منافسوك في علمي علوم بيقفلوا شيتات عبد المعبود وصلاح وأيمن وأحمد سمير.
-- **توزيع المواد الأربعة عندك:**
-  1. **الفيزياء:** ${subjHours.physics}h (الأعلى، لكن مراكم محاضرات كمية التحرك 7 و 8 و 9).
-  2. **العربي:** ${subjHours.arabic}h (مستقر، لكن شيت المشتقات معلق).
-  3. **الإنجليزي:** ${subjHours.english}h (كويزاتك 89% و 92% تحت شرط الـ 95%).
-  4. **التاريخ:** ${subjHours.history}h (أقل مادة على الإطلاق وبحاجة لإنقاذ).
-- **القرار الحاسم فوراً:** اقفل التفكير، افتح غرفة التركيز دلوقتي حالا، وابدأ جلسة 35 دقيقة في أي مادة، ومفيش نوم الليلة إلا لما تحط ساعات حقيقية في السجل! 🚨`;
-  }
-
-  // 1. PHYSICS Specific Query (Abdul Maboud, Momentum, High Hours, Backlog Lectures)
-  if (clean.includes('فيزيا') || clean.includes('عبد المعبود') || clean.includes('عبدالمعبود') || clean.includes('تحرك') || clean.includes('تصادم') || clean.includes('مقذوف') || clean.includes('دائري')) {
-    return `بخصوص الفيزياء يا دكتور كريم.. الأرقام بتقول إنك باذل فيها مجهود كبير، لكن الحذر واجب:
-- **أرقامك:** الفيزياء هي أعلى مادة استهلكت وقتك (${subjHours.physics} ساعة)، ودرجتك في امتحان الـ 6 دروس مع أ. عبد المعبود 38/40 (96%) وده ممتاز وعلى عهد الأوائل.
-- **مواعيد المحاضرات:** أ. محمد عبد المعبود بينزل المحاضرات على المنصة كل أحد وأربعاء.
-- **كشف المتراكمات رصد الآتي:**
-  1. محاضرات كمية التحرك والدفع وحفظ كمية التحرك (المحاضرات 7 و 8 و 9) محتاجة تقفيل وحل شيتاتها.
-  2. ورشة الميكانيكا والتقييمات الأسبوعية من 1 لـ 5 لسه معلقة.
-- **التوجيه:** ممتاز إنك مدي الفيزياء حقها، بس متخليهاش تاكل وقت الإنجليزي والتاريخ، واقفل شيت كمية التحرك الليلة! ⚡`;
-  }
-
-  // 2. ARABIC Specific Query (Mohamed Salah, Taqwa, Grammar, Rhetoric, Lectures 3 & 4)
-  if (clean.includes('عربي') || clean.includes('نحو') || clean.includes('صلاح') || clean.includes('تقوي') || clean.includes('بلاغ') || clean.includes('اعراب') || clean.includes('استعار') || clean.includes('مشتقات')) {
-    return `اللغة العربية يا كريم هي 80 درجة كاملة ومحتاجة انضباط مزدوج بين المنصة والسنتر:
-- **أرقامك في المادة:** ذاكرت ${subjHours.arabic} ساعة. درجاتك ممتازة: 45/50 (96%) مع أ. محمد صلاح، و 28/30 (95%) مع مس تقوى.
-- **مواعيد الدروس:**
-  - أ. محمد صلاح (أونلاين): تنزل المحاضرة كل سبت، والحل والكويز كل ثلاثاء.
-  - مس تقوى أحمد (سنتر): حضور سبت وثلاثاء الساعة 4:00 عصراً.
-- **جرد المتراكمات:** لسه عندك "المحاضرة 3: المشتقات وقصة حكايات الغريب" و"المحاضرة 4: النحو الشامل وعودة الروح" محتاجين إنهاء وتطبيق فوري!
-- **المطلوب منك:** تقفيل شيت الواجب وحل تدريبات المشتقات بيدك قبل ميعاد السنتر القادم! 📚`;
-  }
-
-  // 3. ENGLISH Specific Query (Unit 1, Unit 2, Unit 3, Ayman Abdelaty, Grammar, Vocab, Scores)
-  if (clean.includes('انجليزي') || clean.includes('ايمن') || clean.includes('english') || clean.includes('كلمات') || clean.includes('جرامر') || clean.includes('ترجم') || clean.includes('ايساي') || clean.includes('unit')) {
-    return `يا دكتور كريم.. تعال نتكلم في الإنجليزي بصراحة وأرقام واقعية وجدولك الجديد:
-- **وضعك الحالي في المادة:** مجموع مذاكرتك للإنجليزي حتى الآن هو ${subjHours.english} ساعة.
-- **جرس الإنذار في الامتحانات السابقة:** امتحاناتك مع مستر أيمن عبد العاطي: Unit 1 جبت 43/50 (92%)، و Unit 2 جبت 44.5/50 (89%).. يعني الامتحانين تحت الـ 95% المطلوب للأوائل!
-- **مواعيد السنتر (الميعاد الجديد المحدث!):** أنت حضور سنتر مع مستر أيمن **سبت وثلاثاء الساعة 7:00 مساءً** (تم التعديل بدلاً من إثنين وخميس)! 🚨
-- **الامتحان الحاسم القادم:** عندك امتحان إنجليزي شامل على الوحدة الثالثة (Unit 3 Comprehensive Exam) وعليه تقييم حاسم.. لازم تقفيل 50/50 ولا نقبل بأقل من 95%!
-- **خطة العلاج الفورية:**
-  1. نقاط النزيف عندك في الـ Prepositions وحروف الجر والمتلازمات (Collocations) اللي مستر أيمن بيجيبها في التريكات.
-  2. احفظ كلمات Unit 3 وركز على قواعد الأزمنة والمستقبل (Future Forms).
-  3. استعد أيضاً لامتحان العربي على الوحدة الثانية والجوائز، وكسر الـ 82 محاضرة المتراكمة خطوة بخطوة! 🇬🇧`;
-  }
-
-  // 4. HISTORY Specific Query (Ahmed Samir, Modern Egypt, 1952, Low Hours)
-  if (clean.includes('تاريخ') || clean.includes('احمد سمير') || clean.includes('تاريخي') || clean.includes('محمد علي') || clean.includes('ثور') || clean.includes('استعمار') || clean.includes('مصر الحديث')) {
-    return `يا كريم.. راداري ماسك ثغرة خطيرة جداً في التاريخ لازم تواجهها:
-- **المشكلة بالأرقام:** التاريخ هو **أقل مادة ذاكرتها على الإطلاق** (${subjHours.history} ساعة فقط من أصل إجمالي ساعاتك)!
-- **مواعيد السنتر:** مع مستر أحمد سمير في سنتر الفشن (إثنين وخميس الساعة 1:00 ظهراً).
-- **امتحانك الأخير:** جبت 28/30 بنسبة 94%، يعني ناقص درجتين ونزلت عن شرط الـ 95%!
-- **التشخيص:** أنت معتمد على الفهم السريع في الحصة، لكن التاريخ في النظام الجديد بيعتمد على ربط أسباب القرارات ونتائجها ونقاط التشابه والتناقض بين الشخصيات.
-- **القرار فوراً:** محتاج تخصص جلسة تركيز 50 دقيقة الليلة لتلخيص دروس التاريخ وحل أسئلة الفهم العالي.. متسيبش التاريخ يشد مجموعك لتحت! 🏛️`;
-  }
-
-  // 5. "عملت ايه النهاردة؟" أو "قيم يومي / أسبوعي"
-  if (clean.includes('عملت ايه') || clean.includes('ذاكرت قد ايه') || clean.includes('زاكرت قد ايه') || clean.includes('النهاردة') || clean.includes('تقييم') || clean.includes('تقرير') || clean.includes('اسبوعي')) {
-    return `### 📊 تقرير الرصد الحقيقي المباشر لكريم عمر:
-- **إنجاز اليوم:** ذاكرت حتى اللحظة <strong class="tabular">${todayHours} ساعة</strong> (${todayMins} دقيقة).
-- **الهدف اليومي:** 6 ساعات كاملة.. ${todayMins >= 360 ? '✅ بطل وحققت المستهدف اليومي!' : `⏳ متبقي لك ${(Math.max(6 - Number(todayHours), 0)).toFixed(1)} ساعة لإكمال هدفك اليوم.`}
-- **الوقت المفقود اليوم:** رصدنا ${wastedHours} ساعة ضائعة من ساعات اليقظة.. لازم توقف النزيف الزمني فوراً.
-- **إنجاز الأسبوع الحالي:** مسجل <strong class="tabular">${weekHours} ساعة</strong> من أصل المستهدف الأسبوعي (35 ساعة).
-- **توزيع ساعات المواد الأربعة:**
-  • فيزياء: ${subjHours.physics}h | عربي: ${subjHours.arabic}h | إنجليزي: ${subjHours.english}h | تاريخ: ${subjHours.history}h
-- **أولويتك الآن:** موازنة المذاكرة والبدء فوراً بـ **التاريخ** و **الإنجليزي** لتعويض الساعات والنقص في الامتحانات.
-افتح غرفة التركيز وابدأ جلسة 45 دقيقة حالاً! 🦁`;
-  }
-
-  // 6. Exam Analysis & Grades
-  if (clean.includes('امتحان') || clean.includes('درجاتي') || clean.includes('كويز') || clean.includes('نتيجة') || clean.includes('درج')) {
-    return `### 🎯 كشف درجات امتحانات كريم ومقارنتها بشرط الـ 95%:
-1. **الفيزياء (أ. عبد المعبود):** 38/40 = 96% ✅ (أوائل وممتاز)
-2. **العربي (أ. محمد صلاح):** 45/50 = 96% ✅ (ممتاز)
-3. **العربي (مس تقوى):** 28/30 = 95% ✅ (على الحد تماماً)
-4. **التاريخ (أ. أحمد سمير):** 28/30 = 94% ⚠️ (تحت الـ 95% بدرجتين)
-5. **الإنجليزي Unit 1 (أ. أيمن):** 43/50 = 92% ⚠️ (تحت الـ 95%)
-6. **الإنجليزي Unit 2 (أ. أيمن):** 44.5/50 = 89% 🚨 (أكبر هبوط تحت الـ 95%)
-
-**رسالة المراقب الصارمة:** نزولك في الإنجليزي والتاريخ عن الـ 95% خط أحمر لا يمكن تجاوزه. مجموعك التراكمي مدمج مع تالتة، افتح شيت الإنجليزي وامتحان التاريخ وصلح أخطاءك الليلة!`;
-  }
-
-  // 7. Tiredness / Fatigue / Laziness
-  if (clean.includes('تعب') || clean.includes('زهق') || clean.includes('ملل') || clean.includes('مش قادر') || clean.includes('كسل') || clean.includes('تسويف') || clean.includes('محبط')) {
-    return `يا دكتور كريم.. تعبك شاهده رادارنا ومقدرينه، أنت باذل مجهود كبير، بس اسمع مني الكلام اللي من القلب:
-- اللي بيفرق بين دكتور شاطر وبين شخص عادي هو القدرة على الاستمرار لما الشغف يقل.
-- فكر في فرحة والدك ووالدتك بيك يوم نتيجة الثانوية، وأنت داخل البيت بالبالطو الأبيض وسماعة كلية الطب 🩺
-- متضغطش على نفسك بمذاكرة 4 ساعات متواصلة؛ خد بريك 10 دقائق، اشرب كوباية مية، افتح تايمر 25 دقيقة بومودورو وابدأ في أسهل صفحة قدامك. مجرد ما تبدأ الزهق هيروح فوراً!`;
-  }
-
-  // General Direct Response covering ALL 4 subjects
-  const replies = [
-    `يا كريم، أنا شايف خطواتك وسجل ساعاتك ودرجاتك للمواد الأربعة لحظة بلحظة:
-- الفيزياء (${subjHours.physics}h)، العربي (${subjHours.arabic}h)، الإنجليزي (${subjHours.english}h)، التاريخ (${subjHours.history}h).
-- تركيزك الآن لازم يروح لموازنة المواد والبدء بالمادة الأقل، وحل المتراكمات.
-- اسألني عن أي مادة أو متراكمات محددة وهجاوبك بأرقامك الحقيقية، أو اضغط "بدء الجلسة" واستعن بالله! 🦁`,
-    `يا كريم، مفيش ثانية بتضيع بدون رصد في المواد الأربعة:
-- عندك محاضرات متأخرة في منصة عبد المعبود (كمية التحرك)، شيتات عربي لمستر محمد صلاح، مراجعة كلمات الإنجليزي لمستر أيمن، وأسئلة فهم التاريخ لمستر أحمد سمير.
-- ركز على إنجاز مهام اليوم في الجدول الأسبوعي، وأنا متابع معاك بعد كل جلسة امتحان وكويز! ⚡`
-  ];
-  return replies[turn % replies.length];
+  return computeLiveStudySnapshot({
+    sessions: Array.isArray(payload?.sessions) ? payload.sessions : (dbData.sessions || []),
+    subjects: Array.isArray(payload?.subjects) && payload.subjects.length >= 4
+      ? payload.subjects
+      : (Array.isArray(dbData.subjects) && dbData.subjects.length >= 4 ? dbData.subjects : DEFAULT_SERVER_SUBJECTS),
+    exemptions: Array.isArray(payload?.exemptions) ? payload.exemptions : (dbData.exemptions || []),
+    exams: Array.isArray(payload?.exams) ? payload.exams : (dbData.exams || []),
+    weeklyTasks: Array.isArray(payload?.weeklyTasks) ? payload.weeklyTasks : (dbData.weeklyTasks || []),
+    completedTaskIds: Array.isArray(payload?.completedTaskIds) ? payload.completedTaskIds : (dbData.completedTaskIds || []),
+    lectures: Array.isArray(payload?.lectures) ? payload.lectures : (dbData.lectures || [])
+  });
 }
 
 // Explicit routing for quotes file with UTF-8 support
@@ -342,7 +194,7 @@ const FIREBASE_RTDB_URL = 'https://shapap-13c58-default-rtdb.firebaseio.com/shap
 async function pullFromFirebaseRTDB() {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 1500);
+    const timer = setTimeout(() => controller.abort(), 4000);
     const res = await fetch(`${FIREBASE_RTDB_URL}.json`, { signal: controller.signal });
     clearTimeout(timer);
     if (res.ok) {
@@ -435,12 +287,22 @@ app.get('/api/db/sync', async (req, res) => {
       }
 
       if (fbData.exams) {
-        const examMap = new Map();
-        toArray(prevData.exams).forEach(e => examMap.set(String(e.id), e));
-        toArray(fbData.exams).forEach(e => {
-          if (e && e.id) examMap.set(String(e.id), e);
-        });
-        prevData.exams = Array.from(examMap.values()).sort((a,b) => new Date(b.date||0).getTime() - new Date(a.date||0).getTime());
+        const localLastUpdated = Number(currentDb.lastUpdated || 0);
+        const fbLastUpdated = Number(fbData.lastUpdated || 0);
+        const localExams = toArray(prevData.exams);
+        const fbExams = toArray(fbData.exams);
+
+        if (fbLastUpdated > localLastUpdated || localExams.length === 0) {
+          const examMap = new Map();
+          localExams.forEach(e => { if (e && e.id) examMap.set(String(e.id), e); });
+          fbExams.forEach(e => { if (e && e.id) examMap.set(String(e.id), e); });
+          prevData.exams = Array.from(examMap.values()).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+        } else {
+          // Local database is newer or equal: preserve local edits & deletions while filling only missing records if local was partial
+          const examMap = new Map();
+          localExams.forEach(e => { if (e && e.id) examMap.set(String(e.id), e); });
+          prevData.exams = Array.from(examMap.values()).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+        }
       }
 
       if (fbData.completedTaskIds) {
@@ -499,9 +361,13 @@ app.post('/api/db/sync', (req, res) => {
 
     const mergedExams = Array.isArray(incomingData.exams)
       ? incomingData.exams.map((ex: any) => {
-          const score = Number(ex.score) || 0;
-          const total = Number(ex.total) || 50;
-          const pct = ex.pct !== undefined ? Number(ex.pct) : Math.round((score / total) * 100);
+          const parsedScore = Number(ex.score);
+          const parsedTotal = Number(ex.total);
+          const score = Number.isFinite(parsedScore) ? parsedScore : 0;
+          const total = Number.isFinite(parsedTotal) && parsedTotal > 0 ? parsedTotal : 50;
+          const pct = ex.pct !== undefined && Number.isFinite(Number(ex.pct))
+            ? Number(ex.pct)
+            : Math.round((score / total) * 100);
           return {
             id: ex.id || `exam_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
             subjId: ex.subjId || 'physics',
@@ -663,37 +529,20 @@ app.delete('/api/db/active-session', async (req, res) => {
 });
 
 // AI System Prompt & Academic Supervisor
-const KAREEM_BASE_SYSTEM_PROMPT = `أنت "المراقب الأكاديمي الحصري وخبير إدارة الوقت والمذاكرة" للطالب "كريم عمر سيد".
+const KAREEM_BASE_SYSTEM_PROMPT = `أنت "المراقب الأكاديمي الحصري وكوتش الضمير القاسي والناصح الأمين" للطالب "كريم عمر سيد".
 بيانات الطالب وسياقه الحاسم:
-- الطالب: كريم عمر سيد - الصف الثاني الثانوي (تانية ثانوي مسار علمي علوم - طب وحياة)، من سدس / الفشن بمحافظة بني سويف.
-- الهدف الأسمى: أوائل الجمهورية في الثانوية العامة والالتحاق بكلية الطب البشري.
-- الأهمية القصوى: مجموع الصف الثاني الثانوي مدمج مع الصف الثالث الثانوي، هذه السنة مصيرية وحاسمة جداً ولا مجال لأي تهاون أو تفريط في أي ثانية أو أي درجة.
-- المواد الأربعة المقررة فقط ومدرسيها وجدولها الأسبوعي:
-  1) لغة عربية:
-     - أ. محمد صلاح (منصة أونلاين): تنزل المحاضرة كل سبت، والحل والكويز كل ثلاثاء.
-     - أ. تقوى مرزوق (سنتر): حضور سبت وثلاثاء الساعة 4:00 عصراً.
-  2) فيزياء:
-     - أ. محمد عبد المعبود (منصة أونلاين): تنزل المحاضرات كل أحد وأربعاء.
-  3) لغة إنجليزية:
-     - مستر أيمن عبد العاطي (سنتر): حضور سبت وثلاثاء الساعة 7:00 مساءً (تم تعديل الميعاد رسمياً من إثنين وخميس إلى سبت وثلاثاء).
-  4) تاريخ:
-     - مستر أحمد سمير (سنتر الفشن): حضور إثنين وخميس الساعة 1:00 ظهراً.
-
-خطة الطوارئ والماراثون الأكاديمي الحالية لكريم:
-- مراقبة وتصفية الـ 82 محاضرة ودرس متراكمة ومؤجلة موزعة على الأسبوع الحالي والقادم (فيزياء 24، عربي 22، إنجليزي 20، تاريخ 16).
-- التجهيز الشديد للامتحانين ذوي الجوائز والتكريم:
-  1. امتحان لغة عربية شامل معتمد على الوحدة الثانية (امتحان الجوائز والتكريم - شرط 95%+).
-  2. امتحان لغة إنجليزية شامل معتمد على الوحدة الثالثة Unit 3 (تقفيل 50/50 ولا تراجع).
-- الحفاظ على المذاكرة اليومية المنتظمة وتجنب الانقطاع.
-
-قواعد المراقبة والمحاسبة الصارمة:
-1. مراقبة الوقت والفاقد: راقب ساعات المذاكرة الصافية والوقت الضائع لحظة بلحظة. إذا ضيع وقتاً عاتبه بعتاب صادق ومؤثر يحرك ضميره. وإذا لم يذاكر شيئاً، اسأله بصدمة وعتاب: "مزاكرتش ليه ليه لحد دلوقتي يا كريم؟! الساعات بتضيع من حلمك وتعب أهلك!".
-2. قاعدة الـ 95% الإلزامية في الامتحانات والكويزات:
-   - إذا حصل على 100%: احتفل به كبطل وأسد للأوائل، وهنئه بفخر واعتزاز.
-   - إذا كانت درجته بين 95% و 99%: بارك له بقوة وحثه على غلق النقص البسيط (1-5%) لتقفيل 100% في الامتحان القادم.
-   - إذا نزلت درجته عن 95% (حتى لو 94% أو 90%): عاتبه بحزم واسأله: "ليه نزلت عن الـ 95% يا كريم؟! الـ 95% هي الحد الأدنى للأوائل! ضيعت درجات فين؟ تسرع ولا إهمال؟ افتح كشكول الملاحظات وراجع الغلطة فوراً!".
-   - إذا نزلت الدرجة عن 80%: دق جرس إنذار أحمر طارئ ووقفة حاسمة.
-3. التحدث بلهجة مصرية ذكية، وقورة، محفزة، حاسمة، وأخوية صادقة.`;
+- الطالب: كريم عمر سيد - الصف الثاني الثانوي (مسار علمي علوم)، من سدس / الفشن بمحافظة بني سويف.
+- الهدف الأسمى: أوائل الجمهورية في الثانوية العامة والالتحاق بكلية الطب البشري (المنافسة بالثانية والدرجة، ومجموع 2ث + 3ث متكامل).
+- القاعدة الذهبية للامتحانات: 95% هو الحد الأدنى الإلزامي، وأي نزول عنها جرس إنذار لا يقبل التبرير، والمستهدف 100%.
+- المواد الأربعة ومدرسوها المعتمدون:
+  1) لغة عربية: أ. تقوى مرزوق (سنتر: سبت وثلاثاء 4:00 م) & أ. محمد صلاح (منصة: سبت وثلاثاء).
+  2) فيزياء: أ. محمد عبد المعبود (منصة: أحد وأربعاء).
+  3) لغة إنجليزية: أ. أيمن عبد العاطي (سنتر: سبت وثلاثاء 7:00 م).
+  4) تاريخ: أ. أحمد سمير (منصة/سنتر: إثنين وخميس 1:00 ظ).
+- أسلوب الخطاب الإجباري ("كلام يطلع من النافوخ"):
+  • لا تكتفِ بسرد الأرقام أو الكلام البارد المجامِل أبداً! اربط كل رقم ومركم بضميره وحلم كلية الطب وتعب أهله في سدس/الفشن والوقت اللي بيجري.
+  • زوّد حدة الكلام وقوته طردياً مع الواقع: كلما زادت ساعات الانقطاع أو الساعات الضائعة أو المحاضرات المتروكة أو نزلت الدرجات عن 95%، تكون نبرتك أشد، أجرأ، وتهز ضميره بصدق يوجع ويفوّق من الغفلة، ولو ملتزم ومنضبط فخّمه بشرف وحذّره من الغرور أو التراخي.
+- قاعدة صارمة: اعتمد حصراً على الأرقام والأسماء والدرجات والمحاضرات المرسلة لك في بيانات الجلسة الحية أدناه. لا تخترع ولا تكرر أرقاماً قديمة أبداً.`;
 
 function getKareemSystemPrompt(customInstructions?: string) {
   let instructionsText = customInstructions;
@@ -703,82 +552,66 @@ function getKareemSystemPrompt(customInstructions?: string) {
       instructionsText = db?.data?.customAiInstructions;
     } catch(e) {}
   }
-  const effectiveDirectives = instructionsText || "راقب الوقت اللي بذاكره والوقت اللي بضيعه وعاتبني وقولي كلام مؤثر جداً. في الامتحانات لو جبت درجة حلوة باركلي، ولو مقفلتش أو نزلت عن الـ 95% قولي ليه كده وعلى حسب الدرجة حاسبني، ولو ما ذاكرتش قولي ما ذاكرتش ليه ليه. ومودك يتغير على حسب مستواي وعدد الساعات اللي بذاكرها وعدد المهمات اللي عملتها.";
+  const effectiveDirectives = instructionsText || "متطبطبش عليا لما أقصّر! راقب كل دقيقة بضيعها وكل محاضرة سبتها، وهزّ ضميري بكلام حاد ومؤثر يطلع من النافوخ، مع الحفاظ على دور كل تقرير مستقل بالأرقام الحقيقية اللحظية.";
 
   return `${KAREEM_BASE_SYSTEM_PROMPT}
 
-⚡ تعليمات وقواعد كريم الصريحة المباشرة للمراقب الأكاديمي (أوامر ملزمة بحرفيتها):
-"${effectiveDirectives}"
-(ملاحظة مهمة: نفذ كل حرف طلبه كريم في هذه التعليمات وطبقه على أسلوبك ونبرتك فوراً).`;
+⚡ تعليمات وقواعد كريم الصريحة:
+"${effectiveDirectives}"`;
 }
 
-// POST /api/ai/monitor
+// POST /api/ai/monitor -> Role 1: Comprehensive Performance, Time Discipline & Plan Overview
 app.post('/api/ai/monitor', async (req, res) => {
   try {
-    const { studyData, forceFresh, customInstructions } = req.body || {};
-    if (!studyData) {
-      return res.status(400).json({ success: false, error: 'بيانات المذاكرة مطلوبة للتحليل' });
-    }
-
-    const cacheKey = getCacheKey('monitor', {
-      tasksPending: studyData.pendingTasksCount,
-      completedToday: studyData.completedTodayCount,
-      examsCount: studyData.examsCount,
-      todayStudyMins: Math.floor((studyData.todayStudyMins || 0) / 15),
-      wastedMins: Math.floor((studyData.wastedMins || 0) / 15),
-      customInst: customInstructions || ''
-    });
-
-    if (!forceFresh) {
-      const cached = getFromCache(cacheKey);
-      if (cached) {
-        return res.json({ success: true, fromCache: true, analysis: cached });
-      }
-    }
-
-    const userPrompt = `إليك رادار شامل وفحص حي للموقف الأكاديمي الحقيقي للطالب كريم عمر:
-${JSON.stringify(studyData, null, 2)}
-
-المطلوب منك بصفتك المراقب الأكاديمي الصارم الذكي:
-1. كشف المتراكمات بالاسم: اذكر بوضوح أي محاضرات فيزياء أو عربي أو إنجليزي أو مهام متأخرة لم ينهِها كريم حتى الآن.
-2. مساءلة كريم بحزم: وجه له أسئلة مباشرة وصريحة تهز ضميره (مثال: "ليه مأجل محاضرة كمية التحرك ومسائل المقذوفات لحد دلوقتي؟ مين هيدخل الامتحان بدالك؟").
-3. تقييم الوقت الضائع بدقة: احسب الفاقد من ساعات اليقظة الـ 24 وعاتبه بلهجة مصرية وقورة وصادقة.
-4. مراجعة شرط الـ 95% الإلزامي: لو أي امتحان نزل عن 95% دقق فيه واطلب منه يفتح كشكول الأخطاء فوراً.
-5. خطة عمل حاسمة لليوم: وزع الساعات المتبقية بخطة مركزة بدون أي كلام نظري.`;
-
+    const { studyData, customInstructions } = req.body || {};
+    const snap = buildServerSnapshotFromPayload(studyData || {});
     const systemPrompt = getKareemSystemPrompt(customInstructions);
-    const analysisText = await callGeminiAPI(`${systemPrompt}\n\n${userPrompt}`);
-    setInCache(cacheKey, analysisText);
 
+    const userPrompt = `دورك الآن: كتابة "التقرير الشامل للتوازن الزمني والأداء العام" (بأسلوب استراتيجي هزّاز للضمير — يركز على الانضباط الزمني وتوازن المواد ونسب الإنجاز، مع رسالة ضمير موجعة ومؤثرة تناسب حالته الحالية، ومختلف تماماً عن جلسة استجواب المتراكمات وعن تقرير الامتحانات).
+البيانات الحية الفعلية الآن (${snap.generatedAtLabel}):
+- آخر جلسة مذاكرة: ${snap.inactivityLabel}
+- مذاكرة اليوم (${snap.todayDayName}): ${snap.todayStudyHours}h | الأسبوع: ${snap.weekStudyHours}h | الفاقد اليوم: ${snap.wastedHours}h
+- توزيع المواد: ${JSON.stringify(snap.subjectStudies.map((s) => ({ name: s.subjName, totalHours: s.totalHours, weekMins: s.weekMinutes, pendingLectures: s.pendingLecturesCount })))}
+- جدول الأسبوع: ${snap.doneTasks}/${snap.totalTasks} (${snap.tasksCompletionPct}%) | مهام اليوم المتبقية: ${snap.todayPendingTasks.map((t) => t.text).join(' | ') || 'لا يوجد'}
+- المحاضرات الكلية: ${snap.doneLectures}/${snap.totalLectures} (${snap.lecturesCompletionPct}%)
+- مؤشر الامتحانات العام: ${snap.examsAvgPct}% عبر ${snap.examsCount} امتحانات.
+
+اكتب التقرير الشامل باللهجة المصرية القوية والفصحى المنضبطة بأقسام واضحة (كلمة الضمير التي توجع وتفوّق، مؤشرات الوقت والفاقد، توازن المواد، وضع الخطة، الخلاصة والقرار الفوري) باستخدام هذه الأرقام الحقيقية فقط وبلا مجاملة باردة.`;
+
+    const geminiReply = await callGeminiTextOnly(`${systemPrompt}\n\n${userPrompt}`);
+    const analysisText = geminiReply || buildComprehensiveReport(snap);
     res.json({ success: true, fromCache: false, analysis: analysisText });
   } catch (err: any) {
     console.error('AI Monitor error:', err);
-    res.status(500).json({ success: false, error: err.message || 'فشل استدعاء المراقب الذكي' });
+    res.status(500).json({ success: false, error: err.message || 'فشل استدعاء التقرير الشامل' });
   }
 });
 
-// POST /api/ai/interrogate - Direct Backlog Interrogation & Accountability
+// POST /api/ai/interrogate -> Role 2: Direct Backlog & Procrastination Interrogation
 app.post('/api/ai/interrogate', async (req, res) => {
   try {
     const { backlogData, customInstructions } = req.body || {};
+    const snap = buildServerSnapshotFromPayload(backlogData || {});
     const systemPrompt = getKareemSystemPrompt(customInstructions);
 
     const prompt = `${systemPrompt}
 
-إليك جرد المتراكمات والوضع اللحظي لكريم:
-${JSON.stringify(backlogData || {}, null, 2)}
+دورك الآن: إدارة "جلسة محاكمة واستجواب عسكري للمتراكمات" (أسلوب حاد ولاذع ومؤثر يطلع من النافوخ — لا تسرد المتروكات ببرود أبداً، واجعل كريم يواجه ثمن كل تأجيل على مستقبله!).
+ركز على محاكمة المتروكات الحقيقية الموجودة الآن:
+- مدة الانقطاع عن المذاكرة: ${snap.inactivityLabel}
+- محاضرات المنصات المتروكة (${snap.undonePlatformLectures.length}): ${JSON.stringify(snap.undonePlatformLectures.slice(0, 10).map((l) => l.title))}
+- حصص السناتر المتروكة (${snap.undoneCenterLectures.length}): ${JSON.stringify(snap.undoneCenterLectures.slice(0, 10).map((l) => l.title))}
+- مهام الجدول المعلقة الآن: ${JSON.stringify((snap.todayPendingTasks.length ? snap.todayPendingTasks : snap.urgentPendingTasks).slice(0, 8).map((t) => t.text))}
+- الامتحانات التي نزلت عن 95%: ${JSON.stringify(snap.examsBelow95.map((e) => ({ topic: e.topic, score: `${e.score}/${e.total}`, notes: e.notes })))}
 
-أنت الآن في "جلسة مساءلة ومحاكمة أكاديمية صريحة" مع كريم:
-المطلوب منك:
-1. اذكر له بالضبط ما هو مراكمه بالاسم (من محاضرات فيزياء منصة أ. عبد المعبود المتأخرة، واجبات عربي أ. محمد صلاح، مهام المتراكم، والامتحانات اللي نزلت عن 95%).
-2. اسأله 3 أسئلة مواجهة صريحة ومحرجة تحرك غيرته على حلمه:
-   - سؤال عن سبب تأجيل الدروس المحددة دي بالذات.
-   - سؤال عن درجاته اللي ضاعت في الامتحانات السابقة وكيف هيقفل الـ 100%.
-   - سؤال عن الساعات والوقت اللي ضاع اليوم.
-3. اديه قرار فوري يبدأ بيه حالاً بدون دقيقة تأخير.
-تحدث بلهجة مصرية راقية، حازمة، قاطعة، ومحبّة لمستقبله كطبيب متفوق.`;
+المطلوب:
+1. كلمة افتتحية حادة توقظ ضميره على الفاقد الحقيقي وتعب أهله وثمن المماطلة.
+2. كشف المتروكات مصنفاً (منصة مقابل سنتر) لكل مادة مع تعليق قاسٍ وصادق على كل تراكم.
+3. مواجهة بالمهام المعلقة والثغرات <95% ومدة الانقطاع.
+4. توجيه 3 أسئلة محاكمة قاسية ومباشرة على أكثر مادة متراكمة (${snap.prioritySubjectName}) وحكم تنفيذي لا يقبل التأجيل.`;
 
-    const responseText = await callGeminiAPI(prompt);
+    const geminiReply = await callGeminiTextOnly(prompt);
+    const responseText = geminiReply || buildBacklogInterrogationReport(snap);
     res.json({ success: true, interrogation: responseText });
   } catch (err: any) {
     console.error('AI Interrogate error:', err);
@@ -786,81 +619,73 @@ ${JSON.stringify(backlogData || {}, null, 2)}
   }
 });
 
-// POST /api/ai/exam-reaction
+// POST /api/ai/exam-reaction -> Instant Per-Exam & Trend Reaction
 app.post('/api/ai/exam-reaction', async (req, res) => {
   try {
-    const { exam, currentAvg, customInstructions } = req.body || {};
+    const { exam, sameSubjHistory, subjStudyHours, allExamsCount, customInstructions } = req.body || {};
     if (!exam) {
       return res.status(400).json({ success: false, error: 'بيانات الامتحان مطلوبة' });
     }
 
+    const dbData = loadServerDbData();
+    const allExams = Array.isArray(dbData.exams) ? dbData.exams : [];
+    const subjectsList = Array.isArray(dbData.subjects) && dbData.subjects.length >= 4 ? dbData.subjects : DEFAULT_SERVER_SUBJECTS;
+    const subjName = exam.subjName || subjectsList.find((s: any) => s.id === exam.subjId)?.name || exam.subjId;
+
+    const { reaction: dynamicReaction, pct } = buildDynamicExamReaction(
+      exam,
+      allExams,
+      subjName,
+      String(subjStudyHours || '0.0')
+    );
+
     const score = Number(exam.score) || 0;
     const total = Number(exam.total) || 50;
-    const pct = Math.round((score / total) * 100);
-    const lostPoints = total - score;
+    const lostPoints = Math.max(total - score, 0);
 
     const systemPrompt = getKareemSystemPrompt(customInstructions);
     const prompt = `${systemPrompt}
 
 سجل كريم للتو نتيجة امتحان جديد:
-- المادة: ${exam.subjName || exam.subjId}
-- المدرس / المكان: ${exam.teacher || 'الدرس'}
+- المادة: ${subjName}
+- المدرس: ${exam.teacher || 'أستاذ المادة'}
 - موضوع الامتحان: ${exam.topic || 'اختبار'}
-- الدرجة المحققة: ${score} من ${total} (النسبة: ${pct}%)
-- الدرجات المفقودة: ${lostPoints} درجة
-- الملاحظات: ${exam.notes || 'لا توجد'}
-- المتوسط العام للامتحانات السابقة: ${currentAvg || pct}%
+- الدرجة: ${score}/${total} (${pct}%) | الفاقد: ${lostPoints} درجة
+- الملاحظات المسجلة: ${exam.notes || 'لا توجد'}
+- ساعات مذاكرة كريم المسجلة لهذه المادة: ${subjStudyHours || '0.0'}h
+- سجل الامتحانات السابقة في نفس المادة (${subjName}): ${JSON.stringify(sameSubjHistory || [])}
+- إجمالي الامتحانات المسجلة: ${allExamsCount || allExams.length}
 
-المطلوب:
-رد عليه مباشرة كالمشرف الأكاديمي الصارم بكلام مؤثر في فقرة إلى فقرتين:
-- إذا كانت النسبة 100%: ابتهج وهنئه بفخر كأحد أوائل الجمهورية.
-- إذا كانت 95% إلى 99%: حيه على مستواه الممتاز وطالبه بقفل الدرجات القليلة الضائعة.
-- إذا نزلت عن 95%: عاتبه بجدية واسأله بحزم: "ليه نزلت عن الـ 95% يا كريم؟! ضيعت درجات فين؟" ودعه يراجع أخطاءه فوراً.
-- إذا كانت أقل من 80%: صدمة ومحاسبة قوية على هذا الإخفاق.`;
+المطلوب: رد مخصص ومؤثر للغاية لهذه المادة وهذه الدرجة تحديداً، مع مقارنة واضحة بالتطور أو الهبوط عن الامتحان السابق في نفس المادة إن وجد. لو أقل من 95% اضرب جرس إنذار قاسياً يطلع من النافوخ على الدرجات الضايعة وتأثيرها على حلم الطب، ولو 95%+ احمِه من الغرور وادفعه للـ 100%.`;
 
-    const reactionText = await callGeminiAPI(prompt);
-    res.json({ success: true, reaction: reactionText, pct });
+    const geminiReply = await callGeminiTextOnly(prompt);
+    res.json({ success: true, reaction: geminiReply || dynamicReaction, pct });
   } catch (err: any) {
     console.error('AI Exam Reaction error:', err);
     res.status(500).json({ success: false, error: err.message || 'فشل تحليل الامتحان' });
   }
 });
 
-// POST /api/ai/schedule
+// POST /api/ai/schedule -> Dynamic Remaining-Hours Time Blocking
 app.post('/api/ai/schedule', async (req, res) => {
   try {
-    const { availableHours, bedtime, focusLevel, pendingTasks, examStats, customInstructions } = req.body || {};
-
-    const cacheKey = getCacheKey('schedule', {
-      availableHours,
-      bedtime,
-      focusLevel,
-      tasksLength: (pendingTasks || []).length,
-      examAvg: examStats ? examStats.overallAvg : null,
-      customInst: customInstructions || ''
-    });
-
-    const cached = getFromCache(cacheKey);
-    if (cached) {
-      return res.json({ success: true, fromCache: true, schedule: cached });
-    }
-
+    const { availableHours, bedtime, focusLevel, snapshot, customInstructions } = req.body || {};
+    const snap = buildServerSnapshotFromPayload({ snapshot });
     const systemPrompt = getKareemSystemPrompt(customInstructions);
+
     const prompt = `${systemPrompt}
 
-المعطيات لتوليد جدول اليوم بالدقائق:
-- الساعات المتاحة للمذاكرة اليوم: ${availableHours || '4'} ساعات
-- موعد النوم المستهدف: ${bedtime || '23:30'}
-- مستوى التركيز المطلوب: ${focusLevel || 'عالي'}
-- المهام المعلقة: ${JSON.stringify(pendingTasks || [])}
-- إحصائيات الامتحانات الأخيرة: ${JSON.stringify(examStats || {})}
+دورك الآن: تقسيم الساعات المتبقية من اليوم (${snap.todayDayName}) إلى جولات بومودورو عملية مع رسالة تحفيزية حاسمة توقد العزيمة.
+المعطيات الحية:
+- الساعات المتاحة: ${availableHours || '4'} ساعات | موعد النوم: ${bedtime || '23:30'} | التركيز: ${focusLevel || 'عالي'}
+- مذاكرة اليوم حتى الآن: ${snap.todayStudyHours}h | الفاقد: ${snap.wastedHours}h
+- مهام اليوم المعلقة: ${JSON.stringify(snap.todayPendingTasks.map((t) => t.text))}
+- أولويات المواد (حسب الأقل تغطية والأعلى تراكماً): ${JSON.stringify(snap.subjectStudies.map((s) => ({ subj: s.subjName, pendingLecs: s.pendingLecturesCount, hours: s.totalHours })))}
 
-المطلوب:
-اصنع جدولاً زمنياً دقيقاً بالدقائق، يوزع الوقت بذكاء ويعطي الأولوية للمادة الأضعف والمهام الحرجة، مع فترات راحة بومودورو مدروسة. أجب بتنسيق منظم باللغة العربية.`;
+اصنع جدولاً زمنياً عملياً بجولات 50/10 يعطي الأولوية للمهام المعلقة اليوم ثم أضعف مادة/أعلى محاضرات متبقية، واختمه بكلمة قوية تمنعه من تضييع باقي اليوم.`;
 
-    const scheduleText = await callGeminiAPI(prompt);
-    setInCache(cacheKey, scheduleText);
-
+    const geminiReply = await callGeminiTextOnly(prompt);
+    const scheduleText = geminiReply || buildDynamicTimeBlockSchedule(snap, availableHours, bedtime, focusLevel);
     res.json({ success: true, fromCache: false, schedule: scheduleText });
   } catch (err: any) {
     console.error('AI Schedule error:', err);
@@ -868,35 +693,39 @@ app.post('/api/ai/schedule', async (req, res) => {
   }
 });
 
-// POST /api/ai/exam-audit
+// POST /api/ai/exam-audit -> Role 3: Per-Subject & Per-Score Diagnostic Report
 app.post('/api/ai/exam-audit', async (req, res) => {
   try {
-    const { exams, customInstructions } = req.body || {};
+    const { exams, snapshot, customInstructions } = req.body || {};
     if (!exams || !Array.isArray(exams)) {
       return res.status(400).json({ success: false, error: 'قائمة الامتحانات مطلوبة' });
     }
 
-    const cacheKey = getCacheKey('exam_audit', { examsLength: exams.length, lastExam: exams[0], customInst: customInstructions || '' });
-    const cached = getFromCache(cacheKey);
-    if (cached) {
-      return res.json({ success: true, fromCache: true, diagnostic: cached });
-    }
-
+    const snap = buildServerSnapshotFromPayload({ snapshot, exams });
     const systemPrompt = getKareemSystemPrompt(customInstructions);
+
     const prompt = `${systemPrompt}
 
-إليك سجل امتحانات كريم ودرجاته ونسبه المئوية:
-${JSON.stringify(exams, null, 2)}
+دورك الآن: إعداد "تقرير تشخيص الامتحانات المفصل حسب كل مادة وكل درجة" (مختلف عن التقرير الشامل ومختلف عن استجواب المحاضرات — تشريح حاد ومؤثر للدرجات المفقودة وثمن كل غلطة).
+البيانات الحية لكل مادة:
+${JSON.stringify(snap.subjectExams.map((se) => ({
+      subj: se.subjName,
+      examsCount: se.examsCount,
+      avgPct: se.avgPct,
+      latestPct: se.latestPct,
+      deltaPct: se.deltaPct,
+      totalLostMarks: se.totalLostMarks,
+      band: se.band,
+      notes: se.recordedNotes,
+      exams: se.examsList.map((e) => ({ topic: e.topic, score: `${e.score}/${e.total}`, date: e.date }))
+    })), null, 2)}
 
 المطلوب:
-1. تشخيص دقيق للدرجات ونسب النجاح في كل مادة ومقارنتها بشرط الـ 95%.
-2. كشف الثغرات ونقاط النزيف التي يخسر فيها درجات.
-3. خطة إنقاذ محددة لرفع النسبة المئوية في الامتحانات القادمة وتقفيل الـ 100%.`;
+- إفراد تشريح وتوصية مستقلة ومختلفة لكل مادة حسب درجتها وتطورها (تحسن +delta أو هبوط -delta) مقارنة بشرط الـ 95%، وربط كل مادة بساعات مذاكرتها الفعلية وملاحظات الأخطاء المسجلة فيها، وبلهجة صادقة وحاسمة تهز ضمير كريم على كل درجة تضيع وتبين له الخطة لرفعها لـ 100%.`;
 
-    const text = await callGeminiAPI(prompt);
-    setInCache(cacheKey, text);
-
-    res.json({ success: true, fromCache: false, diagnostic: text });
+    const geminiReply = await callGeminiTextOnly(prompt);
+    const diagnosticText = geminiReply || buildExamsDiagnosticReport(snap);
+    res.json({ success: true, fromCache: false, diagnostic: diagnosticText });
   } catch (err: any) {
     console.error('AI Exam Audit error:', err);
     res.status(500).json({ success: false, error: err.message || 'فشل تحليل الامتحانات' });
@@ -911,18 +740,23 @@ app.post('/api/ai/chat', async (req, res) => {
       return res.status(400).json({ success: false, error: 'الرسالة مطلوبة' });
     }
 
+    const snap = buildServerSnapshotFromPayload(context || {});
     const systemPrompt = getKareemSystemPrompt(customInstructions);
     const prompt = `${systemPrompt}
 
-السياق الحالي للطالب كريم:
-${JSON.stringify(context || {}, null, 2)}
+السياق اللحظي الحقيقي للطالب كريم الآن:
+- آخر جلسة: ${snap.inactivityLabel} | اليوم: ${snap.todayStudyHours}h | الأسبوع: ${snap.weekStudyHours}h | الفاقد اليوم: ${snap.wastedHours}h
+- توزيع المواد: ${JSON.stringify(snap.subjectStudies.map((s) => ({ subj: s.subjName, h: s.totalHours, pendingLecs: s.pendingLecturesCount })))}
+- متوسط الامتحانات: ${snap.examsAvgPct}% (${snap.examsCount} امتحانات)
+- المهام المتبقية: ${snap.pendingTasksCount} | محاضرات غير منجزة: ${snap.undoneLecturesCount}
 
-سؤال أو رسالة كريم:
+رسالة كريم:
 "${message}"
 
-أجب كالمشرف الأكاديمي الصارم والمحب لكريم، باللغة العربية واللهجة المصرية الراقية، مع التركيز التام على إدارة الوقت، علاج التسويف، والحفاظ على التفوق والـ 95%+.`;
+أجب باللهجة المصرية الأصيلة المؤثرة القوية ("كلام يطلع من النافوخ" يهز الضمير ويواجهه بالحقيقة ولا يجامله، وبأرقام حقيقية فقط من السياق أعلاه). لو مريح أو منقطع أو مراكم شد عليه بقسوة المحب الخائف على مستقبله، ولو مجتهد شجّعه بفخر وحفّزه يحافظ على الصدارة.`;
 
-    const reply = await callGeminiAPI(prompt, message, context);
+    const geminiReply = await callGeminiTextOnly(prompt);
+    const reply = geminiReply || buildSupervisorChatAnswer(message, snap);
     res.json({ success: true, reply });
   } catch (err: any) {
     console.error('AI Chat error:', err);

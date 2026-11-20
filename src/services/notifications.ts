@@ -17,37 +17,47 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   morningCheckIn: true
 };
 
-export function getTimeGreeting(date: Date = new Date()): {
+export function getTimeGreeting(date: Date = new Date(), hoursSinceLastSession?: number | null): {
   period: 'morning' | 'afternoon' | 'evening' | 'night';
   greeting: string;
   motivation: string;
 } {
   const hour = date.getHours();
+  const isIdleHard = hoursSinceLastSession === null || (typeof hoursSinceLastSession === 'number' && hoursSinceLastSession >= 12);
+
   if (hour >= 5 && hour < 12) {
     return {
       period: 'morning',
-      greeting: 'صباح الخير والهمة يا دكتور كريم ☀️',
-      motivation: 'جهز نفسك للمذاكرة وابدأ يومك ببركة وتوكل على الله.. كل دقيقة النهاردة بتقربك لكلية الطب!'
+      greeting: isIdleHard ? '🚨 اصحى يا كريم! الصبح طلع وأنت لسه بعيد عن كتبك!' : 'صباح الهمة والرجولة يا دكتور كريم ☀️',
+      motivation: isIdleHard
+        ? 'الساعة بتعدي من رصيدك وحلم الطب البشري مش بيستنى حد نايم! تعب أبوك وأمك في رقبتك — اكسر الكسل وابدأ النهاردة قبل ما يضيع!'
+        : 'ابدأ يومك ببركة وتوكل على الله.. كل ساعة تركيز النهاردة بتحط طوبة جديدة في كلية الطب!'
     };
   }
   if (hour >= 12 && hour < 17) {
     return {
       period: 'afternoon',
-      greeting: 'أهلاً يا بطل في نص اليوم 🌤️',
-      motivation: 'طمني عليك، أخبار المذاكرة والسناتر إيه دلوقتي؟ خليك مركز على مهام اليوم!'
+      greeting: isIdleHard ? '⚠️ نص اليوم راح يا كريم!! لسه ما اتحركتش ليه؟!' : 'أهلاً يا دكتور في نص اليوم 🌤️',
+      motivation: isIdleHard
+        ? 'النهار قرب يخلص ومنافسينك في علمي علوم بيقفلوا شيتات ودروس دلوقتي! فوق لنفسك وافتح التايمر حالاً بدل ما تندم بالليل!'
+        : 'خليك شرس في نص اليوم! راقب الساعة وما تسمحش لنص ساعة تروح هدر من مهام اليوم.'
     };
   }
   if (hour >= 17 && hour < 22) {
     return {
       period: 'evening',
-      greeting: 'مساء الإنجاز يا دكتور كريم 🌙',
-      motivation: 'الوقت الذهبي لتقفيل مهام اليوم! جهز نفسك لجلسة تركيز محترمة تقفل بيها المتاح.'
+      greeting: isIdleHard ? '🔥 اليوم بيودّعك وأنت لسه سايب مهامك!!' : 'مساء الإصرار يا دكتور كريم 🌙',
+      motivation: isIdleHard
+        ? 'الوقت الذهبي ده آخر فرصة تلحق بيها ضميرك النهاردة! اقفل التليفون واللي ملهيش لازمة وشيل أهم مهمة قدامك دلوقتي!'
+        : 'الوقت الذهبي لتقفيل اللي فاضل! اقفل مهام اليوم كلها عشان تحط راسك على المخدة وأنت راضي عن نفسك.'
     };
   }
   return {
     period: 'night',
-    greeting: 'بطل الليل يا كريم 🌟',
-    motivation: 'طمني عليك.. قبل ما تنام خلّص أهم مهمة فاضلة عشان تنام بضمير مستريح.'
+    greeting: isIdleHard ? '🚨 آخر ساعات الليل.. هتنام بضمير ميت ولا هتلحق نفسك؟!' : 'أبطال آخر الليل يا كريم 🌟',
+    motivation: isIdleHard
+      ? 'النهاردة عدى ومش هيرجع تاني في عمرك! قبل ما تنام خلّص ولو مهمة واحدة تقيلة عشان ما تصحاش بكرة شايل حمل يومين!'
+      : 'طمني عليك.. اقفل آخر مهمة متبقية قبل النوم عشان تصحى بكرة على نضافة.'
   };
 }
 
@@ -64,17 +74,19 @@ export function getHoursSinceLastSession(sessions: Session[]): number | null {
 
 /**
  * Generates a dynamic check-in message containing today's actual tasks from the weekly schedule,
- * prioritizing user-added tasks first.
+ * prioritizing user-added tasks first, with sharp conscience-shaking intensity.
  */
 export function buildCheckInNotification(
   tasks: WeeklyTask[],
   completedTaskIds: Set<string | number>,
   subjects: Subject[],
-  customGreetingOverride?: string
+  customGreetingOverride?: string,
+  sessions?: Session[]
 ): SmartNotificationItem {
   const todayId = getCurrentArabicDayId();
   const todayLabel = getArabicDayLabel(todayId);
-  const { greeting, motivation } = getTimeGreeting();
+  const hoursIdle = sessions ? getHoursSinceLastSession(sessions) : undefined;
+  const { greeting, motivation } = getTimeGreeting(new Date(), hoursIdle);
 
   const todayTasks = tasks.filter(t => t.dayId === todayId);
   const pendingToday = todayTasks.filter(
@@ -92,17 +104,17 @@ export function buildCheckInNotification(
 
   let tasksSummary = '';
   if (sortedPending.length === 0 && todayTasks.length > 0) {
-    tasksSummary = `🏆 ما شاء الله! خلصت كل مهام يوم ${todayLabel} (${doneCount}/${todayTasks.length})! ممكن تراجع أو تضيف مهمة في الخانة اليدوية.`;
+    tasksSummary = `🏆 الله عليك يا دكتور! قفلت مهام يوم ${todayLabel} كلها (${doneCount}/${todayTasks.length})! ما تقفش هنا — راجع قديمك أو ضيف مهمة تفوق في الخانة اليدوية.`;
   } else if (sortedPending.length === 0) {
-    tasksSummary = `يوم ${todayLabel} فاضي حالياً! افتح الجدول الأسبوعي واضغط توليد أو أضف مهامك النهاردة.`;
+    tasksSummary = `⚠️ يوم ${todayLabel} فاضي بدون مهام متسجلة! مفيش يوم بيعدي في تانية ثانوي كده — افتح الجدول وزع محاضراتك دلوقتي!`;
   } else {
     const previewLines = sortedPending.slice(0, 4).map((t, idx) => {
       const subjName = subjects.find(s => s.id === t.subjId)?.name || t.subjId;
       const star = (t.isUserAdded || t.category === 'manual') ? '⭐ ' : '';
       return `${idx + 1}. ${star}[${subjName}] ${t.text}`;
     });
-    const extraCount = sortedPending.length > 4 ? `\n+ ولسه ${sortedPending.length - 4} مهام أخرى في جدول النهاردة.` : '';
-    tasksSummary = `📋 مهام جدول النهاردة (يوم ${todayLabel} - متبقي ${sortedPending.length} من ${todayTasks.length}):\n${previewLines.join('\n')}${extraCount}`;
+    const extraCount = sortedPending.length > 4 ? `\n🚨 + ولسه ${sortedPending.length - 4} مهام تانية متسابَة في جدول النهاردة!` : '';
+    tasksSummary = `📋 المهام اللي مستنياك دلوقتي في يوم ${todayLabel} (متبقي ${sortedPending.length} من ${todayTasks.length}):\n${previewLines.join('\n')}${extraCount}\n\n🔥 يلا افتح الكتب — كلام التمنّي ما بيدخلش كلية طب!`;
   }
 
   return {
@@ -117,16 +129,25 @@ export function buildCheckInNotification(
 }
 
 /**
- * Checks if 12+ hours have passed without any study session.
+ * Checks if 12+ hours have passed without any study session — harsh wake-up alarm.
  */
-export function buildInactivity12hNotification(sessions: Session[]): SmartNotificationItem | null {
+export function buildInactivity12hNotification(
+  sessions: Session[],
+  tasks?: WeeklyTask[],
+  completedTaskIds?: Set<string | number>
+): SmartNotificationItem | null {
   const hours = getHoursSinceLastSession(sessions);
+  const pendingCount = tasks && completedTaskIds
+    ? tasks.filter(t => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))).length
+    : 0;
+  const pendingLine = pendingCount > 0 ? `\n📌 وقدامك ${pendingCount} مهمة في جدولك لسه ما اتفتحتش!` : '';
+
   if (hours === null) {
     return {
       id: `notif_12h_${Date.now()}`,
       type: 'inactivity_12h',
-      title: '🚨 عدى أكثر من 12 ساعة بدون جلسة مذاكرة!',
-      body: 'يا دكتور كريم.. مفيش أي جلسة مذاكرة مسجلة في آخر 12 ساعة! جهز نفسك وافتح غرفة التركيز الآن ولو بجلسة 25 دقيقة تنقذ بيها اليوم.',
+      title: '🚨 مفيش ولا دقيقة مذاكرة متسجلة يا كريم!!',
+      body: `الرادار شايف الشاشة بيضا وصفر ساعات مذاكرة! تعب أهلك وحلم أوائل الجمهورية بيضيع وأنت ساكت.${pendingLine}\nارمي أي مشتت في إيدك وافتح غرفة التركيز الآن ولو بـ 25 دقيقة رجولة!`,
       timestamp: Date.now(),
       read: false,
       actionTab: 'focusView'
@@ -134,11 +155,12 @@ export function buildInactivity12hNotification(sessions: Session[]): SmartNotifi
   }
   if (hours >= 12) {
     const rounded = Math.floor(hours);
+    const daysText = rounded >= 24 ? `(${Math.floor(rounded / 24)} يوم و ${rounded % 24} ساعة!!)` : '';
     return {
       id: `notif_12h_${Date.now()}`,
       type: 'inactivity_12h',
-      title: `🚨 إنذار غياب ${rounded} ساعة بدون مذاكرة!`,
-      body: `عدى ${rounded} ساعة كاملة يا كريم من آخر جلسة مذاكرة ليك! مفيش وقت يضيع ومجموع تانية مدمج مع تالتة.. اضغط وابدأ جلسة الآن!`,
+      title: `🚨 إنذار غياب ${rounded} ساعة ${daysText} بدون مذاكرة!`,
+      body: `عدى ${rounded} ساعة كاملة يا كريم من آخر مرة فتحت فيها التايمر!! بتفكر في إيه والساعات دي بتطير من مجموع تانية وتالتة؟ منافسيك مش نايمين!${pendingLine}\nقوم فوراً اكسر الجمود ده بجلسة 30 دقيقة دلوقتي حالاً!`,
       timestamp: Date.now(),
       read: false,
       actionTab: 'focusView'
@@ -194,8 +216,8 @@ export function buildPreExamNotification(
   return {
     id: `notif_exam_${Date.now()}`,
     type: 'exam_alert',
-    title: '🏆 تنبيه امتحان قريب! جهز نفسك لشرط الـ 95%+',
-    body: `يا دكتور كريم عندك امتحان قريب لازم تستعدله من دلوقتي وتراجع أخطاءك:\n${lines.join('\n')}`,
+    title: '🏆 امتحانك على الأبواب يا كريم! مفيش سماح تنزل عن 95%!',
+    body: `الامتحان ده بيختبر تعبك الحقيقي — راجع غلطاتك السابقة وحل بإيدك قبل ما تدخل القاعة عشان تقفله 100% وترفع راس أهلك:\n${lines.join('\n')}`,
     timestamp: Date.now(),
     read: false,
     actionTab: 'weeklyView'

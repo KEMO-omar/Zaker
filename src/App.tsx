@@ -29,6 +29,12 @@ import {
   fetchQuotes,
   calculateDynamicSupervisorMood
 } from './services/api';
+import {
+  computeLiveStudySnapshot,
+  buildComprehensiveReport,
+  buildExamsDiagnosticReport,
+  LiveStudyInput
+} from './services/reportEngine';
 
 import { Header } from './components/Header';
 import { ViewNav } from './components/ViewNav';
@@ -92,6 +98,23 @@ export const App: React.FC = () => {
   const [dbLoaded, setDbLoaded] = useState<boolean>(false);
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [exams, setExams] = useState<ExamRecord[]>([]);
+  const examsRef = useRef<ExamRecord[]>([]);
+  examsRef.current = exams;
+
+  const safeSaveExamsLocalStorage = (list: ExamRecord[]) => {
+    try {
+      localStorage.setItem('kareem_exams', JSON.stringify(list));
+    } catch (e) {
+      try {
+        const lightweight = list.map((ex) =>
+          ex.certificateImage && ex.certificateImage.length > 30000
+            ? { ...ex, certificateImage: '' }
+            : ex
+        );
+        localStorage.setItem('kareem_exams', JSON.stringify(lightweight));
+      } catch (e2) {}
+    }
+  };
   const [customAiInstructions, setCustomAiInstructions] = useState<string>('');
   const [quotes, setQuotes] = useState<string[]>([]);
   const [isManualSessionOpen, setIsManualSessionOpen] = useState(false);
@@ -260,8 +283,8 @@ export const App: React.FC = () => {
         if (rawLectures) setLectures(JSON.parse(rawLectures));
         const rawExams = localStorage.getItem('kareem_exams');
         if (rawExams) setExams(JSON.parse(rawExams));
-        const rawAudit = localStorage.getItem('kareem_audit_report');
-        if (rawAudit) setAuditReport(rawAudit);
+        // Clear any previously frozen report so reports always compute from live real-time data
+        localStorage.removeItem('kareem_audit_report');
       } catch (e) {}
 
       // Server DB
@@ -317,8 +340,23 @@ export const App: React.FC = () => {
           try { localStorage.setItem('kareem_lectures', JSON.stringify(db.lectures)); } catch (e) {}
         }
         if (Array.isArray(db.exams) && db.exams.length > 0) {
-          setExams(db.exams);
-          try { localStorage.setItem('kareem_exams', JSON.stringify(db.exams)); } catch (e) {}
+          setExams((prev) => {
+            const map = new Map<string, ExamRecord>();
+            db.exams.forEach((e: ExamRecord) => {
+              if (e && e.id) map.set(String(e.id), e);
+            });
+            prev.forEach((e) => {
+              if (e && e.id && !map.has(String(e.id))) {
+                map.set(String(e.id), e);
+              }
+            });
+            const merged = Array.from(map.values()).sort(
+              (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
+            );
+            examsRef.current = merged;
+            safeSaveExamsLocalStorage(merged);
+            return merged;
+          });
         }
         if (db.activeWeekStartKey) {
           setActiveWeekStartKey(db.activeWeekStartKey);
@@ -390,12 +428,26 @@ export const App: React.FC = () => {
     setAiMood(dynamicMood);
   }, [sessions, exams]);
 
-  // Initial audit report generation
+  // Live helper returning current snapshot input
+  const getLiveStudyInput = useCallback((overrides?: Partial<LiveStudyInput>): LiveStudyInput => ({
+    sessions,
+    subjects,
+    exemptions,
+    exams,
+    weeklyTasks,
+    completedTaskIds: Array.from(completedTaskIds),
+    lectures,
+    nowMs: Date.now(),
+    ...overrides
+  }), [sessions, subjects, exemptions, exams, weeklyTasks, completedTaskIds, lectures]);
+
+  // Dynamically recompute Comprehensive Report and Exam Diagnostic Report whenever live data changes or view is opened
   useEffect(() => {
-    if (!auditReport && (lectures.length > 0 || weeklyTasks.length > 0)) {
-      handleTriggerAiAudit();
-    }
-  }, [lectures.length, weeklyTasks.length, auditReport]);
+    if (!dbLoaded) return;
+    const snap = computeLiveStudySnapshot(getLiveStudyInput());
+    setAuditReport(buildComprehensiveReport(snap));
+    setExamAuditReport(buildExamsDiagnosticReport(snap));
+  }, [dbLoaded, currentTab, getLiveStudyInput]);
 
   // Sync Countdown Timer (60 mins)
   useEffect(() => {
@@ -553,7 +605,7 @@ export const App: React.FC = () => {
     if (notificationPrefs.inactivity12hAlert) {
       const last12hAlert = Number(localStorage.getItem('kareem_last_12h_alert') || 0);
       if (forceAlerts || now - last12hAlert >= 2 * 60 * 60 * 1000) {
-        const alert12h = buildInactivity12hNotification(sessions);
+        const alert12h = buildInactivity12hNotification(sessions, weeklyTasks, completedTaskIds);
         if (alert12h) {
           localStorage.setItem('kareem_last_12h_alert', String(now));
           pushSmartNotification(alert12h);
@@ -579,7 +631,7 @@ export const App: React.FC = () => {
       const intervalMs = Math.max(15, notificationPrefs.intervalMinutes) * 60 * 1000;
       if (forceCheckIn || now - lastCheckIn >= intervalMs) {
         localStorage.setItem('kareem_last_checkin_alert', String(now));
-        const checkIn = buildCheckInNotification(weeklyTasks, completedTaskIds, subjects);
+        const checkIn = buildCheckInNotification(weeklyTasks, completedTaskIds, subjects, undefined, sessions);
         pushSmartNotification(checkIn);
       }
     }
@@ -617,43 +669,17 @@ export const App: React.FC = () => {
     if (ok) showToast('تمت المزامنة وحفظ التعديلات بنجاح!');
   };
 
-  // AI Supervisor Audit
-  const handleTriggerAiAudit = async (forceFresh = false) => {
+  // AI Supervisor Comprehensive Report Audit
+  const handleTriggerAiAudit = async (forceFresh = true) => {
     setIsAuditing(true);
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const liveInput = getLiveStudyInput();
+    const snap = computeLiveStudySnapshot(liveInput);
 
-    let todayMins = 0;
-    sessions.forEach((s) => {
-      const ts = s.tsStart || (s.date ? new Date(s.date).getTime() : 0);
-      if (ts >= startOfToday) todayMins += s.minutes || 0;
-    });
-
-    const pendingTasksCount = weeklyTasks.filter((t) => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))).length;
-    const completedTodayCount = completedTaskIds.size;
-    const totalLectures = lectures.length || 82;
-    const completedLectures = lectures.filter((l) => l.isDone).length;
-    const remainingLectures = totalLectures - completedLectures;
-
-    const studyData = {
-      todayStudyMins: todayMins,
-      examsCount: exams.length,
-      pendingTasksCount,
-      completedTodayCount,
-      totalLectures,
-      completedLectures,
-      remainingLectures,
-      examsAvg: exams.length > 0 ? Math.round(exams.reduce((a, b) => a + (b.pct || Math.round((b.score / b.total) * 100)), 0) / exams.length) : 0
-    };
-
-    const analysis = await callAiMonitor(studyData, customAiInstructions, forceFresh);
+    const analysis = await callAiMonitor(liveInput, customAiInstructions, forceFresh);
     setAuditReport(analysis);
-    try {
-      localStorage.setItem('kareem_audit_report', analysis);
-    } catch (e) {}
 
     // Dynamic supervisor mood directly calculated from real sessions, exams, and inactivity
-    const dynamicMood = calculateDynamicSupervisorMood(sessions, exams, todayMins);
+    const dynamicMood = calculateDynamicSupervisorMood(sessions, exams, snap.todayStudyMins);
     setAiMood(dynamicMood);
 
     setIsAuditing(false);
@@ -842,31 +868,36 @@ export const App: React.FC = () => {
 
   // Add Exam
   const handleSaveExam = async (examData: Omit<ExamRecord, 'id' | 'pct'>) => {
-    const pct = Math.round((examData.score / examData.total) * 100);
+    const pct = examData.total > 0 ? Math.round((examData.score / examData.total) * 100) : 0;
     const newExam: ExamRecord = {
       ...examData,
       id: `exam_${Date.now()}`,
       pct
     };
 
-    const updated = [newExam, ...exams];
+    const currentExams = examsRef.current;
+    const updated = [newExam, ...currentExams.filter((e) => e.id !== newExam.id)];
+    examsRef.current = updated;
     setExams(updated);
+    safeSaveExamsLocalStorage(updated);
+
+    // Sync IMMEDIATELY to server & Firebase BEFORE running AI reaction
+    const syncOk = await triggerAutoSync({ exams: updated });
+    if (syncOk) {
+      showToast('✅ تم تسجيل وحفظ نتيجة الامتحان في قاعدة البيانات بنجاح!');
+    } else {
+      showToast('⚠️ تم حفظ الامتحان محلياً — تعذر الاتصال بالسيرفر، اضغط مزامنة');
+    }
+
+    // Call instant AI reaction (non-blocking for persistence)
     try {
-      localStorage.setItem('kareem_exams', JSON.stringify(updated));
-    } catch (e) {}
-    showToast('تم تسجيل وحفظ نتيجة الامتحان والشهادة في القاعدة!');
-
-    // Call instant AI reaction
-    const currentAvg = updated.length > 0
-      ? Math.round(updated.reduce((a, b) => a + (b.pct || 0), 0) / updated.length)
-      : pct;
-
-    const res = await callAiExamReaction(newExam, currentAvg, customAiInstructions);
-    setLastExamForReaction(newExam);
-    setExamReactionText(res.reaction);
-    setIsExamReactionOpen(true);
-
-    triggerAutoSync({ exams: updated });
+      const res = await callAiExamReaction(newExam, updated, subjects, sessions, customAiInstructions);
+      setLastExamForReaction(newExam);
+      setExamReactionText(res.reaction);
+      setIsExamReactionOpen(true);
+    } catch (err) {
+      // Exam is already safely persisted
+    }
   };
 
   // Edit Exam
@@ -875,25 +906,23 @@ export const App: React.FC = () => {
     setIsEditExamOpen(true);
   };
 
-  const handleUpdateExam = (updatedExam: ExamRecord) => {
-    const updated = exams.map((e) => (e.id === updatedExam.id ? updatedExam : e));
+  const handleUpdateExam = async (updatedExam: ExamRecord) => {
+    const updated = examsRef.current.map((e) => (e.id === updatedExam.id ? updatedExam : e));
+    examsRef.current = updated;
     setExams(updated);
-    try {
-      localStorage.setItem('kareem_exams', JSON.stringify(updated));
-    } catch (e) {}
-    showToast('تم حفظ تعديلات الامتحان والشهادة في القاعدة!');
-    triggerAutoSync({ exams: updated });
+    safeSaveExamsLocalStorage(updated);
+    const syncOk = await triggerAutoSync({ exams: updated });
+    showToast(syncOk ? '✅ تم حفظ تعديلات الامتحان والشهادة في القاعدة!' : '⚠️ تم التعديل محلياً — اضغط مزامنة');
   };
 
   // Delete Exam
-  const handleDeleteExam = (id: string) => {
-    const updated = exams.filter((e) => e.id !== id);
+  const handleDeleteExam = async (id: string) => {
+    const updated = examsRef.current.filter((e) => e.id !== id);
+    examsRef.current = updated;
     setExams(updated);
-    try {
-      localStorage.setItem('kareem_exams', JSON.stringify(updated));
-    } catch (e) {}
-    showToast('تم حذف سجل الامتحان من القاعدة');
-    triggerAutoSync({ exams: updated });
+    safeSaveExamsLocalStorage(updated);
+    const syncOk = await triggerAutoSync({ exams: updated });
+    showToast(syncOk ? 'تم حذف سجل الامتحان من القاعدة' : 'تم الحذف محلياً');
   };
 
   // Save Subjects Targets
@@ -1107,23 +1136,21 @@ export const App: React.FC = () => {
   // AI Schedule Generator Action
   const handleGenerateSchedule = async (hours: string, bedtime: string, focusLevel: string) => {
     setIsGeneratingSchedule(true);
-    const pendingTasks = weeklyTasks.filter((t) => !completedTaskIds.has(t.id));
     const sched = await callAiSchedule({
       availableHours: hours,
       bedtime,
       focusLevel,
-      pendingTasks,
-      examStats: { count: exams.length },
+      studyInput: getLiveStudyInput(),
       customInstructions: customAiInstructions
     });
     setAiScheduleText(sched);
     setIsGeneratingSchedule(false);
   };
 
-  // AI Exam Audit Action
+  // AI Exam Audit Action (Per-Subject & Per-Score Diagnostic)
   const handleTriggerExamAudit = async () => {
     setIsAuditingExams(true);
-    const report = await callAiExamAudit(exams, customAiInstructions);
+    const report = await callAiExamAudit(getLiveStudyInput(), customAiInstructions);
     setExamAuditReport(report);
     setIsAuditingExams(false);
   };
@@ -1132,24 +1159,7 @@ export const App: React.FC = () => {
   const handleTriggerInterrogation = async () => {
     setIsInterrogating(true);
     setIsInterrogationOpen(true);
-    const undoneLectures = lectures.filter((l) => !l.isDone).map((l) => `${l.title} (${l.code})`);
-    const pendingTasks = weeklyTasks
-      .filter((t) => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id)))
-      .map((t) => `${t.text} [${t.dayId}]`);
-    const lowExams = exams
-      .filter((e) => (e.pct || Math.round((e.score / e.total) * 100)) < 95)
-      .map((e) => `${e.topic} (${e.score}/${e.total} = ${e.pct || Math.round((e.score / e.total) * 100)}%) مع ${e.teacher}`);
-
-    const backlogData = {
-      student: 'كريم عمر سيد',
-      track: 'تانية ثانوي علمي علوم - طب وحياة',
-      goal: 'أوائل الجمهورية والطب البشري',
-      undoneLectures,
-      pendingTasks,
-      lowExams
-    };
-
-    const text = await callAiInterrogate(backlogData, customAiInstructions);
+    const text = await callAiInterrogate(getLiveStudyInput(), customAiInstructions);
     setInterrogationText(text);
     setIsInterrogating(false);
   };
@@ -1275,7 +1285,10 @@ export const App: React.FC = () => {
             onOpenAiSchedule={() => setIsAiScheduleOpen(true)}
             onOpenInterrogation={handleTriggerInterrogation}
             onOpenEditSubjects={() => setIsEditSubjectsOpen(true)}
-            onTriggerAudit={() => handleTriggerAiAudit(true)}
+            onTriggerAudit={() => {
+              handleTriggerAiAudit(true);
+              setCurrentTab('aiSupervisorView');
+            }}
             onSpeakAi={() => speakText(aiMood.speech)}
             onNavigateToView={setCurrentTab}
             onOpenManualSession={() => setIsManualSessionOpen(true)}
@@ -1293,6 +1306,7 @@ export const App: React.FC = () => {
             exams={exams}
             weeklyTasks={weeklyTasks}
             completedTaskIds={completedTaskIds}
+            lectures={lectures}
             customAiInstructions={customAiInstructions}
             onSaveCustomInstructions={handleSaveCustomInstructions}
             onTriggerAudit={() => handleTriggerAiAudit(true)}
@@ -1524,6 +1538,8 @@ export const App: React.FC = () => {
         undoneLecturesCount={lectures.filter((l) => !l.isDone).length}
         backlogTasksCount={weeklyTasks.filter((t) => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))).length}
         lowExamsCount={exams.filter((e) => (e.pct || Math.round((e.score / e.total) * 100)) < 95).length}
+        prioritySubjId={computeLiveStudySnapshot(getLiveStudyInput()).prioritySubjectId}
+        prioritySubjName={computeLiveStudySnapshot(getLiveStudyInput()).prioritySubjectName}
       />
 
       <ManualSessionModal
@@ -1565,7 +1581,7 @@ export const App: React.FC = () => {
           try { localStorage.setItem('kareem_smart_notifications', JSON.stringify([])); } catch (e) {}
         }}
         onTriggerTestCheckIn={() => {
-          const checkIn = buildCheckInNotification(weeklyTasks, completedTaskIds, subjects);
+          const checkIn = buildCheckInNotification(weeklyTasks, completedTaskIds, subjects, undefined, sessions);
           pushSmartNotification(checkIn, true);
           showToast('🔔 تم إرسال رسالة الاطمئنان بمهام النهاردة!');
         }}

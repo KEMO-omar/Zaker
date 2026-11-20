@@ -1,9 +1,21 @@
 {
-  "version": 38,
-  "lastUpdated": 1794609991951,
-  "clientTimestamp": 1794609983570,
+  "version": 40,
+  "lastUpdated": 1794947139216,
+  "clientTimestamp": 1794947139156,
   "data": {
     "sessions": [
+      {
+        "entries": [
+          {
+            "subj": "arabic",
+            "task": "مراجعة المحاضرة الصفرية و الاولى و التانية و تلخيص المحاضرة التالتة و اول الرابعة و سماع جزء من الرابعة"
+          }
+        ],
+        "id": "s_1794645575979",
+        "minutes": 130,
+        "tsEnd": 1794645575979,
+        "tsStart": 1794635756979
+      },
       {
         "entries": [
           {
@@ -735,15 +747,15 @@
     ],
     "weeklyTasks": [
       {
-        "category": "center",
+        "category": "review",
         "dayId": "sat",
         "id": "center_sat_0_1794609983510",
-        "priority": "class",
+        "priority": "normal",
         "slotIndex": 0,
         "subjId": "arabic",
-        "teacher": "أ. تقوى مرزوق",
-        "text": "سنتر عربي: أ. تقوى مرزوق (4:00 ع)",
-        "time": "4:00 مساءً (سنتر)"
+        "teacher": "أ. محمد صلاح (منصة)",
+        "text": "[مراجعة] المحاضرة (00): المحاضرة الصفرية (تأسيس)",
+        "time": "السبت والثلاثاء"
       },
       {
         "category": "center",
@@ -801,22 +813,22 @@
         "time": "1:00 ظهراً (سنتر)"
       },
       {
-        "category": "platform",
+        "category": "review",
         "dayId": "sat",
         "id": "lec_ar-st-shams_sat_1794609983510_5lut",
-        "priority": "high",
-        "slotIndex": 2,
+        "priority": "normal",
+        "slotIndex": 3,
         "subjId": "arabic",
-        "teacher": "أ. تقوى مرزوق (سنتر)",
-        "text": "قصة: شمس و ليل",
-        "time": "السبت والثلاثاء (الساعة 4:00 مساءً - سنتر)"
+        "teacher": "أ. محمد صلاح (منصة)",
+        "text": "[مراجعة] المحاضرة (02): المحاضرة الثانية: نحو و نصوص",
+        "time": "السبت والثلاثاء"
       },
       {
         "category": "platform",
-        "dayId": "sat",
+        "dayId": "thu",
         "id": "lec_ar-txt-kanoon_sat_1794609983510_uft0",
         "priority": "high",
-        "slotIndex": 3,
+        "slotIndex": 6,
         "subjId": "arabic",
         "teacher": "أ. تقوى مرزوق (سنتر)",
         "text": "نصوص: العلم بين القانون و الضمير",
@@ -828,10 +840,10 @@
         "id": "lec_hist-u2-l2_sat_1794609983510_8jqi",
         "priority": "high",
         "slotIndex": 4,
-        "subjId": "history",
-        "teacher": "أ. أحمد سمير (منصة)",
-        "text": "الدرس الثاني: الدرس الثاني الوحدة الثانبة",
-        "time": "الإثنين والخميس (الساعة 1:00 ظهراً - منصة)"
+        "subjId": "arabic",
+        "teacher": "أ. محمد صلاح (منصة)",
+        "text": "المحاضرة (03): المحاضرة الثالثة: نحو و تعبير و نصوص",
+        "time": "السبت والثلاثاء"
       },
       {
         "category": "platform",
@@ -839,10 +851,10 @@
         "id": "lec_eng-u3-l2_sat_1794609983510_x104",
         "priority": "high",
         "slotIndex": 5,
-        "subjId": "english",
-        "teacher": "أ. أيمن عبد العاطي (سنتر)",
-        "text": "الدرس الثاني: الدرس الثاني الوحدة الثالثة",
-        "time": "السبت والثلاثاء (الساعة 7:00 مساءً - سنتر)"
+        "subjId": "arabic",
+        "teacher": "أ. محمد صلاح (منصة)",
+        "text": "المحاضرة (04): المحاضرة الرابعة: بلاغة و نصوص و تعبير و قصة و نحو",
+        "time": "السبت والثلاثاء"
       },
       {
         "category": "platform",
@@ -851,9 +863,9 @@
         "priority": "high",
         "slotIndex": 6,
         "subjId": "arabic",
-        "teacher": "أ. تقوى مرزوق (سنتر)",
-        "text": "نحو: النعت السببي",
-        "time": "السبت والثلاثاء (الساعة 4:00 مساءً - سنتر)"
+        "teacher": "أ. محمد صلاح (منصة)",
+        "text": "المحاضرة الخامسة: المحاضرة الخامسة: نحو و نصوص و تعبير",
+        "time": "السبت والثلاثاء"
       },
       {
         "category": "review",
@@ -863,8 +875,8 @@
         "slotIndex": 7,
         "subjId": "physics",
         "teacher": "أ. محمد عبد المعبود (منصة)",
-        "text": "[مراجعة] المحاضرة (03): حركة المقذوفات بزاوية",
-        "time": "تثبيت ومراجعة"
+        "text": "[مراجعة] المحاضرة (01): متجهات السرعة والسرعة النسبية",
+        "time": "الأحد والأربعاء"
       },
       {
         "category": "review",
@@ -1297,10 +1309,10 @@
       },
       {
         "category": "review",
-        "dayId": "thu",
+        "dayId": "sat",
         "id": "rev_ar-01_thu_1794609983510_rqdh",
         "priority": "normal",
-        "slotIndex": 6,
+        "slotIndex": 2,
         "subjId": "arabic",
         "teacher": "أ. محمد صلاح (منصة)",
         "text": "[مراجعة] المحاضرة (01): المحاضرة الأولى: بلاغة ونحو",
@@ -1426,6 +1438,28 @@
         "teacher": "أ. أيمن عبد العاطي (سنتر)",
         "text": "[مراجعة] writing : Discursive Paragraph",
         "time": "تثبيت ومراجعة"
+      },
+      {
+        "category": "manual",
+        "dayId": "sat",
+        "id": "task_user_1794610310707_7k7",
+        "isUserAdded": true,
+        "priority": "high",
+        "slotIndex": 0,
+        "subjId": "english",
+        "teacher": "وائل ميلاد",
+        "text": "حصة مراجعة مع وائل ميلاد",
+        "time": "1"
+      },
+      {
+        "category": "exam",
+        "dayId": "fri",
+        "id": "task_manual_1794610435585_rncn",
+        "isUserAdded": true,
+        "priority": "exam",
+        "slotIndex": 9,
+        "subjId": "physics",
+        "text": "الشامل الرابع"
       }
     ],
     "completedTaskIds": [
@@ -1473,7 +1507,16 @@
       "task_thu_ar_exam_prize",
       "task_tue_class_eng",
       "task_fri_eng_exam_prize",
-      "task_sat_class_eng"
+      "task_sat_class_eng",
+      "rev_ar-01_thu_1794609983510_rqdh",
+      "lec_ar-st-shams_sat_1794609983510_5lut",
+      "center_sat_0_1794609983510",
+      "lec_hist-u2-l2_sat_1794609983510_8jqi",
+      "center_sat_1_1794609983510",
+      "task_user_1794610310707_7k7",
+      "center_mon_2_1794609983510",
+      "center_tue_3_1794609983510",
+      "center_tue_4_1794609983510"
     ],
     "lectures": [
       {
@@ -1533,7 +1576,7 @@
         "details": "نحو: الجملة الاسمية\nتعبير: الفقرة الحجاجية\nنصوص: تابع نص العلم بين القانون والضمير ج2",
         "dueDay": "السبت والثلاثاء",
         "id": "ar-03",
-        "isDone": false,
+        "isDone": true,
         "packageId": "arabic_course",
         "packageName": "أ. محمد صلاح (منصة)",
         "subjId": "arabic",
@@ -2589,9 +2632,69 @@
         "tag": "منصة",
         "title": "البندول الزنبركي",
         "type": "platform"
+      },
+      {
+        "code": "الوحدة الرابعة",
+        "details": "",
+        "dueDay": "السبت والثلاثاء (الساعة 7:00 مساءً - سنتر)",
+        "id": "lec_1794610856125",
+        "isDone": false,
+        "packageName": "أ. أيمن عبد العاطي (سنتر)",
+        "subjId": "english",
+        "tag": "سنتر",
+        "title": "الدرس الاول الوحدة الرابعة",
+        "type": "center"
+      },
+      {
+        "code": "الوحدة الثالثة",
+        "details": "Grammar",
+        "dueDay": "السبت والثلاثاء (الساعة 7:00 مساءً - سنتر)",
+        "id": "lec_1794947936742",
+        "isDone": false,
+        "packageName": "أ. أيمن عبد العاطي (سنتر)",
+        "subjId": "english",
+        "tag": "سنتر",
+        "title": "Fronting",
+        "type": "center"
       }
     ],
     "exams": [
+      {
+        "date": "2026-11-20",
+        "examType": "امتحان شامل",
+        "id": "exam_1794947543396",
+        "notes": "يارب",
+        "pct": 100,
+        "score": 50,
+        "subjId": "physics",
+        "teacher": "أ. محمد عبد المعبود (منصة أونلاين)",
+        "topic": "الامتحان الشامل الرابع",
+        "total": 50
+      },
+      {
+        "date": "2026-11-10",
+        "examType": "امتحان شامل",
+        "id": "exam_1794947398109",
+        "notes": "انا حزين",
+        "pct": 78,
+        "score": 19.5,
+        "subjId": "arabic",
+        "teacher": "مس تقوى",
+        "topic": "الوحدة الثانية",
+        "total": 25
+      },
+      {
+        "date": "2026-11-10",
+        "examType": "امتحان شامل",
+        "id": "exam_1794947477098",
+        "notes": "كويس نوعا ما",
+        "pct": 90,
+        "score": 45,
+        "subjId": "english",
+        "teacher": "مستر أيمن عبد العاطي",
+        "topic": "الوحدة الثالثة",
+        "total": 50
+      },
       {
         "certificateImage": "",
         "certificateTitle": "",

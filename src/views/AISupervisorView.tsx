@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Subject, Session, ExamRecord, WeeklyTask } from '../types';
+import { Subject, Session, ExamRecord, WeeklyTask, Lecture } from '../types';
 import { callAiChat } from '../services/api';
 import {
   Bot,
@@ -23,6 +23,7 @@ interface AISupervisorViewProps {
   exams: ExamRecord[];
   weeklyTasks: WeeklyTask[];
   completedTaskIds: Set<string | number>;
+  lectures?: Lecture[];
   customAiInstructions: string;
   onSaveCustomInstructions: (text: string) => void;
   onTriggerAudit: () => void;
@@ -46,6 +47,7 @@ export const AISupervisorView: React.FC<AISupervisorViewProps> = ({
   exams,
   weeklyTasks,
   completedTaskIds,
+  lectures = [],
   customAiInstructions,
   onSaveCustomInstructions,
   onTriggerAudit,
@@ -69,9 +71,9 @@ export const AISupervisorView: React.FC<AISupervisorViewProps> = ({
   const [directivesSaved, setDirectivesSaved] = useState(false);
 
   const quickQuestions = [
-    'إزاي أبدأ فيزياء دلوقتي بدون تسويف؟',
-    'نصيحة لتقفيل درجات العربي والـ 95%+',
-    'مراكم كمية التحرك ومحاضرات، أعمل إيه؟',
+    'تحليل متراكمات المنصات والسناتر الآن',
+    'تقرير الامتحانات ودرجاتي حسب كل مادة',
+    'قيّم ساعات مذاكرتي النهاردة والأسبوع',
     'وزعلي وقت المذاكرة المتبقي النهاردة'
   ];
 
@@ -116,6 +118,11 @@ export const AISupervisorView: React.FC<AISupervisorViewProps> = ({
     const wastedMins = Math.max(elapsedAwakeMins - todayMins, 0);
 
     const context = {
+      sessions,
+      subjects,
+      lectures,
+      weeklyTasks,
+      completedTaskIds: Array.from(completedTaskIds),
       todayStudyMins: todayMins,
       todayMins,
       weekMins,
@@ -133,7 +140,8 @@ export const AISupervisorView: React.FC<AISupervisorViewProps> = ({
         score: e.score,
         total: e.total,
         pct: e.pct || Math.round((e.score / e.total) * 100),
-        date: e.date
+        date: e.date,
+        notes: e.notes
       })),
       pendingTasks: weeklyTasks.filter((t) => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))),
       lastReport: auditReport ? auditReport.slice(0, 300) : ''
@@ -228,7 +236,7 @@ export const AISupervisorView: React.FC<AISupervisorViewProps> = ({
           <div className="card-header">
             <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Sparkles size={16} style={{ color: 'var(--accent-primary)' }} />
-              <span>التقرير والتشخيص الأكاديمي الشامل لليوم</span>
+              <span>التقرير الشامل للتوازن الزمني والأداء العام (مباشر)</span>
             </div>
             <button className="btn btn-sm btn-speak" onClick={() => onSpeak(auditReport || aiMood.speech)}>
               <Volume2 size={13} />

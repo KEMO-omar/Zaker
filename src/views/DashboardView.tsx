@@ -230,9 +230,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setTimeout(() => setSaveStatus(null), 3000);
   };
 
+  const undoneLectures = lectures.filter((l) => !l.isDone);
+  const undoneCenterCount = undoneLectures.filter((l) => {
+    const h = `${l.type || ''} ${l.tag || ''} ${l.details || ''} ${l.title || ''}`.toLowerCase();
+    return h.includes('سنتر') || h.includes('حضور');
+  }).length;
+  const undonePlatformCount = undoneLectures.length - undoneCenterCount;
+  const pendingTasksCount = weeklyTasks.filter((t) => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))).length;
+
   return (
     <section className="view-panel active">
-      {/* Emergency Rescue Triage & Overwhelm Breaker */}
+      {/* Live Dynamic Backlog & Quick Rescue Banner */}
       <div style={{
         marginBottom: 18,
         padding: '14px 20px',
@@ -252,14 +260,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-main)' }}>
-                🚨 خطة الإنقاذ والتعافي الفوري: سبرنت الـ 82 محاضرة والامتحانين ذوي الجوائز
+                {undoneLectures.length > 0
+                  ? `🚨 موقف التنفيذ الحي: متبقي ${undoneLectures.length} محاضرة و ${pendingTasksCount} مهمة جدول`
+                  : `✅ جدول المحاضرات مكتمل (${pendingTasksCount} مهمة جدول متبقية)`}
               </strong>
               <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(239, 68, 68, 0.2)', color: 'var(--danger)', fontWeight: 700 }}>
-                تم تحديث الجدول والمحاضرات ⚡
+                بيانات لحظية مباشرة ⚡
               </span>
             </div>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: 1.5 }}>
-              يا دكتور كريم: تم تنظيم الـ 82 محاضرة المتراكمة، وتحديث ميعاد سنتر الإنجليزي ليصبح <strong>السبت والثلاثاء 7:00 م</strong>، وإعداد خطة مكثفة لامتحاني الجوائز (إنجليزي Unit 3 + عربي الوحدة 2). ابدأ الآن بـ 25 دقيقة فقط لكسر الشلل!
+              يا دكتور كريم: لديك الآن <strong>{undonePlatformCount}</strong> محاضرة منصة أونلاين و <strong>{undoneCenterCount}</strong> حصة سنتر غير منجزة، وأولويتك الزمنية الآن هي <strong>{prioritySubjName}</strong>. ابدأ بـ 25 دقيقة فوراً!
             </p>
           </div>
         </div>
@@ -463,11 +473,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
             <button className="btn btn-sm" onClick={onOpenInterrogation} style={{ borderColor: 'var(--danger)', color: 'var(--danger)', fontWeight: 700 }}>
               <AlertTriangle size={13} />
-              <span>استجواب المتراكمات</span>
+              <span>مساءلة المتراكمات (منصات/سناتر)</span>
             </button>
             <button className="btn btn-primary btn-sm" onClick={onTriggerAudit} style={{ fontWeight: 700 }}>
               <Zap size={13} />
-              <span>تحليل المراقبة الفوري</span>
+              <span>التقرير الشامل للوقت والأداء</span>
             </button>
             <button className="btn btn-sm" onClick={onOpenAiSchedule} style={{ borderColor: 'rgba(56, 189, 248, 0.4)', color: 'var(--accent-secondary)', fontWeight: 700 }}>
               <Clock size={13} />
