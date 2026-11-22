@@ -172,17 +172,17 @@ export async function saveDbData(data: {
 
   let ok = false;
 
-  // 1. Try server endpoint
+  // 1. Try primary server endpoint (server persists locally & syncs cleanly to Firebase RTDB)
   try {
     const res = await fetch('/api/db/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ data, clientTimestamp: Date.now() })
     });
-    if (res.ok) ok = true;
+    if (res.ok) return true;
   } catch (err) {}
 
-  // 2. Direct client-side Firebase sync (ensures data is ALWAYS preserved on Firebase)
+  // 2. Direct client-side Firebase fallback (used on static GitHub Pages / when server is unavailable)
   try {
     const examsObj: any = {};
     toArray(data.exams).forEach((e: any) => { if (e && e.id) examsObj[e.id] = e; });

@@ -2,8 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Subject, Session, Exemption, WeeklyTask, Lecture, ExamRecord, ThemeType, ViewTab, ArchivedWeek, SmartNotificationItem } from './types';
 import {
   buildRandomizedWeeklySchedule,
+  getLectureTrack,
   getWeekStartSaturdayKey,
-  injectLectureIntoSchedule
+  injectLectureIntoSchedule,
+  normalizeDaySlots,
+  reindexLectures,
+  setLecturePositionInTrack,
+  sortLecturesByOrder
 } from './utils/scheduleEngine';
 import {
   DEFAULT_NOTIFICATION_PREFS,
@@ -98,8 +103,23 @@ export const App: React.FC = () => {
   const [dbLoaded, setDbLoaded] = useState<boolean>(false);
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [exams, setExams] = useState<ExamRecord[]>([]);
+
   const examsRef = useRef<ExamRecord[]>([]);
   examsRef.current = exams;
+  const weeklyTasksRef = useRef<WeeklyTask[]>([]);
+  weeklyTasksRef.current = weeklyTasks;
+  const completedTaskIdsRef = useRef<Set<string | number>>(completedTaskIds);
+  completedTaskIdsRef.current = completedTaskIds;
+  const lecturesRef = useRef<Lecture[]>([]);
+  lecturesRef.current = lectures;
+  const archivedWeeksRef = useRef<ArchivedWeek[]>([]);
+  archivedWeeksRef.current = archivedWeeks;
+  const activeWeekStartKeyRef = useRef<string>(activeWeekStartKey);
+  activeWeekStartKeyRef.current = activeWeekStartKey;
+  const sessionsRef = useRef<Session[]>([]);
+  sessionsRef.current = sessions;
+  const exemptionsRef = useRef<Exemption[]>([]);
+  exemptionsRef.current = exemptions;
 
   const safeSaveExamsLocalStorage = (list: ExamRecord[]) => {
     try {
@@ -324,20 +344,27 @@ export const App: React.FC = () => {
           setExemptions(db.exemptions);
         }
         if (Array.isArray(db.weeklyTasks) && db.weeklyTasks.length > 0) {
-          setWeeklyTasks(db.weeklyTasks);
-          try { localStorage.setItem('kareem_weekly_tasks', JSON.stringify(db.weeklyTasks)); } catch (e) {}
+          const cleanTasks = normalizeDaySlots(db.weeklyTasks);
+          weeklyTasksRef.current = cleanTasks;
+          setWeeklyTasks(cleanTasks);
+          try { localStorage.setItem('kareem_weekly_tasks', JSON.stringify(cleanTasks)); } catch (e) {}
         }
         if (Array.isArray(db.completedTaskIds)) {
-          setCompletedTaskIds(new Set(db.completedTaskIds));
+          const nextDone = new Set<string | number>(db.completedTaskIds);
+          completedTaskIdsRef.current = nextDone;
+          setCompletedTaskIds(nextDone);
           try { localStorage.setItem('kareem_completed_task_ids', JSON.stringify(db.completedTaskIds)); } catch (e) {}
         }
         if (Array.isArray(db.archivedWeeks)) {
+          archivedWeeksRef.current = db.archivedWeeks;
           setArchivedWeeks(db.archivedWeeks);
           try { localStorage.setItem('kareem_archived_weeks', JSON.stringify(db.archivedWeeks)); } catch (e) {}
         }
         if (Array.isArray(db.lectures) && db.lectures.length > 0) {
-          setLectures(db.lectures);
-          try { localStorage.setItem('kareem_lectures', JSON.stringify(db.lectures)); } catch (e) {}
+          const orderedLectures = reindexLectures(sortLecturesByOrder(db.lectures));
+          lecturesRef.current = orderedLectures;
+          setLectures(orderedLectures);
+          try { localStorage.setItem('kareem_lectures', JSON.stringify(orderedLectures)); } catch (e) {}
         }
         if (Array.isArray(db.exams) && db.exams.length > 0) {
           setExams((prev) => {
@@ -359,6 +386,7 @@ export const App: React.FC = () => {
           });
         }
         if (db.activeWeekStartKey) {
+          activeWeekStartKeyRef.current = db.activeWeekStartKey;
           setActiveWeekStartKey(db.activeWeekStartKey);
           try { localStorage.setItem('kareem_active_week_key', db.activeWeekStartKey); } catch (e) {}
         }
@@ -490,25 +518,25 @@ export const App: React.FC = () => {
     };
   }, [isRunning]);
 
-  // Trigger Sync with Server
+  // Trigger Sync with Server (always reads latest refs so rapid updates never clobber each other!)
   const triggerAutoSync = useCallback(async (overrides?: any) => {
     setIsSyncing(true);
     const dataToSave = {
-      sessions: overrides?.sessions ?? sessions,
-      exemptions: overrides?.exemptions ?? exemptions,
-      weeklyTasks: overrides?.weeklyTasks ?? weeklyTasks,
-      completedTaskIds: overrides?.completedTaskIds ?? Array.from(completedTaskIds),
-      archivedWeeks: overrides?.archivedWeeks ?? archivedWeeks,
-      activeWeekStartKey: overrides?.activeWeekStartKey ?? activeWeekStartKey,
-      lectures: overrides?.lectures ?? lectures,
-      exams: overrides?.exams ?? exams,
+      sessions: overrides?.sessions ?? sessionsRef.current,
+      exemptions: overrides?.exemptions ?? exemptionsRef.current,
+      weeklyTasks: overrides?.weeklyTasks ?? weeklyTasksRef.current,
+      completedTaskIds: overrides?.completedTaskIds ?? Array.from(completedTaskIdsRef.current),
+      archivedWeeks: overrides?.archivedWeeks ?? archivedWeeksRef.current,
+      activeWeekStartKey: overrides?.activeWeekStartKey ?? activeWeekStartKeyRef.current,
+      lectures: overrides?.lectures ?? lecturesRef.current,
+      exams: overrides?.exams ?? examsRef.current,
       subjects: overrides?.subjects ?? subjects,
       customAiInstructions: overrides?.customAiInstructions ?? customAiInstructions
     };
     const success = await saveDbData(dataToSave);
     setIsSyncing(false);
     return success;
-  }, [sessions, exemptions, weeklyTasks, completedTaskIds, archivedWeeks, activeWeekStartKey, lectures, exams, subjects, customAiInstructions]);
+  }, [subjects, customAiInstructions]);
 
   // Push helper for Smart Notifications
   const pushSmartNotification = useCallback((item: SmartNotificationItem, fireNativePush = true) => {
@@ -530,40 +558,50 @@ export const App: React.FC = () => {
     const checkWeekRollover = () => {
       const currentWeekKey = getWeekStartSaturdayKey();
 
-      if (!activeWeekStartKey) {
+      if (!activeWeekStartKeyRef.current) {
+        activeWeekStartKeyRef.current = currentWeekKey;
         setActiveWeekStartKey(currentWeekKey);
         try { localStorage.setItem('kareem_active_week_key', currentWeekKey); } catch (e) {}
+        triggerAutoSync({ activeWeekStartKey: currentWeekKey });
         return;
       }
 
-      if (activeWeekStartKey !== currentWeekKey) {
-        // Archive previous finished week as-is (completed stays completed, uncompleted stays uncompleted in snapshot)
-        const total = weeklyTasks.length;
-        const done = weeklyTasks.filter(
-          t => completedTaskIds.has(t.id) || completedTaskIds.has(String(t.id))
+      if (activeWeekStartKeyRef.current !== currentWeekKey) {
+        const currentTasks = weeklyTasksRef.current;
+        const currentDoneSet = completedTaskIdsRef.current;
+        const total = currentTasks.length;
+        const done = currentTasks.filter(
+          t => currentDoneSet.has(t.id) || currentDoneSet.has(String(t.id))
         ).length;
         const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
         const newArchive: ArchivedWeek = {
-          id: `auto_archive_${activeWeekStartKey}_${Date.now()}`,
-          weekTitle: `أسبوع ${activeWeekStartKey}`,
-          weekKey: activeWeekStartKey,
+          id: `auto_archive_${activeWeekStartKeyRef.current}_${Date.now()}`,
+          weekTitle: `أسبوع ${activeWeekStartKeyRef.current}`,
+          weekKey: activeWeekStartKeyRef.current,
           archivedAt: new Date().toISOString(),
           totalCount: total,
           completedCount: done,
           completionPct: pct,
-          tasks: [...weeklyTasks]
+          tasks: []
         };
 
-        const updatedArchives = total > 0 ? [newArchive, ...archivedWeeks] : archivedWeeks;
+        const updatedArchives = total > 0 ? [newArchive, ...archivedWeeksRef.current] : archivedWeeksRef.current;
         const freshWeekTasks = buildRandomizedWeeklySchedule({
-          lectures,
-          preserveUserTasks: []
+          lectures: lecturesRef.current,
+          preserveUserTasks: [],
+          respectLectureOrder: true
         });
+        const emptyDone = new Set<string | number>();
+
+        archivedWeeksRef.current = updatedArchives;
+        weeklyTasksRef.current = freshWeekTasks;
+        completedTaskIdsRef.current = emptyDone;
+        activeWeekStartKeyRef.current = currentWeekKey;
 
         setArchivedWeeks(updatedArchives);
         setWeeklyTasks(freshWeekTasks);
-        setCompletedTaskIds(new Set());
+        setCompletedTaskIds(emptyDone);
         setActiveWeekStartKey(currentWeekKey);
 
         try {
@@ -697,32 +735,31 @@ export const App: React.FC = () => {
     showToast('جاري تشغيل صوت المراقب...');
   };
 
-  // Task Toggle
+  // Task Toggle (immediately updates ref + localStorage + server/Firebase)
   const handleToggleTask = (taskId: string | number) => {
-    setCompletedTaskIds((prev) => {
-      const next = new Set(prev);
-      const strId = String(taskId);
-      const numId = Number(taskId);
+    const next = new Set(completedTaskIdsRef.current);
+    const strId = String(taskId);
+    const numId = Number(taskId);
 
-      if (next.has(taskId) || next.has(strId) || (!isNaN(numId) && next.has(numId))) {
-        next.delete(taskId);
-        next.delete(strId);
-        if (!isNaN(numId)) next.delete(numId);
-      } else {
-        next.add(taskId);
-        next.add(strId);
-        if (!isNaN(numId)) next.add(numId);
-      }
-      const arr = Array.from(next);
-      try {
-        localStorage.setItem('kareem_completed_task_ids', JSON.stringify(arr));
-      } catch (e) {}
-      triggerAutoSync({ completedTaskIds: arr });
-      return next;
-    });
+    if (next.has(taskId) || next.has(strId) || (!isNaN(numId) && next.has(numId))) {
+      next.delete(taskId);
+      next.delete(strId);
+      if (!isNaN(numId)) next.delete(numId);
+    } else {
+      next.add(taskId);
+      next.add(strId);
+      if (!isNaN(numId)) next.add(numId);
+    }
+    const arr = Array.from(next);
+    completedTaskIdsRef.current = next;
+    setCompletedTaskIds(next);
+    try {
+      localStorage.setItem('kareem_completed_task_ids', JSON.stringify(arr));
+    } catch (e) {}
+    triggerAutoSync({ completedTaskIds: arr });
   };
 
-  // Add Task (preserving category, teacher, time, bottom manual slot placement, and user priority)
+  // Add Task (preserving category, teacher, time, safe non-colliding slot placement, and user priority)
   const handleSaveNewTask = (taskData: {
     dayId: string;
     subjId: string;
@@ -746,12 +783,13 @@ export const App: React.FC = () => {
       slotIndex: taskData.slotIndex,
       isUserAdded: taskData.isUserAdded ?? true
     };
-    const updated = [newTask, ...weeklyTasks];
+    const updated = normalizeDaySlots([...weeklyTasksRef.current, newTask]);
+    weeklyTasksRef.current = updated;
     setWeeklyTasks(updated);
     try {
       localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
     } catch (e) {}
-    showToast('تمت إضافة المهمة بتصنيفها وإظهارها على الجدول بنجاح! ✓');
+    showToast('تمت إضافة المهمة بتصنيفها وحفظها في الجدول حتى نهاية الأسبوع ✓');
     triggerAutoSync({ weeklyTasks: updated });
   };
 
@@ -762,57 +800,91 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateTask = (updatedTask: WeeklyTask) => {
-    const updated = weeklyTasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
+    const updated = normalizeDaySlots(
+      weeklyTasksRef.current.map((t) => (String(t.id) === String(updatedTask.id) ? updatedTask : t))
+    );
+    weeklyTasksRef.current = updated;
     setWeeklyTasks(updated);
     try {
       localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
     } catch (e) {}
-    showToast('تم حفظ تعديلات المهمة في القاعدة بنجاح!');
+    showToast('تم حفظ تعديلات المهمة وتثبيتها في الجدول ✓');
     triggerAutoSync({ weeklyTasks: updated });
   };
 
   // Delete Task
   const handleDeleteTask = (taskId: string | number) => {
-    const updated = weeklyTasks.filter((t) => t.id !== taskId);
+    const updated = normalizeDaySlots(weeklyTasksRef.current.filter((t) => String(t.id) !== String(taskId)));
+    const nextDone = new Set(completedTaskIdsRef.current);
+    nextDone.delete(taskId);
+    nextDone.delete(String(taskId));
+    const arrDone = Array.from(nextDone);
+
+    weeklyTasksRef.current = updated;
+    completedTaskIdsRef.current = nextDone;
     setWeeklyTasks(updated);
+    setCompletedTaskIds(nextDone);
     try {
       localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
+      localStorage.setItem('kareem_completed_task_ids', JSON.stringify(arrDone));
     } catch (e) {}
-    showToast('تم حذف المهمة من القاعدة');
-    triggerAutoSync({ weeklyTasks: updated });
+    showToast('تم حذف المهمة وحفظ الجدول');
+    triggerAutoSync({ weeklyTasks: updated, completedTaskIds: arrDone });
   };
 
-  // Bulk update all tasks
+  // Bulk update all tasks (preserves completedTaskIds for all remaining tasks and syncs immediately)
   const handleUpdateAllTasks = (updated: WeeklyTask[]) => {
-    setWeeklyTasks(updated);
+    const normalized = normalizeDaySlots(updated);
+    const validIds = new Set(normalized.map((t) => String(t.id)));
+    const filteredDone = Array.from(completedTaskIdsRef.current).filter((id) => validIds.has(String(id)));
+    const nextDoneSet = new Set<string | number>(filteredDone);
+
+    weeklyTasksRef.current = normalized;
+    completedTaskIdsRef.current = nextDoneSet;
+    setWeeklyTasks(normalized);
+    setCompletedTaskIds(nextDoneSet);
     try {
-      localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
+      localStorage.setItem('kareem_weekly_tasks', JSON.stringify(normalized));
+      localStorage.setItem('kareem_completed_task_ids', JSON.stringify(filteredDone));
     } catch (e) {}
-    triggerAutoSync({ weeklyTasks: updated });
+    triggerAutoSync({ weeklyTasks: normalized, completedTaskIds: filteredDone });
   };
 
   // Archive Current Week
   const handleArchiveWeek = (archive: ArchivedWeek, cleanTasks: WeeklyTask[]) => {
-    const updatedArchives = [archive, ...archivedWeeks];
+    const currentWeekKey = getWeekStartSaturdayKey();
+    const updatedArchives = [archive, ...archivedWeeksRef.current];
+    const normalizedClean = normalizeDaySlots(cleanTasks);
+    const emptyDone = new Set<string | number>();
+
+    archivedWeeksRef.current = updatedArchives;
+    weeklyTasksRef.current = normalizedClean;
+    completedTaskIdsRef.current = emptyDone;
+    activeWeekStartKeyRef.current = currentWeekKey;
+
     setArchivedWeeks(updatedArchives);
-    setWeeklyTasks(cleanTasks);
-    setCompletedTaskIds(new Set());
+    setWeeklyTasks(normalizedClean);
+    setCompletedTaskIds(emptyDone);
+    setActiveWeekStartKey(currentWeekKey);
     try {
       localStorage.setItem('kareem_archived_weeks', JSON.stringify(updatedArchives));
-      localStorage.setItem('kareem_weekly_tasks', JSON.stringify(cleanTasks));
+      localStorage.setItem('kareem_weekly_tasks', JSON.stringify(normalizedClean));
       localStorage.setItem('kareem_completed_task_ids', JSON.stringify([]));
+      localStorage.setItem('kareem_active_week_key', currentWeekKey);
     } catch (e) {}
     showToast('تمت أرشفة الأسبوع بنجاح وبدء أسبوع جديد نظيف!');
     triggerAutoSync({
       archivedWeeks: updatedArchives,
-      weeklyTasks: cleanTasks,
-      completedTaskIds: []
+      weeklyTasks: normalizedClean,
+      completedTaskIds: [],
+      activeWeekStartKey: currentWeekKey
     });
   };
 
   // Lecture Toggle
   const handleToggleLecture = (lecId: string) => {
-    const updated = lectures.map((l) => (l.id === lecId ? { ...l, isDone: !l.isDone } : l));
+    const updated = lecturesRef.current.map((l) => (l.id === lecId ? { ...l, isDone: !l.isDone } : l));
+    lecturesRef.current = updated;
     setLectures(updated);
     try {
       localStorage.setItem('kareem_lectures', JSON.stringify(updated));
@@ -821,15 +893,38 @@ export const App: React.FC = () => {
     triggerAutoSync({ lectures: updated });
   };
 
+  // Reorder Lectures (saves orderIndex permanently so Weekly Schedule injects them strictly in this order)
+  const handleReorderLectures = (reordered: Lecture[]) => {
+    const indexed = reindexLectures(reordered);
+    lecturesRef.current = indexed;
+    setLectures(indexed);
+    try {
+      localStorage.setItem('kareem_lectures', JSON.stringify(indexed));
+    } catch (e) {}
+    showToast('تم حفظ ترتيب المحاضرات الجديد — سينزل الجدول بهذا الترتيب ✓');
+    triggerAutoSync({ lectures: indexed });
+  };
+
   // Add Lecture (auto-injecting newly added lecture into weekly schedule)
   const handleSaveNewLecture = (lecData: Omit<Lecture, 'id' | 'isDone'>) => {
-    const newLec: Lecture = {
+    const maxOrder = lecturesRef.current.reduce(
+      (max, l, idx) => Math.max(max, typeof l.orderIndex === 'number' ? l.orderIndex : idx),
+      -1
+    );
+    const baseLec: Lecture = {
       ...lecData,
       id: `lec_${Date.now()}`,
-      isDone: false
+      isDone: false,
+      orderIndex: maxOrder + 1
     };
-    const updatedLectures = [newLec, ...lectures];
-    const updatedTasks = injectLectureIntoSchedule(weeklyTasks, newLec);
+    const newLec: Lecture = {
+      ...baseLec,
+      trackKey: lecData.trackKey || getLectureTrack(baseLec).id
+    };
+    const updatedLectures = reindexLectures([...lecturesRef.current, newLec]);
+    const updatedTasks = injectLectureIntoSchedule(weeklyTasksRef.current, newLec);
+    lecturesRef.current = updatedLectures;
+    weeklyTasksRef.current = updatedTasks;
     setLectures(updatedLectures);
     setWeeklyTasks(updatedTasks);
     try {
@@ -846,18 +941,25 @@ export const App: React.FC = () => {
     setIsEditLectureOpen(true);
   };
 
-  const handleUpdateLecture = (updatedLecture: Lecture) => {
-    const updated = lectures.map((l) => (l.id === updatedLecture.id ? updatedLecture : l));
+  const handleUpdateLecture = (updatedLecture: Lecture, desiredTrackOrder?: number) => {
+    const updated =
+      typeof desiredTrackOrder === 'number' && !isNaN(desiredTrackOrder) && desiredTrackOrder >= 1
+        ? setLecturePositionInTrack(lecturesRef.current, updatedLecture, desiredTrackOrder)
+        : reindexLectures(
+            lecturesRef.current.map((l) => (l.id === updatedLecture.id ? updatedLecture : l))
+          );
+    lecturesRef.current = updated;
     setLectures(updated);
     try {
       localStorage.setItem('kareem_lectures', JSON.stringify(updated));
     } catch (e) {}
-    showToast('تم حفظ تعديلات المحاضرة في القاعدة بنجاح!');
+    showToast('تم حفظ تعديلات المحاضرة وترتيبها في القاعدة بنجاح! ✓');
     triggerAutoSync({ lectures: updated });
   };
 
   const handleDeleteLecture = (id: string) => {
-    const updated = lectures.filter((l) => l.id !== id);
+    const updated = reindexLectures(lecturesRef.current.filter((l) => l.id !== id));
+    lecturesRef.current = updated;
     setLectures(updated);
     try {
       localStorage.setItem('kareem_lectures', JSON.stringify(updated));
@@ -1275,6 +1377,7 @@ export const App: React.FC = () => {
             weeklyTasks={weeklyTasks}
             completedTaskIds={completedTaskIds}
             lectures={lectures}
+            archivedWeeks={archivedWeeks}
             customAiInstructions={customAiInstructions}
             onSaveCustomInstructions={handleSaveCustomInstructions}
             onStartFocus={(subjId) => {
@@ -1353,6 +1456,7 @@ export const App: React.FC = () => {
             onOpenNewLectureModal={() => setIsNewLectureModalOpen(true)}
             onOpenEditLecture={handleOpenEditLecture}
             onDeleteLecture={handleDeleteLecture}
+            onReorderLectures={handleReorderLectures}
             onStartFocus={(subjId) => {
               setActiveSubjId(subjId);
               setCurrentTab('focusView');
@@ -1497,6 +1601,7 @@ export const App: React.FC = () => {
         isOpen={isEditLectureOpen}
         onClose={() => setIsEditLectureOpen(false)}
         lecture={lectureToEdit}
+        allLectures={lectures}
         subjects={subjects}
         onUpdate={handleUpdateLecture}
         onDelete={handleDeleteLecture}

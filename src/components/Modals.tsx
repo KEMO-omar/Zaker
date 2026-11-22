@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Subject, ExamRecord, WeeklyTask, Lecture } from '../types';
 import { compressImageFile } from '../services/imageUtils';
 import {
+  LECTURE_TRACKS,
+  getLectureTrack,
+  getLectureRankInTrack
+} from '../utils/scheduleEngine';
+import {
   Coffee,
   FileText,
   FilePlus,
@@ -1583,6 +1588,23 @@ export const NewLectureModal: React.FC<NewLectureModalProps> = ({ isOpen, onClos
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+    const resolvedTrackKey =
+      selectedPreset === 'arabic_platform'
+        ? 'arabic_salah'
+        : selectedPreset === 'arabic_center'
+        ? 'arabic_taqwa'
+        : getLectureTrack({
+            id: 'new',
+            subjId,
+            code,
+            title: title.trim(),
+            details: details.trim(),
+            dueDay,
+            packageName,
+            tag,
+            type: tag === 'سنتر' ? 'center' : 'platform',
+            isDone: false
+          }).id;
     onSave({
       code,
       title: title.trim(),
@@ -1591,7 +1613,8 @@ export const NewLectureModal: React.FC<NewLectureModalProps> = ({ isOpen, onClos
       subjId,
       packageName,
       tag,
-      type: tag === 'سنتر' ? 'center' : 'platform'
+      type: tag === 'سنتر' ? 'center' : 'platform',
+      trackKey: resolvedTrackKey
     });
     onClose();
   };
@@ -1693,8 +1716,9 @@ interface EditLectureModalProps {
   isOpen: boolean;
   onClose: () => void;
   lecture: Lecture | null;
+  allLectures?: Lecture[];
   subjects: Subject[];
-  onUpdate: (updatedLecture: Lecture) => void;
+  onUpdate: (updatedLecture: Lecture, desiredTrackOrder?: number) => void;
   onDelete: (id: string) => void;
 }
 
@@ -1702,6 +1726,7 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
   isOpen,
   onClose,
   lecture,
+  allLectures = [],
   subjects,
   onUpdate,
   onDelete
@@ -1713,6 +1738,9 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
   const [subjId, setSubjId] = useState('');
   const [packageName, setPackageName] = useState('');
   const [tag, setTag] = useState('');
+  const [trackKey, setTrackKey] = useState('');
+  const [trackOrder, setTrackOrder] = useState<number>(1);
+  const [totalInTrack, setTotalInTrack] = useState<number>(1);
   const [isDone, setIsDone] = useState(false);
 
   useEffect(() => {
@@ -1725,16 +1753,50 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
       setPackageName(lecture.packageName || '');
       setTag(lecture.tag || '');
       setIsDone(lecture.isDone);
+
+      const resolvedTrack = getLectureTrack(lecture);
+      setTrackKey(resolvedTrack.id);
+
+      const rankInfo = getLectureRankInTrack(allLectures, lecture.id);
+      if (rankInfo) {
+        setTrackOrder(rankInfo.rank);
+        setTotalInTrack(rankInfo.totalInTrack);
+      } else {
+        const sameTrackCount = allLectures.filter((l) => getLectureTrack(l).id === resolvedTrack.id).length;
+        setTrackOrder(1);
+        setTotalInTrack(Math.max(1, sameTrackCount));
+      }
     }
-  }, [lecture]);
+  }, [lecture, allLectures]);
 
   if (!isOpen || !lecture) return null;
+
+  const availableTracksForSubj = LECTURE_TRACKS.filter((t) =>
+    subjId === 'arabic' ? t.subjId === 'arabic' : t.subjId === subjId || t.id === trackKey
+  );
+
+  const handleTrackChange = (nextTrackId: string) => {
+    setTrackKey(nextTrackId);
+    const matching = allLectures.filter((l) => getLectureTrack(l).id === nextTrackId);
+    setTotalInTrack(Math.max(1, matching.length + (getLectureTrack(lecture).id === nextTrackId ? 0 : 1)));
+    const preset = LECTURE_TRACKS.find((t) => t.id === nextTrackId);
+    if (preset) {
+      setSubjId(preset.subjId);
+      if (nextTrackId === 'arabic_salah') {
+        setTag('منصة');
+        if (!packageName || packageName.includes('تقوى')) setPackageName('أ. محمد صلاح (منصة)');
+      } else if (nextTrackId === 'arabic_taqwa') {
+        setTag('سنتر');
+        if (!packageName || packageName.includes('صلاح')) setPackageName('أ. تقوى مرزوق (سنتر)');
+      }
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    onUpdate({
+    const updatedLecture: Lecture = {
       ...lecture,
       code,
       title: title.trim(),
@@ -1743,18 +1805,22 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
       subjId,
       packageName,
       tag,
+      type: tag === 'سنتر' ? 'center' : 'platform',
+      trackKey: trackKey || getLectureTrack({ ...lecture, subjId, packageName, tag }).id,
       isDone
-    });
+    };
+
+    onUpdate(updatedLecture, Math.max(1, Number(trackOrder) || 1));
     onClose();
   };
 
   return (
     <div className="modal-overlay show" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
         <div className="modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Pencil size={18} style={{ color: 'var(--accent-primary)' }} />
-            <span>تعديل المحاضرة</span>
+            <span>تعديل المحاضرة وترتيبها في المسار</span>
           </div>
           <button
             type="button"
@@ -1787,12 +1853,59 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
                     setPackageName(p.teacher);
                     setDueDay(p.dueDay);
                     setTag(p.tag);
+                    if (p.key === 'arabic_platform') handleTrackChange('arabic_salah');
+                    else if (p.key === 'arabic_center') handleTrackChange('arabic_taqwa');
+                    else handleTrackChange(p.subjId);
                   }}
                   style={{ fontSize: 10, padding: '2px 8px' }}
                 >
                   {p.label.split(' - ')[0]}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Track + Editable Order Rank Box */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1.5fr 1fr',
+            gap: 10,
+            marginBottom: 12,
+            padding: 10,
+            borderRadius: 10,
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-subtle)'
+          }}>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--accent-secondary)', display: 'block', marginBottom: 4 }}>
+                المسار المستقل (خصوصاً العربي):
+              </label>
+              <select
+                className="input-field"
+                value={trackKey}
+                onChange={(e) => handleTrackChange(e.target.value)}
+                style={{ margin: 0, fontSize: 12, fontWeight: 700 }}
+              >
+                {(availableTracksForSubj.length > 0 ? availableTracksForSubj : LECTURE_TRACKS).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--accent-primary)', display: 'block', marginBottom: 4 }}>
+                ترتيبها في المسار (1 ← {totalInTrack}):
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, totalInTrack)}
+                className="input-field tabular"
+                value={trackOrder}
+                onChange={(e) => setTrackOrder(Math.max(1, Number(e.target.value) || 1))}
+                style={{ margin: 0, fontWeight: 800, textAlign: 'center' }}
+              />
             </div>
           </div>
 
@@ -1858,7 +1971,7 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
             <button type="button" className="btn" onClick={onClose}>إلغاء</button>
-            <button type="submit" className="btn btn-primary">حفظ التعديلات</button>
+            <button type="submit" className="btn btn-primary">حفظ التعديلات والترتيب ✓</button>
           </div>
         </form>
       </div>

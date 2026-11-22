@@ -7,17 +7,17 @@ import {
   DYNAMIC_STUDY_POOL,
   buildRandomizedWeeklySchedule,
   getCurrentArabicDayId,
-  getArabicDayLabel
+  getArabicDayLabel,
+  normalizeDaySlots,
+  sortLecturesByOrder
 } from '../utils/scheduleEngine';
 import {
   Calendar,
   CalendarCheck,
   Clock,
   Download,
-  Flame,
   Building2,
   Laptop,
-  FileCheck,
   RotateCcw,
   ArrowRightLeft,
   Plus,
@@ -25,58 +25,59 @@ import {
   Pencil,
   Bell,
   Archive,
-  Sparkles,
   Eye,
   History,
   Shuffle,
   Search,
   Star,
-  BookOpen,
+  LayoutGrid,
+  Check,
   X
 } from 'lucide-react';
 
-// Exact coordinates derived from the 2000x1414 template image
+// Exact calibrated coordinates measured directly from public/weekly_schedule_template.png (2000x1414)
 export const SCHEDULE_GRID_CONFIG = {
   width: 2000,
   height: 1414,
+  weekHeaderPill: { minX: 1239, minY: 81, width: 317, height: 76, leftPct: 61.95, topPct: 5.73, widthPct: 15.85, heightPct: 5.37 },
   columns: [
-    { dayId: 'fri', label: 'الجمعة', startX: 34, width: 259, leftPct: 1.7 },
-    { dayId: 'thu', label: 'الخميس', startX: 314, width: 259, leftPct: 15.7 },
-    { dayId: 'wed', label: 'الأربعاء', startX: 593, width: 260, leftPct: 29.65 },
-    { dayId: 'tue', label: 'الثلاثاء', startX: 873, width: 260, leftPct: 43.65 },
-    { dayId: 'mon', label: 'الاثنين', startX: 1153, width: 260, leftPct: 57.65 },
-    { dayId: 'sun', label: 'الأحد', startX: 1433, width: 259, leftPct: 71.65 },
-    { dayId: 'sat', label: 'السبت', startX: 1713, width: 259, leftPct: 85.65 }
+    { dayId: 'fri', label: 'الجمعة', startX: 30, width: 267, leftPct: 1.5, widthPct: 13.35 },
+    { dayId: 'thu', label: 'الخميس', startX: 310, width: 267, leftPct: 15.5, widthPct: 13.35 },
+    { dayId: 'wed', label: 'الأربعاء', startX: 590, width: 266, leftPct: 29.5, widthPct: 13.3 },
+    { dayId: 'tue', label: 'الثلاثاء', startX: 870, width: 266, leftPct: 43.5, widthPct: 13.3 },
+    { dayId: 'mon', label: 'الاثنين', startX: 1149, width: 267, leftPct: 57.45, widthPct: 13.35 },
+    { dayId: 'sun', label: 'الأحد', startX: 1429, width: 267, leftPct: 71.45, widthPct: 13.35 },
+    { dayId: 'sat', label: 'السبت', startX: 1709, width: 267, leftPct: 85.45, widthPct: 13.35 }
   ],
   rows: [
-    { index: 0, startY: 377, height: 85, topPct: 26.66 },
-    { index: 1, startY: 475, height: 86, topPct: 33.59 },
-    { index: 2, startY: 574, height: 85, topPct: 40.59 },
-    { index: 3, startY: 672, height: 85, topPct: 47.52 },
-    { index: 4, startY: 770, height: 86, topPct: 54.46 },
-    { index: 5, startY: 868, height: 86, topPct: 61.39 },
-    { index: 6, startY: 967, height: 85, topPct: 68.39 },
-    { index: 7, startY: 1065, height: 86, topPct: 75.32 },
-    { index: 8, startY: 1163, height: 86, topPct: 82.25 },
-    { index: 9, startY: 1262, height: 85, topPct: 89.25 }
+    { index: 0, startY: 377, height: 85, topPct: 26.66, heightPct: 6.01 },
+    { index: 1, startY: 475, height: 86, topPct: 33.59, heightPct: 6.08 },
+    { index: 2, startY: 574, height: 85, topPct: 40.59, heightPct: 6.01 },
+    { index: 3, startY: 672, height: 85, topPct: 47.52, heightPct: 6.01 },
+    { index: 4, startY: 770, height: 86, topPct: 54.46, heightPct: 6.08 },
+    { index: 5, startY: 868, height: 86, topPct: 61.39, heightPct: 6.08 },
+    { index: 6, startY: 967, height: 85, topPct: 68.39, heightPct: 6.01 },
+    { index: 7, startY: 1065, height: 86, topPct: 75.32, heightPct: 6.08 },
+    { index: 8, startY: 1163, height: 86, topPct: 82.25, heightPct: 6.08 },
+    { index: 9, startY: 1262, height: 85, topPct: 89.25, heightPct: 6.01 }
   ]
 };
 
 const SUBJECT_SHORT_LABELS: Record<string, { name: string; color: string }> = {
-  physics: { name: 'فيزياء', color: '#6366f1' },
-  arabic: { name: 'عربي', color: '#d97706' },
-  english: { name: 'إنجليزي', color: '#0284c7' },
-  history: { name: 'تاريخ', color: '#059669' }
+  physics: { name: 'فيزياء', color: '#818cf8' },
+  arabic: { name: 'عربي', color: '#f59e0b' },
+  english: { name: 'إنجليزي', color: '#38bdf8' },
+  history: { name: 'تاريخ', color: '#10b981' }
 };
 
 function getCategoryMeta(task: WeeklyTask) {
-  if (task.category === 'center') return { label: 'سنتر', emoji: '🏢', color: '#0284c7' };
-  if (task.category === 'review') return { label: 'مراجعة', emoji: '🔄', color: '#0d9488' };
-  if (task.category === 'exam' || task.priority === 'exam') return { label: 'امتحان', emoji: '🏆', color: '#7c3aed' };
-  if (task.category === 'manual' || task.isUserAdded) return { label: 'مهمتك', emoji: '⚡', color: '#ea580c' };
-  if (task.category === 'platform') return { label: 'محاضرة', emoji: '💻', color: '#d97706' };
-  if (task.priority === 'urgent' || task.isRolled) return { label: 'عاجل', emoji: '🚨', color: '#dc2626' };
-  return { label: 'مذاكرة', emoji: '📖', color: '#10b981' };
+  if (task.category === 'center') return { label: 'سنتر', color: '#38bdf8' };
+  if (task.category === 'review') return { label: 'مراجعة', color: '#14b8a6' };
+  if (task.category === 'exam' || task.priority === 'exam') return { label: 'امتحان', color: '#a78bfa' };
+  if (task.category === 'manual' || task.isUserAdded) return { label: 'مهمتك', color: '#f97316' };
+  if (task.category === 'platform') return { label: 'محاضرة', color: '#fbbf24' };
+  if (task.priority === 'urgent' || task.isRolled) return { label: 'عاجل', color: '#ef4444' };
+  return { label: 'مذاكرة', color: '#10b981' };
 }
 
 interface DynamicScheduleBoardProps {
@@ -108,21 +109,27 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
   lectures = [],
   onOpenNotificationsCenter
 }) => {
+  // Primary schedule view is the Official Image Poster with crisp full-text capsules; Cards / Checklist / Timeblock / Archive are 1 click away
+  const [activeViewMode, setActiveViewMode] = useState<'poster' | 'cards' | 'checklist' | 'timeblock' | 'archive'>('poster');
+  const [boardDayFocus, setBoardDayFocus] = useState<string>('all');
+  const [boardSubjFilter, setBoardSubjFilter] = useState<string>('all');
+
   const [selectedDayTab, setSelectedDayTab] = useState<string>('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<'all' | 'pending' | 'review' | 'center' | 'manual'>('all');
-  const [activeViewMode, setActiveViewMode] = useState<'board' | 'checklist' | 'timeblock' | 'archive'>('board');
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [quickAddInput, setQuickAddInput] = useState<{ [dayId: string]: string }>({});
+  const [quickAddSubj, setQuickAddSubj] = useState<{ [dayId: string]: string }>({});
   const [boardNotice, setBoardNotice] = useState<string | null>(null);
   const [notificationStatus, setNotificationStatus] = useState<string>('default');
 
-  // Inline bottom-slot quick-add modal state (replaces window.prompt)
+  // Inline day/slot quick-add modal state
   const [slotQuickAddDay, setSlotQuickAddDay] = useState<string | null>(null);
+  const [slotQuickSlotIdx, setSlotQuickSlotIdx] = useState<number>(9);
   const [slotQuickText, setSlotQuickText] = useState<string>('');
   const [slotQuickSubj, setSlotQuickSubj] = useState<string>('physics');
   const [slotQuickCategory, setSlotQuickCategory] = useState<NonNullable<WeeklyTask['category']>>('manual');
 
-  // Inline archive confirm modal state (replaces window.confirm)
+  // Inline archive confirm modal state
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState<boolean>(false);
 
   // Enhanced 3-Mode Task Swap Modal State
@@ -130,6 +137,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
   const [taskToSwap, setTaskToSwap] = useState<WeeklyTask | null>(null);
   const [swapMode, setSwapMode] = useState<'schedule' | 'lectures' | 'move'>('schedule');
   const [selectedScheduleTargetId, setSelectedScheduleTargetId] = useState<string>('');
+  const [swapScheduleSearch, setSwapScheduleSearch] = useState<string>('');
   const [swapLectureSearch, setSwapLectureSearch] = useState<string>('');
   const [swapLectureFilter, setSwapLectureFilter] = useState<'all' | 'pending' | 'review'>('all');
   const [swapLectureSubjFilter, setSwapLectureSubjFilter] = useState<string>('all');
@@ -142,8 +150,11 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
 
   const flashNotice = (msg: string) => {
     setBoardNotice(msg);
-    setTimeout(() => setBoardNotice(null), 4500);
+    setTimeout(() => setBoardNotice(null), 5000);
   };
+
+  const isTaskDone = (taskId: string | number) =>
+    completedTaskIds.has(taskId) || completedTaskIds.has(String(taskId));
 
   // Preload template image
   useEffect(() => {
@@ -160,30 +171,19 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     }
   }, []);
 
-  // Map tasks to columns (up to 10 slots per day: 0..8 automated, 9 reserved for manual bottom entry)
+  // Deterministic slot mapping per day (0..9)
   const daySlotsMap = useMemo(() => {
     const map = new Map<string, Array<WeeklyTask | null>>();
     ORDERED_WEEK_DAYS.forEach(d => {
       map.set(d.id, new Array(10).fill(null));
     });
 
-    tasks.forEach(t => {
+    const normalized = normalizeDaySlots(tasks);
+    normalized.forEach(t => {
       if (t.dayId && map.has(t.dayId)) {
         const slots = map.get(t.dayId)!;
-        const targetSlot = (typeof t.slotIndex === 'number' && t.slotIndex >= 0 && t.slotIndex < 10)
-          ? t.slotIndex
-          : slots.findIndex((s, i) => s === null && i < 9);
-
-        if (targetSlot !== -1 && slots[targetSlot] === null) {
-          slots[targetSlot] = t;
-        } else {
-          // If desired slot occupied, look for empty auto slot [0..8] first, then slot 9
-          const firstAutoEmpty = slots.findIndex((s, i) => s === null && i < 9);
-          if (firstAutoEmpty !== -1) {
-            slots[firstAutoEmpty] = t;
-          } else if (slots[9] === null && (t.isUserAdded || t.category === 'manual')) {
-            slots[9] = t;
-          }
+        if (typeof t.slotIndex === 'number' && t.slotIndex >= 0 && t.slotIndex <= 9 && slots[t.slotIndex] === null) {
+          slots[t.slotIndex] = t;
         }
       }
     });
@@ -191,16 +191,20 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     return map;
   }, [tasks]);
 
+  // Lectures sorted strictly by Karim's defined order
+  const orderedLectures = useMemo(() => sortLecturesByOrder(lectures), [lectures]);
+
   // Overall statistics
   const totalTasksCount = tasks.length;
-  const completedCount = tasks.filter(t => completedTaskIds.has(t.id) || completedTaskIds.has(String(t.id))).length;
+  const completedCount = tasks.filter(t => isTaskDone(t.id)).length;
+  const pendingCount = totalTasksCount - completedCount;
   const completionPercentage = totalTasksCount > 0 ? Math.round((completedCount / totalTasksCount) * 100) : 0;
 
   // Handle task check with confetti
   const handleCheck = (taskId: string | number) => {
-    const isDone = completedTaskIds.has(taskId) || completedTaskIds.has(String(taskId));
+    const doneNow = isTaskDone(taskId);
     onToggleTask(taskId);
-    if (!isDone) {
+    if (!doneNow) {
       try {
         confetti({
           particleCount: 55,
@@ -211,31 +215,32 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     }
   };
 
-  // Quick add emergency task in checklist (prefers open slot or bottom slot 9)
+  // Quick add task in checklist (places cleanly in bottom slot 9 or open slot)
   const handleQuickAdd = (dayId: string) => {
     const text = quickAddInput[dayId]?.trim();
     if (!text || !onUpdateAllTasks) return;
 
+    const chosenSubj = quickAddSubj[dayId] || 'physics';
     const slots = daySlotsMap.get(dayId) || [];
-    const targetSlot = slots[9] === null ? 9 : Math.max(0, slots.findIndex(s => s === null));
+    const firstFree = slots.findIndex(s => s === null);
 
     const newTask: WeeklyTask = {
       id: `task_quick_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       dayId,
-      subjId: 'physics',
+      subjId: chosenSubj,
       text,
       priority: 'urgent',
       category: 'manual',
       isUserAdded: true,
-      slotIndex: targetSlot === -1 ? 9 : targetSlot
+      slotIndex: firstFree !== -1 ? firstFree : 9
     };
 
     onUpdateAllTasks([...tasks, newTask]);
     setQuickAddInput(prev => ({ ...prev, [dayId]: '' }));
-    flashNotice(`⚡ تمت إضافة مهمتك اليدوية ليوم ${getArabicDayLabel(dayId)} وإظهارها على الجدول!`);
+    flashNotice(`⚡ تمت إضافة مهمتك (${SUBJECT_SHORT_LABELS[chosenSubj]?.name || chosenSubj}) ليوم ${getArabicDayLabel(dayId)} وحفظها!`);
   };
 
-  // Save inline modal for the bottom reserved slot 9
+  // Save inline modal for a day slot
   const handleSaveSlotQuickAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!slotQuickAddDay || !slotQuickText.trim() || !onUpdateAllTasks) return;
@@ -248,70 +253,77 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
       priority: slotQuickCategory === 'exam' ? 'exam' : 'urgent',
       category: slotQuickCategory,
       isUserAdded: true,
-      slotIndex: 9
+      slotIndex: slotQuickSlotIdx
     };
 
     onUpdateAllTasks([...tasks, newTask]);
-    flashNotice(`✅ أُضيفت المهمة (${SUBJECT_SHORT_LABELS[slotQuickSubj]?.name || slotQuickSubj}) في الخانة الأخيرة ليوم ${getArabicDayLabel(slotQuickAddDay)}!`);
+    flashNotice(`✅ تم تثبيت المهمة (${SUBJECT_SHORT_LABELS[slotQuickSubj]?.name || slotQuickSubj}) ليوم ${getArabicDayLabel(slotQuickAddDay)}!`);
     setSlotQuickAddDay(null);
     setSlotQuickText('');
   };
 
-  // Generate Randomized Dynamic Schedule (keeping centers + user-added tasks, filling 0..8 randomly, leaving slot 9 empty!)
-  const handleGenerateRandomWeek = (startFromToday = false) => {
+  /**
+   * Smart Partial Randomizer:
+   * - LOCKS all completed tasks (isDone === true), fixed center classes, and Karim's user-added tasks in their exact slots!
+   * - Fills ALL 10 slots (0..9) per day so no day is left missing a task!
+   * - ONLY randomizes/replaces UNCOMPLETED auto tasks using Karim's ordered lectures!
+   */
+  const handleRandomizeUndoneOnly = () => {
     if (!onUpdateAllTasks) return;
 
-    // Preserve user-added manual/urgent/exam tasks so Karim's own additions stay prioritized!
-    const preservedUserTasks = tasks.filter(
-      t => t.isUserAdded || t.category === 'manual' || t.category === 'exam' || t.slotIndex === 9
+    const lockedTasks = tasks.filter(
+      (t) =>
+        isTaskDone(t.id) ||
+        t.category === 'center' ||
+        t.isUserAdded ||
+        t.category === 'manual' ||
+        t.category === 'exam'
     );
 
+    const lockedDoneCount = tasks.filter((t) => isTaskDone(t.id)).length;
+    const replacedCount = Math.max(0, tasks.length - lockedTasks.length);
+
     const freshTasks = buildRandomizedWeeklySchedule({
-      lectures,
-      preserveUserTasks: preservedUserTasks,
-      startFromToday
+      lectures: orderedLectures,
+      lockedTasks,
+      respectLectureOrder: true
     });
 
     onUpdateAllTasks(freshTasks);
     flashNotice(
-      startFromToday
-        ? '🎲 تم توليد جدول عشوائي نشط بدءاً من اليوم بمحاضراتك والسناتر، مع ترك الخانة الأخيرة فارغة لإضافاتك!'
-        : '🎲 تم توليد أسبوع عشوائي جديد من محاضراتك والسناتر مع ترك الخانة الأخيرة أسفل كل يوم فارغة لمهامك!'
+      `🎲 تم تجديد ${replacedCount} مهمة غير منجزة في الخانات التسع الأولى وفق ترتيب دروسك (مع ترك الخانة الأخيرة فارغة لإضافاتك والحفاظ على ${lockedDoneCount} منجزة والسناتر ومهامك اليدوية)!`
     );
   };
 
-  // Rollover uncompleted non-center tasks to next day
+  // Rollover uncompleted non-center tasks to next day cleanly without slot collisions
   const handleRolloverTasks = () => {
     if (!onUpdateAllTasks) return;
 
     const dayKeys = ORDERED_WEEK_DAYS.map(d => d.id);
     let rolledCount = 0;
-    let updatedTasks = [...tasks];
 
-    for (let i = 0; i < dayKeys.length - 1; i++) {
-      const currentDay = dayKeys[i];
-      const nextDay = dayKeys[i + 1];
-
-      updatedTasks = updatedTasks.map(t => {
-        const isDone = completedTaskIds.has(t.id) || completedTaskIds.has(String(t.id));
-        if (t.dayId === currentDay && !isDone && t.category !== 'center') {
-          rolledCount++;
-          return {
-            ...t,
-            dayId: nextDay,
-            priority: 'urgent',
-            isRolled: true,
-            originalDayId: t.originalDayId || currentDay,
-            text: t.isRolled ? t.text : `[مرحّل] ${t.text}`
-          };
-        }
+    const rolledTasks = tasks.map(t => {
+      if (isTaskDone(t.id) || t.category === 'center' || t.dayId === 'fri' || t.dayId === 'backlog') {
         return t;
-      });
-    }
+      }
+      const idx = dayKeys.indexOf(t.dayId);
+      if (idx === -1 || idx >= dayKeys.length - 1) return t;
+      const nextDay = dayKeys[idx + 1];
+      rolledCount++;
+      return {
+        ...t,
+        dayId: nextDay,
+        slotIndex: undefined,
+        priority: 'urgent' as const,
+        isRolled: true,
+        originalDayId: t.originalDayId || t.dayId,
+        text: t.isRolled ? t.text : `[مرحّل] ${t.text}`
+      };
+    });
 
     if (rolledCount > 0) {
-      onUpdateAllTasks(updatedTasks);
-      flashNotice(`🚨 تم ترحيل ${rolledCount} مهمة غير منجزة إلى اليوم التالي بأولوية عاجلة!`);
+      onUpdateAllTasks(normalizeDaySlots(rolledTasks));
+      flashNotice(`🚨 تم ترحيل ${rolledCount} مهمة غير منجزة إلى اليوم التالي بأولوية عاجلة وحفظ الجدول!`);
     } else {
       flashNotice('✅ ممتاز يا دكتور! كل مهام الأيام السابقة منجزة ولا توجد مهام متأخرة.');
     }
@@ -322,6 +334,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     setTaskToSwap(task);
     setSwapMode('schedule');
     setSelectedScheduleTargetId('');
+    setSwapScheduleSearch('');
     setSelectedLectureId('');
     setSwapLectureSearch('');
     setSwapTargetDay(task.dayId);
@@ -332,20 +345,21 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
   const handleExecuteSwap = () => {
     if (!taskToSwap || !onUpdateAllTasks) return;
 
-    let updatedTasks = [...tasks];
+    const currentNormalized = normalizeDaySlots(tasks);
+    const sourceTask = currentNormalized.find(t => String(t.id) === String(taskToSwap.id)) || taskToSwap;
+    let updatedTasks = [...currentNormalized];
 
     if (swapMode === 'schedule' && selectedScheduleTargetId) {
-      // True 2-way swap of (dayId, slotIndex) between taskToSwap and targetTask
-      const targetTask = tasks.find(t => String(t.id) === selectedScheduleTargetId);
+      const targetTask = currentNormalized.find(t => String(t.id) === selectedScheduleTargetId);
       if (!targetTask) return;
 
-      const sourceDay = taskToSwap.dayId;
-      const sourceSlot = taskToSwap.slotIndex;
+      const sourceDay = sourceTask.dayId;
+      const sourceSlot = sourceTask.slotIndex;
       const destDay = targetTask.dayId;
       const destSlot = targetTask.slotIndex;
 
       updatedTasks = updatedTasks.map(t => {
-        if (String(t.id) === String(taskToSwap.id)) {
+        if (String(t.id) === String(sourceTask.id)) {
           return { ...t, dayId: destDay, slotIndex: destSlot };
         }
         if (String(t.id) === String(targetTask.id)) {
@@ -355,14 +369,13 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
       });
 
       onUpdateAllTasks(updatedTasks);
-      flashNotice(`🔁 تم تبديل الأيام والأماكن بين المهمتين بنجاح!`);
+      flashNotice(`🔁 تم تبديل المهمتين وحفظهما في الجدول حتى نهاية الأسبوع!`);
     } else if (swapMode === 'lectures' && selectedLectureId) {
-      // Replace current task with chosen real lecture from lectures catalog
-      const lec = lectures.find(l => l.id === selectedLectureId);
+      const lec = orderedLectures.find(l => l.id === selectedLectureId);
       if (!lec) return;
 
       updatedTasks = updatedTasks.map(t => {
-        if (String(t.id) === String(taskToSwap.id)) {
+        if (String(t.id) === String(sourceTask.id)) {
           return {
             ...t,
             subjId: lec.subjId,
@@ -370,42 +383,60 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
             category: lec.isDone ? 'review' : 'platform',
             priority: lec.isDone ? 'normal' : 'high',
             teacher: lec.packageName || 'محاضرة',
-            time: lec.dueDay || ''
+            time: lec.dueDay || '',
+            lectureId: lec.id
           };
         }
         return t;
       });
 
       onUpdateAllTasks(updatedTasks);
-      flashNotice(`📚 تم استبدال الخانة بالمحاضرة: ${lec.title}`);
+      flashNotice(`📚 تم استبدال الخانة بالمحاضرة «${lec.title}» وحفظ الجدول!`);
     } else if (swapMode === 'move') {
       if (swapBankSelect) {
         const bankItem = DYNAMIC_STUDY_POOL.find(item => item.text === swapBankSelect);
         if (bankItem) {
           updatedTasks = updatedTasks.map(t =>
-            String(t.id) === String(taskToSwap.id)
-              ? { ...t, subjId: bankItem.subjId, text: bankItem.text, category: 'study' }
+            String(t.id) === String(sourceTask.id)
+              ? { ...t, subjId: bankItem.subjId, text: bankItem.text, category: 'study', lectureId: undefined }
               : t
           );
           onUpdateAllTasks(updatedTasks);
-          flashNotice('✅ تم استبدال المهمة من بنك المذاكرة السريعة.');
+          flashNotice('✅ تم استبدال المهمة من بنك المذاكرة وحفظ الجدول.');
         }
-      } else if (swapTargetDay !== taskToSwap.dayId) {
-        // Move to first free slot [0..8] in target day
-        const usedInDest = new Set(
-          tasks.filter(t => t.dayId === swapTargetDay && typeof t.slotIndex === 'number').map(t => t.slotIndex as number)
-        );
+      } else if (swapTargetDay !== sourceTask.dayId) {
+        const destTasks = updatedTasks.filter(t => t.dayId === swapTargetDay);
+        const usedInDest = new Set(destTasks.map(t => t.slotIndex).filter((s): s is number => typeof s === 'number'));
         let freeSlot: number | undefined = undefined;
-        for (let i = 0; i <= 8; i++) {
+        for (let i = 0; i <= 9; i++) {
           if (!usedInDest.has(i)) { freeSlot = i; break; }
         }
-        updatedTasks = updatedTasks.map(t =>
-          String(t.id) === String(taskToSwap.id)
-            ? { ...t, dayId: swapTargetDay, slotIndex: freeSlot ?? t.slotIndex }
-            : t
-        );
-        onUpdateAllTasks(updatedTasks);
-        flashNotice(`📅 تم نقل المهمة إلى يوم ${getArabicDayLabel(swapTargetDay)}.`);
+
+        if (freeSlot !== undefined) {
+          updatedTasks = updatedTasks.map(t =>
+            String(t.id) === String(sourceTask.id)
+              ? { ...t, dayId: swapTargetDay, slotIndex: freeSlot }
+              : t
+          );
+          onUpdateAllTasks(updatedTasks);
+          flashNotice(`📅 تم نقل المهمة إلى يوم ${getArabicDayLabel(swapTargetDay)} وحفظها.`);
+        } else {
+          const candidateInDest = [...destTasks]
+            .reverse()
+            .find(t => !isTaskDone(t.id) && t.category !== 'center');
+          if (candidateInDest) {
+            const sourceDay = sourceTask.dayId;
+            const sourceSlot = sourceTask.slotIndex;
+            const destSlot = candidateInDest.slotIndex;
+            updatedTasks = updatedTasks.map(t => {
+              if (String(t.id) === String(sourceTask.id)) return { ...t, dayId: swapTargetDay, slotIndex: destSlot };
+              if (String(t.id) === String(candidateInDest.id)) return { ...t, dayId: sourceDay, slotIndex: sourceSlot };
+              return t;
+            });
+            onUpdateAllTasks(updatedTasks);
+            flashNotice(`🔁 يوم ${getArabicDayLabel(swapTargetDay)} مكتمل — تم التبادل مع «${candidateInDest.text}» وحفظ الجدول!`);
+          }
+        }
       }
     }
 
@@ -413,7 +444,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     setTaskToSwap(null);
   };
 
-  // Execute Week Archive & Start Fresh Randomized Week
+  // Execute Week Archive & Start Fresh Schedule respecting Karim's lecture order (10/10 full)
   const confirmExecuteArchive = (autoFillNewWeek: boolean) => {
     if (!onArchiveWeek) return;
 
@@ -424,11 +455,15 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
       totalCount: totalTasksCount,
       completedCount,
       completionPct: completionPercentage,
-      tasks: [...tasks]
+      tasks: []
     };
 
     const cleanTasks = autoFillNewWeek
-      ? buildRandomizedWeeklySchedule({ lectures, preserveUserTasks: [] })
+      ? buildRandomizedWeeklySchedule({
+          lectures: orderedLectures,
+          preserveUserTasks: [],
+          respectLectureOrder: true
+        })
       : FIXED_WEEKLY_CLASSES.map((f, idx) => ({
           id: `fixed_${f.dayId}_${idx}_${Date.now()}`,
           dayId: f.dayId,
@@ -443,12 +478,12 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
 
     onArchiveWeek(archiveRecord, cleanTasks);
     setArchiveConfirmOpen(false);
-    flashNotice('📦 تمت أرشفة الأسبوع وتجهيز الأسبوع الجديد بنجاح!');
+    flashNotice('📦 تمت أرشفة الأسبوع وتجهيز الأسبوع الجديد بنجاح وفق ترتيب دروسك!');
   };
 
-  // Filtered lectures for Swap Tab 2
+  // Filtered lectures for Swap Tab 2 (strictly sorted by Karim's order)
   const filteredSwapLectures = useMemo(() => {
-    return lectures.filter(l => {
+    return orderedLectures.filter(l => {
       if (swapLectureFilter === 'pending' && l.isDone) return false;
       if (swapLectureFilter === 'review' && !l.isDone) return false;
       if (swapLectureSubjFilter !== 'all' && l.subjId !== swapLectureSubjFilter) return false;
@@ -462,15 +497,23 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
       }
       return true;
     });
-  }, [lectures, swapLectureFilter, swapLectureSubjFilter, swapLectureSearch]);
+  }, [orderedLectures, swapLectureFilter, swapLectureSubjFilter, swapLectureSearch]);
 
-  // Other tasks on schedule for 2-way Swap Tab 1
+  // Other tasks on schedule for 2-way Swap Tab 1 (supports search)
   const swappableScheduleTasks = useMemo(() => {
     if (!taskToSwap) return [];
-    return tasks.filter(t => String(t.id) !== String(taskToSwap.id) && t.dayId !== 'backlog');
-  }, [tasks, taskToSwap]);
+    return tasks
+      .filter(t => String(t.id) !== String(taskToSwap.id) && t.dayId !== 'backlog')
+      .filter(t => {
+        if (!swapScheduleSearch.trim()) return true;
+        const q = swapScheduleSearch.trim().toLowerCase();
+        const dayLbl = getArabicDayLabel(t.dayId).toLowerCase();
+        const subjLbl = (SUBJECT_SHORT_LABELS[t.subjId]?.name || '').toLowerCase();
+        return t.text.toLowerCase().includes(q) || dayLbl.includes(q) || subjLbl.includes(q);
+      });
+  }, [tasks, taskToSwap, swapScheduleSearch]);
 
-  // Generate & Download visual poster PNG showing BOTH Subject + Category on every capsule
+  // Crisp PNG Poster Export using legible Cairo font + safe horizontal capsule bounds
   const generateScheduleCanvas = async () => {
     setIsGeneratingImage(true);
     const canvas = document.createElement('canvas');
@@ -495,9 +538,25 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     ctx.drawImage(templateImg, 0, 0, 2000, 1414);
 
     try {
-      await document.fonts.load('bold 18px "AraHamahHoms"');
+      await document.fonts.load('700 18px "Cairo"');
     } catch (e) {}
 
+    // Fill Top-Right Header Pill ("جدول الاسبوع :") cleanly
+    const hp = SCHEDULE_GRID_CONFIG.weekHeaderPill;
+    ctx.save();
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 26px "Cairo", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.direction = 'rtl';
+    ctx.fillText(
+      `الأسبوع الحالي (${completedCount}/${totalTasksCount})`,
+      hp.minX + hp.width / 2,
+      hp.minY + hp.height / 2 + 2
+    );
+    ctx.restore();
+
+    // Draw every day & capsule safely inside rounded boundaries
     SCHEDULE_GRID_CONFIG.columns.forEach(col => {
       const dayTasks = daySlotsMap.get(col.dayId) || [];
 
@@ -505,76 +564,93 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
         const task = dayTasks[row.index];
         if (!task) return;
 
-        const isDone = completedTaskIds.has(task.id) || completedTaskIds.has(String(task.id));
+        const done = isTaskDone(task.id);
         const capsuleX = col.startX;
         const capsuleY = row.startY;
         const capsuleW = col.width;
         const capsuleH = row.height;
-        const catMeta = getCategoryMeta(task);
         const subjMeta = SUBJECT_SHORT_LABELS[task.subjId] || { name: task.subjId || 'مادة', color: '#475569' };
-
-        if (isDone) {
-          ctx.save();
-          ctx.fillStyle = 'rgba(16, 185, 129, 0.16)';
-          ctx.beginPath();
-          ctx.roundRect(capsuleX + 4, capsuleY + 4, capsuleW - 8, capsuleH - 8, 20);
-          ctx.fill();
-          ctx.restore();
-        }
 
         ctx.save();
         ctx.beginPath();
-        ctx.roundRect(capsuleX + 6, capsuleY + 6, capsuleW - 12, capsuleH - 12, 18);
+        ctx.roundRect(capsuleX + 5, capsuleY + 3, capsuleW - 10, capsuleH - 6, 36);
         ctx.clip();
 
-        // Colored subject accent bar on right side of capsule
-        ctx.fillStyle = subjMeta.color;
-        ctx.fillRect(capsuleX + capsuleW - 11, capsuleY + 10, 5, capsuleH - 20);
+        if (done) {
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.16)';
+          ctx.fillRect(capsuleX, capsuleY, capsuleW, capsuleH);
+        }
 
-        // Subject Label pill (top-left) & Category Badge (top-right)
-        ctx.font = 'bold 11px "Cairo", sans-serif';
+        // Top subtle colored indicator + subject name cleanly centered high
+        ctx.font = 'bold 11.5px "Cairo", sans-serif';
         ctx.direction = 'rtl';
+        ctx.fillStyle = done ? '#059669' : subjMeta.color;
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          done ? `✓ ${subjMeta.name} (منجز)` : `● ${subjMeta.name}`,
+          capsuleX + capsuleW / 2,
+          capsuleY + 17
+        );
 
-        // Right: Category
-        ctx.fillStyle = catMeta.color;
-        ctx.textAlign = 'right';
-        ctx.fillText(`${catMeta.emoji} ${catMeta.label}`, capsuleX + capsuleW - 16, capsuleY + 22);
+        // Dynamic auto-fit wrapping up to 3 lines so 100% of every task title renders clearly without cutoff
+        const maxTextW = capsuleW - 30;
+        const wrapForFont = (fontPx: number): string[] => {
+          ctx.font = `bold ${fontPx}px "Cairo", sans-serif`;
+          const words = task.text.trim().split(/\s+/);
+          const wrapped: string[] = [];
+          let line = '';
+          for (const w of words) {
+            const candidate = line ? `${line} ${w}` : w;
+            if (ctx.measureText(candidate).width <= maxTextW) {
+              line = candidate;
+            } else {
+              if (line) wrapped.push(line);
+              line = w;
+            }
+          }
+          if (line) wrapped.push(line);
+          return wrapped;
+        };
 
-        // Left: Subject Name + Done mark
-        ctx.fillStyle = isDone ? '#10b981' : subjMeta.color;
-        ctx.textAlign = 'left';
-        ctx.fillText(isDone ? `✓ ${subjMeta.name}` : subjMeta.name, capsuleX + 14, capsuleY + 22);
+        let chosenFont = 16;
+        let finalLines = wrapForFont(16);
+        if (finalLines.length > 2) {
+          chosenFont = 14;
+          finalLines = wrapForFont(14);
+        }
+        if (finalLines.length > 3) {
+          chosenFont = 12;
+          finalLines = wrapForFont(12);
+        }
+        if (finalLines.length > 3) {
+          chosenFont = 10.5;
+          finalLines = wrapForFont(10.5);
+        }
 
-        // Draw task text in AraHamahHoms
-        ctx.fillStyle = isDone ? '#475569' : '#0f172a';
-        ctx.font = 'bold 15px "AraHamahHoms", "Cairo", sans-serif';
+        ctx.fillStyle = done ? '#475569' : '#0f172a';
+        ctx.font = `bold ${chosenFont}px "Cairo", sans-serif`;
         ctx.textAlign = 'center';
         ctx.direction = 'rtl';
 
-        const words = task.text.split(' ');
-        let line1 = '';
-        let line2 = '';
-        for (const w of words) {
-          if ((line1 + ' ' + w).length <= 22) {
-            line1 += (line1 ? ' ' : '') + w;
-          } else if ((line2 + ' ' + w).length <= 24) {
-            line2 += (line2 ? ' ' : '') + w;
-          }
-        }
+        const displayLines = finalLines.slice(0, 3);
+        const lineGap = chosenFont + 3;
+        const startY =
+          displayLines.length === 1
+            ? capsuleY + 52
+            : displayLines.length === 2
+            ? capsuleY + 41
+            : capsuleY + 34;
 
-        if (line2) {
-          ctx.fillText(line1, capsuleX + capsuleW / 2, capsuleY + 46);
-          ctx.fillText(line2, capsuleX + capsuleW / 2, capsuleY + 68);
-        } else {
-          ctx.fillText(line1, capsuleX + capsuleW / 2, capsuleY + 54);
-        }
+        displayLines.forEach((ln, lIdx) => {
+          ctx.fillText(ln, capsuleX + capsuleW / 2, startY + lIdx * lineGap);
+        });
 
-        if (isDone) {
-          ctx.strokeStyle = '#94a3b8';
+        if (done) {
+          ctx.strokeStyle = 'rgba(71, 85, 105, 0.45)';
           ctx.lineWidth = 1.5;
           ctx.beginPath();
-          ctx.moveTo(capsuleX + 20, capsuleY + capsuleH / 2 + 6);
-          ctx.lineTo(capsuleX + capsuleW - 20, capsuleY + capsuleH / 2 + 6);
+          ctx.moveTo(capsuleX + 28, capsuleY + capsuleH / 2 + 8);
+          ctx.lineTo(capsuleX + capsuleW - 28, capsuleY + capsuleH / 2 + 8);
           ctx.stroke();
         }
 
@@ -589,7 +665,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     link.download = `جدول_المذاكرة_الأسبوعي_${new Date().toISOString().slice(0, 10)}.png`;
     link.href = dataUrl;
     link.click();
-    flashNotice('🖼️ تم توليد وتحميل صورة الجدول بكافة المواد والتصنيفات!');
+    flashNotice('🖼️ تم توليد وتحميل صورة الجدول بتصميم واضح ومنسق!');
   };
 
   const getSubject = (subjId?: string) => subjects.find(s => s.id === subjId);
@@ -605,197 +681,600 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     }
   };
 
+  const weekLabelText = useMemo(() => {
+    const d = new Date();
+    return `الأسبوع الحالي · ${completedCount}/${totalTasksCount}`;
+  }, [completedCount, totalTasksCount]);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Live Feedback Notice */}
       {boardNotice && (
         <div
           style={{
             padding: '10px 16px',
             borderRadius: 10,
-            background: 'rgba(16, 185, 129, 0.14)',
-            border: '1px solid rgba(16, 185, 129, 0.4)',
+            background: 'rgba(16, 185, 129, 0.12)',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
             color: '#10b981',
             fontWeight: 700,
             fontSize: 13,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between'
+            justifyContent: 'space-between',
+            gap: 10
           }}
         >
           <span>{boardNotice}</span>
           <button
             onClick={() => setBoardNotice(null)}
-            style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer' }}
+            style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', flexShrink: 0 }}
           >
             <X size={14} />
           </button>
         </div>
       )}
 
-      {/* Top Banner & Control Deck */}
+      {/* Clean Unified Command Bar */}
       <div className="card" style={{ padding: '16px 20px', background: 'var(--bg-surface)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <CalendarCheck size={22} style={{ color: 'var(--accent-primary)' }} />
-              <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
-                جدول الأسبوع الديناميكي الذكي (السبت ← الجمعة)
-              </h2>
-              <span className="tabular" style={{ fontSize: 13, color: 'var(--accent-primary)', background: 'var(--bg-elevated)', padding: '2px 10px', borderRadius: 'var(--radius-full)' }}>
-                {completedCount} من {totalTasksCount} مكتمل ({completionPercentage}%)
+          {/* Progress Overview */}
+          <div style={{ minWidth: 230, flex: '1 1 260px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-main)', fontWeight: 700, flexWrap: 'wrap' }}>
+              <span className="tabular" style={{ fontSize: 17, fontWeight: 800, color: 'var(--accent-primary)' }}>
+                {completionPercentage}%
               </span>
-              <span style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245, 158, 11, 0.12)', padding: '2px 10px', borderRadius: 'var(--radius-full)', fontWeight: 700 }}>
-                اليوم: {getArabicDayLabel(todayDayId)}
-              </span>
+              <span style={{ color: 'var(--text-muted)' }}>·</span>
+              <span className="tabular">{completedCount} من {totalTasksCount} مهمة منجزة</span>
+              <span style={{ color: 'var(--text-muted)' }}>·</span>
+              <span style={{ color: '#fbbf24' }}>اليوم: {getArabicDayLabel(todayDayId)}</span>
+              {pendingCount > 0 && (
+                <>
+                  <span style={{ color: 'var(--text-muted)' }}>·</span>
+                  <span className="tabular" style={{ color: 'var(--text-muted)', fontSize: 12 }}>متبقي {pendingCount}</span>
+                </>
+              )}
             </div>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 0 0' }}>
-              يتجدد تلقائياً كل سبت بعد أرشفة الأسبوع السابق، ويملأ 9 خانات عشوائياً من محاضراتك والسناتر مع ترك الخانة الأخيرة أسفل كل يوم فارغة لإضافاتك اليدوية.
-            </p>
+            <div style={{ width: '100%', maxWidth: 400, height: 6, background: 'var(--bg-elevated)', borderRadius: 3, overflow: 'hidden', marginTop: 8 }}>
+              <div
+                style={{
+                  width: `${completionPercentage}%`,
+                  height: '100%',
+                  background: 'var(--accent-primary)',
+                  transition: 'width 0.3s ease'
+                }}
+              />
+            </div>
           </div>
 
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <button
               className="btn btn-sm btn-primary"
               onClick={onOpenNewTaskModal}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+              style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
             >
               <Plus size={14} />
-              <span>إضافة مهمة وتصنيف +</span>
+              <span>إضافة مهمة</span>
             </button>
 
             <button
               className="btn btn-sm"
-              onClick={() => handleGenerateRandomWeek(false)}
-              title="إعادة توزيع المهام عشوائياً من المحاضرات المتبقية والمراجعة مع ترك الخانة الأخيرة فارغة"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', background: 'rgba(86, 194, 166, 0.08)', fontWeight: 700 }}
+              onClick={handleRandomizeUndoneOnly}
+              title="يجدد المهام غير المنجزة فقط وفق ترتيب دروسك ويحافظ على المنجز والسناتر ومهامك اليدوية"
+              style={{
+                borderColor: 'var(--accent-primary)',
+                color: 'var(--accent-primary)',
+                background: 'rgba(86, 194, 166, 0.08)',
+                fontWeight: 700,
+                whiteSpace: 'nowrap'
+              }}
             >
               <Shuffle size={14} />
-              <span>توليد أسبوع عشوائي جديد 🎲</span>
+              <span>تغيير عشوائي لغير المنجز</span>
+            </button>
+
+            <button
+              className="btn btn-sm"
+              onClick={handleRolloverTasks}
+              title="ترحيل المهام غير المنجزة لليوم التالي"
+              style={{ borderColor: 'rgba(245, 158, 11, 0.4)', color: 'var(--warning)', whiteSpace: 'nowrap' }}
+            >
+              <RotateCcw size={14} />
+              <span>ترحيل المتأخر</span>
             </button>
 
             <button
               className="btn btn-sm"
               onClick={generateScheduleCanvas}
               disabled={isGeneratingImage}
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ whiteSpace: 'nowrap' }}
             >
               <Download size={14} />
-              <span>{isGeneratingImage ? 'جارٍ التوليد...' : 'تحميل صورة الجدول (PNG)'}</span>
-            </button>
-
-            <button
-              className="btn btn-sm"
-              onClick={handleRolloverTasks}
-              title="نقل المهام غير المنجزة لليوم التالي بأولوية عاجلة"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, borderColor: 'var(--warning)', color: 'var(--warning)' }}
-            >
-              <RotateCcw size={14} />
-              <span>ترحيل المتأخر 🚨</span>
+              <span>{isGeneratingImage ? 'جارٍ التوليد...' : 'تحميل PNG'}</span>
             </button>
 
             <button
               className="btn btn-sm"
               onClick={handleRequestNotifications}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                borderColor: notificationStatus === 'granted' ? 'var(--success)' : 'var(--border-subtle)',
-                color: notificationStatus === 'granted' ? 'var(--success)' : 'var(--text-main)'
-              }}
+              style={{ color: notificationStatus === 'granted' ? 'var(--success)' : 'var(--text-main)', whiteSpace: 'nowrap' }}
+              title="مركز التنبيهات والرسائل"
             >
               <Bell size={14} />
-              <span>إعدادات التنبيهات والرسائل 🔔</span>
+              <span>التنبيهات</span>
             </button>
 
             <button
               className="btn btn-sm"
               onClick={() => setArchiveConfirmOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}
+              style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}
             >
               <Archive size={14} />
-              <span>أرشفة وبدء أسبوع جديد</span>
+              <span>أرشفة</span>
             </button>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 16, borderTop: '1px solid var(--border-subtle)', paddingTop: 14, overflowX: 'auto' }}>
-          <button
-            className={`btn btn-sm ${activeViewMode === 'board' ? 'btn-primary' : ''}`}
-            onClick={() => setActiveViewMode('board')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
-          >
-            <Eye size={14} />
-            <span>البوستر التفاعلي (المواد والتصنيفات)</span>
-          </button>
+        {/* View Mode Switcher Bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 8,
+            marginTop: 14,
+            borderTop: '1px solid var(--border-subtle)',
+            paddingTop: 12
+          }}
+        >
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              className={`btn btn-sm ${activeViewMode === 'poster' ? 'btn-primary' : ''}`}
+              onClick={() => setActiveViewMode('poster')}
+              style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+            >
+              <Eye size={14} />
+              <span>البوستر الرسمي (الرئيسي)</span>
+            </button>
 
-          <button
-            className={`btn btn-sm ${activeViewMode === 'checklist' ? 'btn-primary' : ''}`}
-            onClick={() => setActiveViewMode('checklist')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
-          >
-            <CalendarCheck size={14} />
-            <span>قائمة المهام والاستبدال ({totalTasksCount})</span>
-          </button>
+            <button
+              className={`btn btn-sm ${activeViewMode === 'cards' ? 'btn-primary' : ''}`}
+              onClick={() => setActiveViewMode('cards')}
+              style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+            >
+              <LayoutGrid size={14} />
+              <span>الجدول المنسق (كروت)</span>
+            </button>
 
-          <button
-            className={`btn btn-sm ${activeViewMode === 'timeblock' ? 'btn-primary' : ''}`}
-            onClick={() => setActiveViewMode('timeblock')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
-          >
-            <Clock size={14} />
-            <span>خطة البومودورو اليومية ⏱️</span>
-          </button>
+            <button
+              className={`btn btn-sm ${activeViewMode === 'checklist' ? 'btn-primary' : ''}`}
+              onClick={() => setActiveViewMode('checklist')}
+              style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+            >
+              <CalendarCheck size={14} />
+              <span>قائمة التفصيل (<span className="tabular">{totalTasksCount}</span>)</span>
+            </button>
 
-          <button
-            className={`btn btn-sm ${activeViewMode === 'archive' ? 'btn-primary' : ''}`}
-            onClick={() => setActiveViewMode('archive')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
-          >
-            <History size={14} />
-            <span>أرشيف الأسابيع السابقة ({archivedWeeks.length})</span>
-          </button>
+            <button
+              className={`btn btn-sm ${activeViewMode === 'timeblock' ? 'btn-primary' : ''}`}
+              onClick={() => setActiveViewMode('timeblock')}
+              style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+            >
+              <Clock size={14} />
+              <span>البومودورو</span>
+            </button>
+
+            <button
+              className={`btn btn-sm ${activeViewMode === 'archive' ? 'btn-primary' : ''}`}
+              onClick={() => setActiveViewMode('archive')}
+              style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+            >
+              <History size={14} />
+              <span>الأرشيف (<span className="tabular">{archivedWeeks.length}</span>)</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* VIEW MODE 1: INTERACTIVE BOARD OVERLAY OVER TEMPLATE */}
-      {activeViewMode === 'board' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden', background: '#090d0f' }}>
-          {/* Legend Header showing Subjects + Categories */}
-          <div style={{ padding: '12px 18px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-main)' }}>
-              <Sparkles size={15} style={{ color: 'var(--accent-primary)' }} />
-              <span>اضغط على أي خانة لتسجيل الإنجاز ✓، أو اضغط أيقونة (🔁) للاستبدال بمهمة أو محاضرة، أو الخانة الأخيرة للإضافة اليدوية!</span>
+      {/* VIEW MODE 1 (DEFAULT): CLEAN, HIGH-LEGIBILITY RESPONSIVE DAY CARDS GRID */}
+      {activeViewMode === 'cards' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Clean Filter Strip: Day Focus + Subject Filter */}
+          <div
+            className="card"
+            style={{
+              padding: '10px 16px',
+              background: 'var(--bg-surface)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 10
+            }}
+          >
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                type="button"
+                className={`btn btn-sm ${boardDayFocus === 'all' ? 'btn-primary' : ''}`}
+                onClick={() => setBoardDayFocus('all')}
+                style={{ fontWeight: 700, fontSize: 12 }}
+              >
+                كل الأسبوع (7 أيام)
+              </button>
+              {ORDERED_WEEK_DAYS.map(d => {
+                const isToday = d.id === todayDayId;
+                const active = boardDayFocus === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className={`btn btn-sm ${active ? 'btn-primary' : ''}`}
+                    onClick={() => setBoardDayFocus(d.id)}
+                    style={{
+                      fontSize: 12,
+                      fontWeight: isToday || active ? 700 : 600,
+                      borderColor: isToday && !active ? 'var(--accent-primary)' : undefined,
+                      color: isToday && !active ? 'var(--accent-primary)' : undefined
+                    }}
+                  >
+                    {d.label}{isToday ? ' (النهاردة)' : ''}
+                  </button>
+                );
+              })}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, flexWrap: 'wrap' }}>
-              {Object.entries(SUBJECT_SHORT_LABELS).map(([id, meta]) => (
-                <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: meta.color, fontWeight: 700 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: meta.color }} />
-                  {meta.name}
-                </span>
-              ))}
-              <span style={{ opacity: 0.3 }}>|</span>
-              <span style={{ color: '#0284c7', fontWeight: 700 }}>🏢 سنتر</span>
-              <span style={{ color: '#d97706', fontWeight: 700 }}>💻 محاضرة</span>
-              <span style={{ color: '#0d9488', fontWeight: 700 }}>🔄 مراجعة</span>
-              <span style={{ color: '#ea580c', fontWeight: 700 }}>⚡ مهمتك</span>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setBoardSubjFilter('all')}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: boardSubjFilter === 'all' ? 800 : 600,
+                  color: boardSubjFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-muted)'
+                }}
+              >
+                كل المواد
+              </button>
+              {Object.entries(SUBJECT_SHORT_LABELS).map(([id, meta]) => {
+                const active = boardSubjFilter === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setBoardSubjFilter(active ? 'all' : id)}
+                    style={{
+                      border: 'none',
+                      background: active ? `${meta.color}18` : 'transparent',
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: active ? meta.color : 'var(--text-muted)'
+                    }}
+                  >
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: meta.color }} />
+                    {meta.name}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Interactive Poster Area */}
-          <div style={{ position: 'relative', width: '100%', overflowX: 'auto', padding: '16px 8px', display: 'flex', justifyContent: 'center' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: 1240, minWidth: 820, aspectRatio: '2000 / 1414', borderRadius: 12, overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
-              {/* Background Template Image */}
+          {/* Responsive Cards Grid: Today Card First when showing all, or filtered day */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: boardDayFocus === 'all' ? 'repeat(auto-fill, minmax(340px, 1fr))' : '1fr',
+              gap: 16,
+              alignItems: 'start'
+            }}
+          >
+            {ORDERED_WEEK_DAYS
+              .filter(d => boardDayFocus === 'all' || boardDayFocus === d.id)
+              .map(day => {
+                const slots = daySlotsMap.get(day.id) || [];
+                const dayTasks = slots.filter((t): t is WeeklyTask => t !== null);
+                const visibleSlots = slots.map((t, idx) => ({ task: t, slotIdx: idx }))
+                  .filter(item => {
+                    if (!item.task) return boardSubjFilter === 'all';
+                    if (boardSubjFilter !== 'all' && item.task.subjId !== boardSubjFilter) return false;
+                    return true;
+                  });
+                const dayDone = dayTasks.filter(t => isTaskDone(t.id)).length;
+                const dayPct = dayTasks.length > 0 ? Math.round((dayDone / dayTasks.length) * 100) : 0;
+                const isToday = day.id === todayDayId;
+
+                return (
+                  <div
+                    key={day.id}
+                    className="card"
+                    style={{
+                      padding: 16,
+                      background: 'var(--bg-surface)',
+                      border: isToday ? '1.5px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12
+                    }}
+                  >
+                    {/* Card Header */}
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: isToday ? 'var(--accent-primary)' : 'var(--text-main)' }}>
+                            {day.label}
+                          </h3>
+                          {isToday && (
+                            <span style={{ fontSize: 11, fontWeight: 800, color: '#10b981' }}>
+                              · النهاردة ★
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className="tabular" style={{ fontSize: 12, fontWeight: 700, color: dayDone === dayTasks.length && dayTasks.length > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                            {dayDone}/{dayTasks.length}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            onClick={() => {
+                              const firstEmpty = slots.findIndex(s => s === null);
+                              setSlotQuickAddDay(day.id);
+                              setSlotQuickSlotIdx(firstEmpty !== -1 ? firstEmpty : 9);
+                              setSlotQuickText('');
+                            }}
+                            title={`إضافة مهمة ليوم ${day.label}`}
+                            style={{ padding: '4px 8px', fontSize: 11 }}
+                          >
+                            <Plus size={12} />
+                            <span>إضافة</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Thin Day Progress Bar */}
+                      <div style={{ width: '100%', height: 4, background: 'var(--bg-elevated)', borderRadius: 2, overflow: 'hidden', marginTop: 8 }}>
+                        <div
+                          style={{
+                            width: `${dayPct}%`,
+                            height: '100%',
+                            background: isToday ? 'var(--accent-primary)' : '#10b981',
+                            transition: 'width 0.3s ease'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Clean Readable Task Rows */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {visibleSlots.map(({ task, slotIdx }) => {
+                        if (!task) {
+                          return (
+                            <button
+                              key={`open_${day.id}_${slotIdx}`}
+                              type="button"
+                              onClick={() => {
+                                setSlotQuickAddDay(day.id);
+                                setSlotQuickSlotIdx(slotIdx);
+                                setSlotQuickText('');
+                              }}
+                              style={{
+                                padding: '9px 12px',
+                                borderRadius: 8,
+                                border: '1px dashed var(--border-subtle)',
+                                background: 'transparent',
+                                color: 'var(--text-muted)',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'right',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                              }}
+                            >
+                              <span>+ إضافة مهمة في الخانة {slotIdx + 1}</span>
+                              <Plus size={13} />
+                            </button>
+                          );
+                        }
+
+                        const done = isTaskDone(task.id);
+                        const subjMeta = SUBJECT_SHORT_LABELS[task.subjId] || { name: task.subjId || 'مادة', color: '#64748b' };
+                        const catMeta = getCategoryMeta(task);
+
+                        return (
+                          <div
+                            key={task.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: 10,
+                              padding: '10px 12px',
+                              borderRadius: 10,
+                              background: done ? 'rgba(16, 185, 129, 0.07)' : 'var(--bg-elevated)',
+                              border: `1px solid ${done ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-subtle)'}`,
+                              borderRight: `3.5px solid ${done ? '#10b981' : subjMeta.color}`,
+                              transition: 'background 0.15s ease, border-color 0.15s ease'
+                            }}
+                          >
+                            {/* Clean Checkbox */}
+                            <button
+                              type="button"
+                              onClick={() => handleCheck(task.id)}
+                              aria-label={done ? 'إلغاء الإنجاز' : 'تحديد كمنجز'}
+                              style={{
+                                width: 20,
+                                height: 20,
+                                borderRadius: 6,
+                                border: `1.5px solid ${done ? '#10b981' : 'var(--text-faint)'}`,
+                                background: done ? '#10b981' : 'transparent',
+                                color: '#0b1212',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                marginTop: 2
+                              }}
+                            >
+                              {done && <Check size={13} strokeWidth={3} />}
+                            </button>
+
+                            {/* Readable Content */}
+                            <div
+                              onClick={() => handleCheck(task.id)}
+                              style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 13.5,
+                                  fontWeight: 700,
+                                  lineHeight: 1.45,
+                                  color: done ? 'var(--text-muted)' : 'var(--text-main)',
+                                  textDecoration: done ? 'line-through' : 'none',
+                                  wordBreak: 'break-word'
+                                }}
+                              >
+                                {task.text}
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: 11.5, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                                <span style={{ color: subjMeta.color, fontWeight: 700 }}>{subjMeta.name}</span>
+                                <span>·</span>
+                                <span style={{ color: catMeta.color, fontWeight: 600 }}>{catMeta.label}</span>
+                                {task.time && (
+                                  <>
+                                    <span>·</span>
+                                    <span>{task.time}</span>
+                                  </>
+                                )}
+                                <span style={{ marginRight: 'auto' }} />
+                                <span className="tabular" style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>#{slotIdx + 1}</span>
+                              </div>
+                            </div>
+
+                            {/* Clean Compact Actions */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSwap(task)}
+                                title="تبديل أو استبدال المهمة"
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 6,
+                                  border: '1px solid var(--border-subtle)',
+                                  background: 'var(--bg-surface)',
+                                  color: 'var(--text-muted)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <ArrowRightLeft size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onOpenEditTask(task)}
+                                title="تعديل المهمة"
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 6,
+                                  border: '1px solid var(--border-subtle)',
+                                  background: 'var(--bg-surface)',
+                                  color: 'var(--text-muted)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* VIEW MODE 2: AUTHENTIC POSTER OVERLAY (SHARP CAIRO TYPOGRAPHY + SAFE CAPSULE PADDING) */}
+      {activeViewMode === 'poster' && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div
+            style={{
+              padding: '10px 18px',
+              background: 'var(--bg-elevated)',
+              borderBottom: '1px solid var(--border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 10,
+              fontSize: 12
+            }}
+          >
+            <span style={{ color: 'var(--text-muted)' }}>
+              اضغط على أي كبسولة لتحديد الإنجاز · مرر الماوس أو اضغط (⇄) لتبديل المهمة
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontWeight: 700 }}>
+              {Object.entries(SUBJECT_SHORT_LABELS).map(([id, meta]) => (
+                <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: meta.color }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: meta.color }} />
+                  {meta.name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ position: 'relative', width: '100%', overflowX: 'auto', padding: '14px 10px', background: '#0b1012', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: 1240, minWidth: 920, aspectRatio: '2000 / 1414', borderRadius: 12, overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.45)' }}>
               <img
                 src="/weekly_schedule_template.png"
                 alt="جدول الأسبوع"
                 style={{ width: '100%', height: '100%', display: 'block', objectFit: 'contain' }}
               />
 
-              {/* Today's highlight indicator pill over today's column header */}
+              {/* Top-Right Week Header Pill Overlay */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${SCHEDULE_GRID_CONFIG.weekHeaderPill.leftPct}%`,
+                  top: `${SCHEDULE_GRID_CONFIG.weekHeaderPill.topPct}%`,
+                  width: `${SCHEDULE_GRID_CONFIG.weekHeaderPill.widthPct}%`,
+                  height: `${SCHEDULE_GRID_CONFIG.weekHeaderPill.heightPct}%`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#0f172a',
+                  fontFamily: 'Cairo, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 'clamp(11px, 1.05vw, 15px)',
+                  pointerEvents: 'none',
+                  zIndex: 3
+                }}
+              >
+                {weekLabelText}
+              </div>
+
+              {/* Clean Today Indicator above day pill */}
               {SCHEDULE_GRID_CONFIG.columns.map(col => {
                 if (col.dayId !== todayDayId) return null;
                 return (
@@ -803,33 +1282,32 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                     key={`today_badge_${col.dayId}`}
                     style={{
                       position: 'absolute',
-                      left: `${col.leftPct + 1}%`,
-                      top: '18.2%',
-                      width: '10.95%',
+                      left: `${col.leftPct + 2}%`,
+                      top: '17.2%',
+                      width: `${col.widthPct - 4}%`,
                       textAlign: 'center',
-                      background: 'linear-gradient(90deg, #10b981, #059669)',
-                      color: '#fff',
-                      fontSize: 'clamp(8px, 0.75vw, 11px)',
+                      background: '#10b981',
+                      color: '#0b1212',
+                      fontSize: 'clamp(9px, 0.72vw, 11px)',
                       fontWeight: 800,
-                      padding: '2px 4px',
+                      padding: '2px 6px',
                       borderRadius: 99,
-                      boxShadow: '0 2px 8px rgba(16,185,129,0.5)',
                       zIndex: 3,
                       pointerEvents: 'none'
                     }}
                   >
-                    ★ النهاردة ★
+                    اليوم ★
                   </div>
                 );
               })}
 
-              {/* Dynamic Interactive Slots mapped to 7 columns x 10 rows */}
+              {/* 7 columns x 10 legible pill slots */}
               {SCHEDULE_GRID_CONFIG.columns.map(col => {
                 const dayTasks = daySlotsMap.get(col.dayId) || [];
 
                 return SCHEDULE_GRID_CONFIG.rows.map(row => {
                   const task = dayTasks[row.index];
-                  const isDone = task ? (completedTaskIds.has(task.id) || completedTaskIds.has(String(task.id))) : false;
+                  const done = task ? isTaskDone(task.id) : false;
 
                   return (
                     <div
@@ -838,30 +1316,29 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                         position: 'absolute',
                         left: `${col.leftPct}%`,
                         top: `${row.topPct}%`,
-                        width: '12.95%',
-                        height: '6.01%',
+                        width: `${col.widthPct}%`,
+                        height: `${row.heightPct}%`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        cursor: 'pointer',
-                        padding: '2px 5px',
+                        padding: '2px 8px',
                         boxSizing: 'border-box',
-                        transition: 'all 0.15s ease',
                         zIndex: 2
                       }}
-                      title={
-                        task
-                          ? `${SUBJECT_SHORT_LABELS[task.subjId]?.name || task.subjId} | ${task.text}`
-                          : row.index === 9
-                            ? `إضافة مهمة يدوية أسفل يوم ${col.label}`
-                            : 'خانة فارغة'
-                      }
+                      title={task ? `${SUBJECT_SHORT_LABELS[task.subjId]?.name || task.subjId} · ${task.text}` : `إضافة مهمة أو محاضرة من عندك ليوم ${col.label}`}
                     >
                       {task ? (
                         (() => {
-                          const catMeta = getCategoryMeta(task);
                           const subjMeta = SUBJECT_SHORT_LABELS[task.subjId] || { name: task.subjId || 'مادة', color: '#475569' };
-                          const isManualOrFocus = Boolean(task.isUserAdded || task.category === 'manual');
+                          const textLen = (task.text || '').trim().length;
+                          const adaptiveFont =
+                            textLen <= 20
+                              ? 'clamp(9.8px, 0.88vw, 12.5px)'
+                              : textLen <= 34
+                              ? 'clamp(8.8px, 0.78vw, 11px)'
+                              : textLen <= 50
+                              ? 'clamp(7.8px, 0.68vw, 9.6px)'
+                              : 'clamp(7px, 0.6vw, 8.6px)';
 
                           return (
                             <div
@@ -869,132 +1346,133 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                               style={{
                                 width: '100%',
                                 height: '100%',
-                                borderRadius: 14,
+                                borderRadius: 999,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                justifyContent: 'space-between',
-                                textAlign: 'center',
-                                padding: '2px 5px',
-                                background: isDone
-                                  ? 'rgba(16, 185, 129, 0.2)'
-                                  : isManualOrFocus
-                                    ? 'rgba(249, 115, 22, 0.08)'
-                                    : 'transparent',
-                                borderRight: `3.5px solid ${subjMeta.color}`,
-                                color: isDone ? '#475569' : '#0f172a',
-                                fontFamily: 'AraHamahHoms, Cairo, sans-serif',
+                                justifyContent: 'center',
+                                padding: '2px 16px',
+                                background: done ? 'rgba(16, 185, 129, 0.22)' : 'transparent',
+                                color: done ? '#475569' : '#0f172a',
+                                fontFamily: 'Cairo, sans-serif',
                                 fontWeight: 700,
-                                lineHeight: 1.12,
+                                cursor: 'pointer',
                                 userSelect: 'none',
                                 position: 'relative'
                               }}
                             >
-                              {/* Top bar: Category Badge + Subject Pill + Quick Swap button */}
-                              <div
+                              {/* Compact corner subject dot */}
+                              <span
                                 style={{
-                                  display: 'flex',
+                                  position: 'absolute',
+                                  right: 7,
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '50%',
+                                  background: done ? '#10b981' : subjMeta.color,
+                                  pointerEvents: 'none'
+                                }}
+                              />
+
+                              {/* Subtle top-left corner swap button (does not compress text width!) */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenSwap(task);
+                                }}
+                                title="تبديل أو استبدال المهمة"
+                                style={{
+                                  position: 'absolute',
+                                  left: 5,
+                                  top: 3,
+                                  border: 'none',
+                                  background: 'rgba(15, 23, 42, 0.08)',
+                                  color: '#334155',
+                                  borderRadius: 99,
+                                  width: 15,
+                                  height: 15,
+                                  display: 'inline-flex',
                                   alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  width: '100%',
-                                  padding: '0 2px',
-                                  fontSize: 'clamp(7px, 0.62vw, 9.5px)',
-                                  fontFamily: 'Cairo, sans-serif',
-                                  gap: 2
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  opacity: 0.72,
+                                  zIndex: 4
                                 }}
                               >
-                                {/* Category Tag */}
-                                <span style={{ color: catMeta.color, fontWeight: 800, whiteSpace: 'nowrap' }}>
-                                  {catMeta.emoji} {catMeta.label}
-                                </span>
+                                <ArrowRightLeft size={9} />
+                              </button>
 
-                                {/* Subject Colored Pill + Quick Swap Trigger */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                  <span
-                                    style={{
-                                      background: `${subjMeta.color}1e`,
-                                      color: subjMeta.color,
-                                      padding: '0px 4px',
-                                      borderRadius: 4,
-                                      fontWeight: 800,
-                                      whiteSpace: 'nowrap'
-                                    }}
-                                  >
-                                    {subjMeta.name}
-                                  </span>
-                                  {isDone ? (
-                                    <span style={{ color: '#10b981', fontWeight: 900 }}>✓</span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleOpenSwap(task);
-                                      }}
-                                      title="استبدال أو نقل المهمة"
-                                      style={{
-                                        border: 'none',
-                                        background: 'rgba(15, 23, 42, 0.08)',
-                                        color: '#334155',
-                                        borderRadius: 4,
-                                        padding: '0 3px',
-                                        fontSize: 'clamp(7px, 0.6vw, 9px)',
-                                        cursor: 'pointer',
-                                        lineHeight: 1.2
-                                      }}
-                                    >
-                                      🔁
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Task Title in AraHamahHoms */}
-                              <div
+                              {/* Tiny subtle edit button at bottom-left for quick inline editing */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenEditTask(task);
+                                }}
+                                title="تعديل المهمة"
                                 style={{
-                                  fontSize: 'clamp(8.5px, 0.8vw, 11.5px)',
-                                  textDecoration: isDone ? 'line-through' : 'none',
-                                  overflow: 'hidden',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
+                                  position: 'absolute',
+                                  left: 5,
+                                  bottom: 3,
+                                  border: 'none',
+                                  background: 'rgba(15, 23, 42, 0.06)',
+                                  color: '#475569',
+                                  borderRadius: 99,
+                                  width: 15,
+                                  height: 15,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  opacity: 0.6,
+                                  zIndex: 4
+                                }}
+                              >
+                                <Pencil size={8} />
+                              </button>
+
+                              {/* Complete Full Non-Truncated Arabic Task Title */}
+                              <span
+                                style={{
+                                  fontSize: adaptiveFont,
+                                  lineHeight: 1.14,
+                                  textDecoration: done ? 'line-through' : 'none',
                                   wordBreak: 'break-word',
                                   textAlign: 'center',
-                                  marginBottom: 1
+                                  width: '100%'
                                 }}
                               >
-                                {isManualOrFocus && !task.text.includes('⭐') ? `⭐ ${task.text}` : task.text}
-                              </div>
+                                {task.text}
+                              </span>
                             </div>
                           );
                         })()
                       ) : (
-                        // Reserved empty bottom slot (Row 9) or open slot quick trigger
-                        row.index === 9 && (
-                          <div
-                            onClick={() => {
-                              setSlotQuickAddDay(col.dayId);
-                              setSlotQuickText('');
-                            }}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              borderRadius: 14,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              border: '1.5px dashed rgba(234, 88, 12, 0.45)',
-                              background: 'rgba(249, 115, 22, 0.05)',
-                              color: '#c2410c',
-                              fontSize: 'clamp(8px, 0.7vw, 10.5px)',
-                              cursor: 'pointer',
-                              fontWeight: 700,
-                              fontFamily: 'Cairo, sans-serif'
-                            }}
-                          >
-                            + خانة يدوية
-                          </div>
-                        )
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSlotQuickAddDay(col.dayId);
+                            setSlotQuickSlotIdx(row.index);
+                            setSlotQuickText('');
+                          }}
+                          style={{
+                            width: '88%',
+                            height: '76%',
+                            borderRadius: 999,
+                            border: row.index === 9 ? '1.5px dashed rgba(16, 185, 129, 0.55)' : '1px dashed rgba(100, 116, 139, 0.45)',
+                            background: row.index === 9 ? 'rgba(16, 185, 129, 0.05)' : 'transparent',
+                            color: row.index === 9 ? '#0f766e' : '#475569',
+                            fontSize: 'clamp(8.5px, 0.7vw, 10.5px)',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            fontFamily: 'Cairo, sans-serif'
+                          }}
+                        >
+                          {row.index === 9 ? '+ أضف محاضرة من عندك' : '+ إضافة'}
+                        </button>
                       )}
                     </div>
                   );
@@ -1005,22 +1483,21 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
         </div>
       )}
 
-      {/* VIEW MODE 2: INTERACTIVE CHECKLIST BELOW THE BOARD */}
+      {/* VIEW MODE 3: INTERACTIVE CHECKLIST & SWAP MANAGEMENT */}
       {activeViewMode === 'checklist' && (
         <div className="card" style={{ padding: '16px 20px' }}>
-          {/* Filter Bar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button
                 className={`btn btn-sm ${selectedDayTab === 'all' ? 'btn-primary' : ''}`}
                 onClick={() => setSelectedDayTab('all')}
                 style={{ fontWeight: 700 }}
               >
-                جميع الأيام ({totalTasksCount})
+                جميع الأيام (<span className="tabular">{totalTasksCount}</span>)
               </button>
               {ORDERED_WEEK_DAYS.map(d => {
                 const dayTasks = tasks.filter(t => t.dayId === d.id);
-                const doneCount = dayTasks.filter(t => completedTaskIds.has(t.id) || completedTaskIds.has(String(t.id))).length;
+                const doneCount = dayTasks.filter(t => isTaskDone(t.id)).length;
                 const isToday = d.id === todayDayId;
                 return (
                   <button
@@ -1031,17 +1508,17 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       gap: 6,
-                      borderColor: isToday ? 'var(--accent-primary)' : undefined
+                      borderColor: isToday && selectedDayTab !== d.id ? 'var(--accent-primary)' : undefined
                     }}
                   >
                     <span>{d.label} {isToday ? '★' : ''}</span>
-                    <span style={{ fontSize: 10, opacity: 0.8 }}>({doneCount}/{dayTasks.length})</span>
+                    <span className="tabular" style={{ fontSize: 11, opacity: 0.85 }}>({doneCount}/{dayTasks.length})</span>
                   </button>
                 );
               })}
             </div>
 
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
               <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', marginLeft: 4 }}>
                 تصفية النوع:
               </span>
@@ -1055,39 +1532,38 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               <button
                 className={`btn btn-sm ${selectedCategoryFilter === 'manual' ? 'btn-primary' : ''}`}
                 onClick={() => setSelectedCategoryFilter('manual')}
-                style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}
+                style={{ fontSize: 12 }}
               >
-                <Star size={13} style={{ color: '#f97316' }} />
-                <span>مهامك المضافة ⚡ ({tasks.filter(t => t.category === 'manual' || t.isUserAdded).length})</span>
+                <Star size={12} style={{ color: '#f97316' }} />
+                <span>مهامك المضافة (<span className="tabular">{tasks.filter(t => t.category === 'manual' || t.isUserAdded).length}</span>)</span>
               </button>
               <button
                 className={`btn btn-sm ${selectedCategoryFilter === 'pending' ? 'btn-primary' : ''}`}
                 onClick={() => setSelectedCategoryFilter('pending')}
-                style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}
+                style={{ fontSize: 12 }}
               >
-                <Laptop size={13} style={{ color: '#fbbf24' }} />
-                <span>محاضرات للإنجاز ({tasks.filter(t => t.category === 'platform' || t.category === 'study').length})</span>
+                <Laptop size={12} style={{ color: '#fbbf24' }} />
+                <span>محاضرات للإنجاز (<span className="tabular">{tasks.filter(t => t.category === 'platform' || t.category === 'study').length}</span>)</span>
               </button>
               <button
                 className={`btn btn-sm ${selectedCategoryFilter === 'review' ? 'btn-primary' : ''}`}
                 onClick={() => setSelectedCategoryFilter('review')}
-                style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}
+                style={{ fontSize: 12 }}
               >
-                <RotateCcw size={13} style={{ color: '#14b8a6' }} />
-                <span>محاضرات للمراجعة 🔄 ({tasks.filter(t => t.category === 'review').length})</span>
+                <RotateCcw size={12} style={{ color: '#14b8a6' }} />
+                <span>للمراجعة (<span className="tabular">{tasks.filter(t => t.category === 'review').length}</span>)</span>
               </button>
               <button
                 className={`btn btn-sm ${selectedCategoryFilter === 'center' ? 'btn-primary' : ''}`}
                 onClick={() => setSelectedCategoryFilter('center')}
-                style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}
+                style={{ fontSize: 12 }}
               >
-                <Building2 size={13} style={{ color: '#38bdf8' }} />
-                <span>السناتر الحضورية 🏢 ({tasks.filter(t => t.category === 'center').length})</span>
+                <Building2 size={12} style={{ color: '#38bdf8' }} />
+                <span>السناتر (<span className="tabular">{tasks.filter(t => t.category === 'center').length}</span>)</span>
               </button>
             </div>
           </div>
 
-          {/* Tasks list grouped by day */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {ORDERED_WEEK_DAYS
               .filter(d => selectedDayTab === 'all' || selectedDayTab === d.id)
@@ -1103,24 +1579,34 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                   })
                   .sort((a, b) => (a.slotIndex ?? 5) - (b.slotIndex ?? 5));
 
+                const dayDoneCount = dayTasks.filter(t => isTaskDone(t.id)).length;
+
                 return (
-                  <div key={d.id} style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 14, border: d.id === todayDayId ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)' }}>
+                  <div
+                    key={d.id}
+                    style={{
+                      background: 'var(--bg-elevated)',
+                      borderRadius: 10,
+                      padding: 14,
+                      border: d.id === todayDayId ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)'
+                    }}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                       <strong style={{ fontSize: 15, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Calendar size={16} />
                         <span>يوم {d.label} {d.id === todayDayId ? '(النهاردة ★)' : ''}</span>
                       </strong>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {dayTasks.filter(t => completedTaskIds.has(t.id) || completedTaskIds.has(String(t.id))).length} من {dayTasks.length} منجز
+                      <span className="tabular" style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>
+                        {dayDoneCount} من {dayTasks.length} منجز
                       </span>
                     </div>
 
                     {dayTasks.length === 0 ? (
                       <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>لا توجد مهام مطابقة لهذا الفلتر.</p>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {dayTasks.map(t => {
-                          const isDone = completedTaskIds.has(t.id) || completedTaskIds.has(String(t.id));
+                          const done = isTaskDone(t.id);
                           const subj = getSubject(t.subjId);
                           const catMeta = getCategoryMeta(t);
 
@@ -1134,63 +1620,44 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                                 gap: 10,
                                 padding: '10px 14px',
                                 borderRadius: 8,
-                                borderRight: `4px solid ${subj?.color || 'var(--accent-primary)'}`,
-                                background: isDone ? 'rgba(16, 185, 129, 0.05)' : 'var(--bg-surface)',
-                                borderTop: '1px solid var(--border-subtle)',
-                                borderBottom: '1px solid var(--border-subtle)',
-                                borderLeft: '1px solid var(--border-subtle)'
+                                background: done ? 'rgba(16, 185, 129, 0.06)' : 'var(--bg-surface)',
+                                border: `1px solid ${done ? 'rgba(16, 185, 129, 0.25)' : 'var(--border-subtle)'}`
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
                                 <input
                                   type="checkbox"
-                                  checked={isDone}
+                                  checked={done}
                                   onChange={() => handleCheck(t.id)}
-                                  style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--accent-primary)' }}
+                                  style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--accent-primary)', flexShrink: 0 }}
                                 />
 
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                    {subj && (
-                                      <span style={{
-                                        fontSize: 10,
-                                        padding: '2px 8px',
-                                        borderRadius: 6,
-                                        background: `${subj.color}22`,
-                                        color: subj.color,
-                                        fontWeight: 800
-                                      }}>
-                                        {subj.name}
-                                      </span>
-                                    )}
-
-                                    <span style={{
-                                      fontSize: 10,
-                                      padding: '2px 8px',
-                                      borderRadius: 6,
-                                      background: `${catMeta.color}1e`,
-                                      color: catMeta.color,
-                                      fontWeight: 700
-                                    }}>
-                                      {catMeta.emoji} {catMeta.label}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: subj?.color || 'var(--accent-primary)', fontWeight: 700 }}>
+                                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: subj?.color || 'var(--accent-primary)' }} />
+                                      {subj?.name || t.subjId}
                                     </span>
-
-                                    <span
-                                      style={{
-                                        fontSize: 14,
-                                        fontWeight: 600,
-                                        color: isDone ? 'var(--text-muted)' : 'var(--text-main)',
-                                        textDecoration: isDone ? 'line-through' : 'none'
-                                      }}
-                                    >
-                                      {t.text}
-                                    </span>
-
-                                    {t.slotIndex === 9 && (
-                                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(249, 115, 22, 0.15)', color: '#f97316', fontWeight: 700 }}>
-                                        الخانة اليدوية الأخيرة
-                                      </span>
+                                    <span>·</span>
+                                    <span style={{ color: catMeta.color, fontWeight: 700 }}>{catMeta.label}</span>
+                                    {typeof t.slotIndex === 'number' && (
+                                      <>
+                                        <span>·</span>
+                                        <span className="tabular">خانة {t.slotIndex + 1}</span>
+                                      </>
                                     )}
+                                  </div>
+
+                                  <div
+                                    style={{
+                                      fontSize: 14,
+                                      fontWeight: 600,
+                                      color: done ? 'var(--text-muted)' : 'var(--text-main)',
+                                      textDecoration: done ? 'line-through' : 'none',
+                                      wordBreak: 'break-word'
+                                    }}
+                                  >
+                                    {t.text}
                                   </div>
 
                                   {(t.teacher || t.time) && (
@@ -1202,13 +1669,12 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                                 </div>
                               </div>
 
-                              {/* Task actions */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                                 <button
                                   className="btn btn-sm"
                                   onClick={() => handleOpenSwap(t)}
-                                  title="استبدال بمهمة أخرى في الجدول أو من المحاضرات"
-                                  style={{ padding: '3px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                                  title="تبديل مع مهمة بالجدول أو من المحاضرات"
+                                  style={{ padding: '4px 10px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
                                 >
                                   <ArrowRightLeft size={12} />
                                   <span>استبدال</span>
@@ -1217,7 +1683,8 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                                 <button
                                   className="btn btn-sm"
                                   onClick={() => onOpenEditTask(t)}
-                                  style={{ padding: '3px 8px', fontSize: 11 }}
+                                  title="تعديل المهمة"
+                                  style={{ padding: '4px 8px', fontSize: 11 }}
                                 >
                                   <Pencil size={12} />
                                 </button>
@@ -1226,7 +1693,8 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                                   <button
                                     className="btn btn-sm"
                                     onClick={() => onDeleteTask(t.id)}
-                                    style={{ padding: '3px 8px', fontSize: 11, color: 'var(--danger)' }}
+                                    title="حذف المهمة"
+                                    style={{ padding: '4px 8px', fontSize: 11, color: 'var(--danger)' }}
                                   >
                                     <Trash2 size={12} />
                                   </button>
@@ -1238,18 +1706,28 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                       </div>
                     )}
 
-                    {/* Quick Add box at the bottom of day */}
-                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    {/* Quick Add box at the bottom of day with Subject Selector */}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                      <select
+                        className="input-field"
+                        value={quickAddSubj[d.id] || 'physics'}
+                        onChange={(e) => setQuickAddSubj(prev => ({ ...prev, [d.id]: e.target.value }))}
+                        style={{ width: 'auto', minWidth: 115, margin: 0, fontSize: 12, padding: '6px 10px' }}
+                      >
+                        {subjects.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
                       <input
                         type="text"
                         className="input-field"
-                        placeholder={`+ إضافة في الخانة الأخيرة ليوم ${d.label}...`}
+                        placeholder={`+ إضافة مهمة يدوية ليوم ${d.label}...`}
                         value={quickAddInput[d.id] || ''}
                         onChange={(e) => setQuickAddInput(prev => ({ ...prev, [d.id]: e.target.value }))}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleQuickAdd(d.id);
                         }}
-                        style={{ fontSize: 12, padding: '6px 12px', margin: 0 }}
+                        style={{ fontSize: 12, padding: '6px 12px', margin: 0, flex: 1, minWidth: 180 }}
                       />
                       <button
                         className="btn btn-sm btn-primary"
@@ -1267,11 +1745,11 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
         </div>
       )}
 
-      {/* VIEW MODE 3: POMODORO PLAN */}
+      {/* VIEW MODE 4: POMODORO PLAN */}
       {activeViewMode === 'timeblock' && (
         <div className="card" style={{ padding: '20px' }}>
           <div style={{ marginBottom: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
               <Clock size={18} style={{ color: 'var(--accent-primary)' }} />
               <span>تقسيم اليوم بالبومودورو حول مواعيد السناتر الحضورية</span>
             </h3>
@@ -1283,33 +1761,33 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
             <div style={{ background: 'var(--bg-elevated)', padding: 14, borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
               <strong style={{ color: 'var(--accent-primary)', fontSize: 14 }}>🗓️ أيام السناتر الثقيلة (السبت والثلاثاء)</strong>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, fontSize: 12 }}>
-                <div style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(16, 185, 129, 0.1)', borderRight: '3px solid #10b981' }}>
+                <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
                   <strong>10:00 ص - 1:00 ظ:</strong> إنجاز محاضرتين + مراجعة تثبيت
                 </div>
-                <div style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(56, 189, 248, 0.15)', borderRight: '3px solid #0284c7' }}>
-                  <strong>4:00 م - 6:30 م:</strong> 🏢 سنتر عربي أ. تقوى مرزوق
+                <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                  <strong>4:00 م - 6:30 م:</strong> سنتر عربي أ. تقوى مرزوق
                 </div>
-                <div style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(56, 189, 248, 0.15)', borderRight: '3px solid #0284c7' }}>
-                  <strong>7:00 م - 9:30 م:</strong> 🏢 سنتر إنجليزي أ. أيمن عبد العاطي
+                <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                  <strong>7:00 م - 9:30 م:</strong> سنتر إنجليزي أ. أيمن عبد العاطي
                 </div>
               </div>
             </div>
             <div style={{ background: 'var(--bg-elevated)', padding: 14, borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
               <strong style={{ color: 'var(--accent-primary)', fontSize: 14 }}>🗓️ أيام سنتر التاريخ (الإثنين والخميس)</strong>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, fontSize: 12 }}>
-                <div style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(56, 189, 248, 0.15)', borderRight: '3px solid #0284c7' }}>
-                  <strong>1:00 ظ - 3:00 ع:</strong> 🏢 سنتر تاريخ الفشن أ. أحمد سمير
+                <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                  <strong>1:00 ظ - 3:00 ع:</strong> سنتر تاريخ الفشن أ. أحمد سمير
                 </div>
-                <div style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(99, 102, 241, 0.12)', borderRight: '3px solid #6366f1' }}>
-                  <strong>5:00 م - 9:00 م:</strong> جلسات فيزياء وعربي من المحاضرات المتبقية
+                <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
+                  <strong>5:00 م - 9:00 م:</strong> جلسات فيزياء وعربي من المحاضرات المرتبة
                 </div>
               </div>
             </div>
             <div style={{ background: 'var(--bg-elevated)', padding: 14, borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
               <strong style={{ color: 'var(--accent-primary)', fontSize: 14 }}>🔥 أيام التقفيل الحرة (الأحد، الأربعاء، الجمعة)</strong>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, fontSize: 12 }}>
-                <div style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(245, 158, 11, 0.12)', borderRight: '3px solid #f59e0b' }}>
-                  <strong>أوقات مفتوحة:</strong> مثالية لإنهاء دفعات كبيرة من المحاضرات غير المنجزة + حل امتحانات شاملة.
+                <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                  <strong>أوقات مفتوحة:</strong> مثالية لإنهاء المحاضرات غير المنجزة بالترتيب + حل امتحانات شاملة.
                 </div>
               </div>
             </div>
@@ -1317,7 +1795,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
         </div>
       )}
 
-      {/* VIEW MODE 4: ARCHIVED WEEKS */}
+      {/* VIEW MODE 5: ARCHIVED WEEKS */}
       {activeViewMode === 'archive' && (
         <div className="card" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -1325,7 +1803,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               <Archive size={18} style={{ color: 'var(--accent-primary)' }} />
               <span>أرشيف الجداول السابقة (يتم الترحيل والأرشفة تلقائياً كل سبت)</span>
             </h3>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            <span className="tabular" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               {archivedWeeks.length} أسابيع مؤرشفة
             </span>
           </div>
@@ -1345,7 +1823,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                       {arch.completionPct}%
                     </span>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                  <div className="tabular" style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
                     تم إنجاز {arch.completedCount} من أصل {arch.totalCount} مهمة
                   </div>
                   <div style={{ width: '100%', height: 6, background: 'var(--bg-surface)', borderRadius: 3, overflow: 'hidden' }}>
@@ -1358,13 +1836,13 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
         </div>
       )}
 
-      {/* INLINE BOTTOM SLOT QUICK ADD MODAL */}
+      {/* INLINE QUICK ADD MODAL */}
       {slotQuickAddDay && (
         <div className="modal-overlay show" onClick={() => setSlotQuickAddDay(null)}>
           <div className="modal-box" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Plus size={18} style={{ color: '#f97316' }} />
-              <span>إضافة مهمة في الخانة اليدوية — يوم {getArabicDayLabel(slotQuickAddDay)}</span>
+              <span>إضافة مهمة — يوم {getArabicDayLabel(slotQuickAddDay)}</span>
             </div>
             <form onSubmit={handleSaveSlotQuickAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
@@ -1418,7 +1896,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                 <input
                   type="text"
                   className="input-field"
-                  placeholder="اكتب مهمتك الطارئة هنا..."
+                  placeholder="اكتب مهمتك هنا..."
                   value={slotQuickText}
                   onChange={(e) => setSlotQuickText(e.target.value)}
                   required
@@ -1445,7 +1923,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               <span>أرشفة الأسبوع الحالي وبدء أسبوع جديد</span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-main)', lineHeight: 1.7 }}>
-              سيتم حفظ سجل الأسبوع الحالي ({completedCount} من {totalTasksCount} مهمة — {completionPercentage}%) في الأرشيف كما هو (اللي اتعمل اتعمل واللي ماتعملش خلص)، وتجهيز أسبوع جديد نظيف.
+              سيتم أرشفة ملخص الأسبوع الحالي ({completedCount} من {totalTasksCount} مهمة منجزة — {completionPercentage}%) وحذف المهام القديمة، ثم توليد أسبوعك الجديد (9 مهام يومياً وفق ترتيب مساراتك مع ترك الخانة الأخيرة فارغة لإضافاتك اليدوية).
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
               <button
@@ -1453,7 +1931,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                 className="btn btn-primary"
                 onClick={() => confirmExecuteArchive(true)}
               >
-                🎲 أرشفة + توليد مهام عشوائية جديدة من المحاضرات والسناتر
+                🎲 أرشفة + توليد أسبوع جديد مرتب من المحاضرات والسناتر
               </button>
               <button
                 type="button"
@@ -1481,19 +1959,18 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
           <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 580 }}>
             <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <ArrowRightLeft size={18} style={{ color: 'var(--accent-primary)' }} />
-              <span>استبدال وتبديل المهمة</span>
+              <span>استبدال وتبديل المهمة (يُحفظ حتى نهاية الأسبوع)</span>
             </div>
 
             <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                المهمة الحالية ({getArabicDayLabel(taskToSwap.dayId)} - {SUBJECT_SHORT_LABELS[taskToSwap.subjId]?.name || taskToSwap.subjId}):
+                المهمة الحالية ({getArabicDayLabel(taskToSwap.dayId)} · {SUBJECT_SHORT_LABELS[taskToSwap.subjId]?.name || taskToSwap.subjId}):
               </span>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)', marginTop: 3 }}>
                 {taskToSwap.text}
               </div>
             </div>
 
-            {/* 3 Swap Mode Tabs */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 14 }}>
               <button
                 type="button"
@@ -1521,15 +1998,23 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               </button>
             </div>
 
-            {/* MODE 1: Two-way Swap with another existing task on the schedule */}
             {swapMode === 'schedule' && (
               <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
-                  اختر مهمة أخرى من الجدول لتبديل أيامهما وأماكنهما معاً:
-                </label>
+                <div style={{ position: 'relative', marginBottom: 8 }}>
+                  <Search size={13} style={{ position: 'absolute', right: 10, top: 10, color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="ابحث بالمهمة أو اليوم أو المادة للتبديل معها..."
+                    value={swapScheduleSearch}
+                    onChange={(e) => setSwapScheduleSearch(e.target.value)}
+                    style={{ margin: 0, paddingRight: 30, fontSize: 12 }}
+                  />
+                </div>
                 <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 4 }}>
                   {swappableScheduleTasks.map(other => {
                     const isSelected = selectedScheduleTargetId === String(other.id);
+                    const otherDone = isTaskDone(other.id);
                     const subjMeta = SUBJECT_SHORT_LABELS[other.subjId] || { name: other.subjId, color: '#64748b' };
                     return (
                       <button
@@ -1550,15 +2035,15 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: `${subjMeta.color}22`, color: subjMeta.color, fontWeight: 800, flexShrink: 0 }}>
+                          <span style={{ fontSize: 11, color: subjMeta.color, fontWeight: 800, flexShrink: 0 }}>
                             {subjMeta.name}
                           </span>
-                          <span style={{ fontSize: 12, color: 'var(--text-main)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ fontSize: 12, color: otherDone ? 'var(--text-muted)' : 'var(--text-main)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: otherDone ? 'line-through' : 'none' }}>
                             {other.text}
                           </span>
                         </div>
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>
-                          {getArabicDayLabel(other.dayId)}
+                          {otherDone ? '✓ ' : ''}{getArabicDayLabel(other.dayId)}
                         </span>
                       </button>
                     );
@@ -1567,7 +2052,6 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               </div>
             )}
 
-            {/* MODE 2: Replace from real Lectures Catalog (82+ lectures) */}
             {swapMode === 'lectures' && (
               <div style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -1576,7 +2060,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                     <input
                       type="text"
                       className="input-field"
-                      placeholder="ابحث في جدول المحاضرات..."
+                      placeholder="ابحث في المحاضرات (مرتبة حسب أولويتك)..."
                       value={swapLectureSearch}
                       onChange={(e) => setSwapLectureSearch(e.target.value)}
                       style={{ margin: 0, paddingRight: 30, fontSize: 12 }}
@@ -1597,18 +2081,18 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
 
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button type="button" className={`btn btn-sm ${swapLectureFilter === 'all' ? 'btn-primary' : ''}`} onClick={() => setSwapLectureFilter('all')} style={{ fontSize: 11 }}>
-                    الكل ({lectures.length})
+                    الكل ({orderedLectures.length})
                   </button>
                   <button type="button" className={`btn btn-sm ${swapLectureFilter === 'pending' ? 'btn-primary' : ''}`} onClick={() => setSwapLectureFilter('pending')} style={{ fontSize: 11 }}>
-                    غير منجزة 💻 ({lectures.filter(l => !l.isDone).length})
+                    غير منجزة ({orderedLectures.filter(l => !l.isDone).length})
                   </button>
                   <button type="button" className={`btn btn-sm ${swapLectureFilter === 'review' ? 'btn-primary' : ''}`} onClick={() => setSwapLectureFilter('review')} style={{ fontSize: 11 }}>
-                    منجزة للمراجعة 🔄 ({lectures.filter(l => l.isDone).length})
+                    منجزة للمراجعة ({orderedLectures.filter(l => l.isDone).length})
                   </button>
                 </div>
 
                 <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {filteredSwapLectures.slice(0, 40).map(lec => {
+                  {filteredSwapLectures.slice(0, 60).map((lec, idx) => {
                     const isSelected = selectedLectureId === lec.id;
                     const subjMeta = SUBJECT_SHORT_LABELS[lec.subjId] || { name: lec.subjId, color: '#64748b' };
                     return (
@@ -1630,7 +2114,10 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: `${subjMeta.color}22`, color: subjMeta.color, fontWeight: 800, flexShrink: 0 }}>
+                          <span className="tabular" style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>
+                            #{idx + 1}
+                          </span>
+                          <span style={{ fontSize: 11, color: subjMeta.color, fontWeight: 800, flexShrink: 0 }}>
                             {subjMeta.name}
                           </span>
                           <span style={{ fontSize: 12, color: 'var(--text-main)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1638,7 +2125,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                           </span>
                         </div>
                         <span style={{ fontSize: 10, color: lec.isDone ? '#14b8a6' : '#fbbf24', fontWeight: 700, flexShrink: 0 }}>
-                          {lec.isDone ? '🔄 مراجعة' : '💻 غير منجزة'}
+                          {lec.isDone ? 'مراجعة' : 'غير منجزة'}
                         </span>
                       </button>
                     );
@@ -1647,7 +2134,6 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               </div>
             )}
 
-            {/* MODE 3: Move to another day or replace from flexible pool */}
             {swapMode === 'move' && (
               <div style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
@@ -1701,7 +2187,8 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                 onClick={handleExecuteSwap}
                 disabled={
                   (swapMode === 'schedule' && !selectedScheduleTargetId) ||
-                  (swapMode === 'lectures' && !selectedLectureId)
+                  (swapMode === 'lectures' && !selectedLectureId) ||
+                  (swapMode === 'move' && !swapBankSelect && swapTargetDay === taskToSwap.dayId)
                 }
               >
                 تنفيذ التبديل وحفظ الجدول ✓

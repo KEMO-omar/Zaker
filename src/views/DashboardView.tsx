@@ -1,5 +1,5 @@
 import React from 'react';
-import { Subject, Session, Exemption, ExamRecord, WeeklyTask, Lecture } from '../types';
+import { Subject, Session, Exemption, ExamRecord, WeeklyTask, Lecture, ArchivedWeek } from '../types';
 import { Visualizer } from '../components/Visualizer';
 import { PastWeeksAnalytics } from '../components/PastWeeksAnalytics';
 import {
@@ -36,6 +36,7 @@ interface DashboardViewProps {
   weeklyTasks: WeeklyTask[];
   completedTaskIds: Set<string | number>;
   lectures?: Lecture[];
+  archivedWeeks?: ArchivedWeek[];
   customAiInstructions: string;
   onSaveCustomInstructions: (text: string) => void;
   onStartFocus: (subjId: string) => void;
@@ -65,6 +66,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   weeklyTasks,
   completedTaskIds,
   lectures = [],
+  archivedWeeks = [],
   customAiInstructions,
   onSaveCustomInstructions,
   onStartFocus,
@@ -724,6 +726,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           weeklyTasks={weeklyTasks}
           completedTaskIds={completedTaskIds}
           lectures={lectures}
+          archivedWeeks={archivedWeeks}
           onStartFocus={onStartFocus}
         />
       </div>

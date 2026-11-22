@@ -2,13 +2,7 @@ import React, { useState } from 'react';
 import { Subject, WeeklyTask, Session, ExamRecord, Lecture, ArchivedWeek } from '../types';
 import { PastWeeksAnalytics } from '../components/PastWeeksAnalytics';
 import { DynamicScheduleBoard } from '../components/DynamicScheduleBoard';
-import {
-  Calendar,
-  CalendarCheck,
-  BarChart3,
-  Layers,
-  Sparkles
-} from 'lucide-react';
+import { CalendarCheck, BarChart3 } from 'lucide-react';
 
 interface WeeklyViewProps {
   tasks: WeeklyTask[];
@@ -49,55 +43,84 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
 
   return (
     <section className="view-panel active">
-      {/* Top Navigation Deck */}
-      <div className="card" style={{ marginBottom: 20, padding: '14px 20px', background: 'var(--bg-surface)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <CalendarCheck size={24} style={{ color: 'var(--accent-primary)' }} />
-            <div>
-              <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>نظام الجداول الأسبوعية والأتمتة الذكية</span>
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(86, 194, 166, 0.15)', color: 'var(--accent-primary)', fontWeight: 700 }}>
-                  تجدد تلقائي كل سبت + أرشفة ذكية
-                </span>
-              </h2>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                توزيع عشوائي لمحاضراتك والسناتر الحضورية مع إبقاء الخانة الأخيرة أسفل كل يوم لمهامك اليدوية.
-              </p>
-            </div>
+      {/* Clean Single Top Header & Segmented Switcher */}
+      <div
+        style={{
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: 'var(--accent-glow)',
+              color: 'var(--accent-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            <CalendarCheck size={18} />
           </div>
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-main)', margin: 0, lineHeight: 1.25 }}>
+              الجدول الأسبوعي والمهام
+            </h2>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+              كل التعديلات والتبديلات والإنجاز تُحفظ تلقائياً حتى نهاية الأسبوع
+            </p>
+          </div>
+        </div>
 
-          {/* Sub-tab Switcher: Dynamic Board vs History Analytics */}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              className={`btn btn-sm ${activeSubTab === 'tasks' ? 'btn-primary' : ''}`}
-              onClick={() => setActiveSubTab('tasks')}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
-            >
-              <CalendarCheck size={14} />
-              <span>جدول الأسبوع التفاعلي والمهام</span>
-            </button>
-            <button
-              className={`btn btn-sm ${activeSubTab === 'history' ? 'btn-primary' : ''}`}
-              onClick={() => setActiveSubTab('history')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                fontWeight: 700,
-                background: activeSubTab === 'history' ? 'var(--accent-primary)' : 'rgba(56, 189, 248, 0.1)',
-                borderColor: activeSubTab === 'history' ? 'var(--accent-primary)' : 'rgba(56, 189, 248, 0.3)',
-                color: activeSubTab === 'history' ? '#000' : 'var(--accent-secondary)'
-              }}
-            >
-              <BarChart3 size={14} />
-              <span>مخطط وأرشيف الأسابيع السابقة ⚡</span>
-            </button>
-          </div>
+        <div
+          style={{
+            display: 'inline-flex',
+            gap: 4,
+            padding: 4,
+            background: 'var(--bg-surface)',
+            borderRadius: 10,
+            border: '1px solid var(--border-subtle)'
+          }}
+        >
+          <button
+            type="button"
+            className={`btn btn-sm ${activeSubTab === 'tasks' ? 'btn-primary' : ''}`}
+            onClick={() => setActiveSubTab('tasks')}
+            style={{
+              fontWeight: 700,
+              whiteSpace: 'nowrap',
+              border: activeSubTab === 'tasks' ? undefined : 'none',
+              background: activeSubTab === 'tasks' ? undefined : 'transparent'
+            }}
+          >
+            <CalendarCheck size={14} />
+            <span>الجدول والمهام</span>
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${activeSubTab === 'history' ? 'btn-primary' : ''}`}
+            onClick={() => setActiveSubTab('history')}
+            style={{
+              fontWeight: 700,
+              whiteSpace: 'nowrap',
+              border: activeSubTab === 'history' ? undefined : 'none',
+              background: activeSubTab === 'history' ? undefined : 'transparent'
+            }}
+          >
+            <BarChart3 size={14} />
+            <span>تحليلات الأسابيع السابقة</span>
+          </button>
         </div>
       </div>
 
-      {/* Sub-tab 1: Dynamic Interactive Schedule Board */}
       {activeSubTab === 'tasks' && (
         <DynamicScheduleBoard
           tasks={tasks}
@@ -115,7 +138,6 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
         />
       )}
 
-      {/* Sub-tab 2: Past Weeks Analytics */}
       {activeSubTab === 'history' && (
         <PastWeeksAnalytics
           sessions={sessions}
@@ -124,6 +146,7 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
           weeklyTasks={tasks}
           completedTaskIds={completedTaskIds}
           lectures={lectures}
+          archivedWeeks={archivedWeeks}
           onStartFocus={onStartFocus}
         />
       )}

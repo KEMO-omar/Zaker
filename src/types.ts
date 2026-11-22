@@ -54,6 +54,7 @@ export interface WeeklyTask {
   isUserAdded?: boolean;
   originalDayId?: string;
   contextInfo?: string;
+  lectureId?: string;
   overlay?: TaskOverlay;
 }
 
@@ -65,7 +66,7 @@ export interface ArchivedWeek {
   totalCount: number;
   completedCount: number;
   completionPct: number;
-  tasks: WeeklyTask[];
+  tasks?: WeeklyTask[];
   notes?: string;
 }
 
@@ -91,6 +92,8 @@ export interface Lecture {
   subjId: string;
   tag?: string;
   type?: string;
+  orderIndex?: number;
+  trackKey?: string;
 }
 
 export interface ExamRecord {

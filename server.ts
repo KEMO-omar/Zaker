@@ -231,6 +231,8 @@ async function pushToFirebaseRTDB(data: any) {
       fetch(`${FIREBASE_RTDB_URL}/sessions.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sessionsObj) }),
       fetch(`${FIREBASE_RTDB_URL}/exemptions.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(exemptionsObj) }),
       fetch(`${FIREBASE_RTDB_URL}/subjects.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.subjects)) }),
+      ...(data.archivedWeeks !== undefined ? [fetch(`${FIREBASE_RTDB_URL}/archivedWeeks.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.archivedWeeks)) })] : []),
+      ...(data.activeWeekStartKey ? [fetch(`${FIREBASE_RTDB_URL}/activeWeekStartKey.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data.activeWeekStartKey) })] : []),
       fetch(`${FIREBASE_RTDB_URL}/customAiInstructions.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data.customAiInstructions || '') }),
       fetch(`${FIREBASE_RTDB_URL}/lastUpdated.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now()) })
     ]);
@@ -252,73 +254,89 @@ app.get('/api/db/sync', async (req, res) => {
     const fbData: any = await pullFromFirebaseRTDB();
     if (fbData) {
       const prevData = currentDb.data || {};
+      const localLastUpdated = Number(currentDb.lastUpdated || 0);
+      const fbLastUpdated = Number(fbData.lastUpdated || 0);
+      const fbIsNewer = fbLastUpdated > localLastUpdated;
 
       if (fbData.sessions) {
-        const sessMap = new Map();
-        toArray(prevData.sessions).forEach(s => sessMap.set(s.id || s.fbKey || s.tsStart, s));
-        toArray(fbData.sessions).forEach(v => {
-          if (v) {
-            const k = v.id || v.fbKey || (v.tsStart ? `ts_${v.tsStart}` : null);
-            if (k) sessMap.set(String(k), v);
-          }
-        });
-        prevData.sessions = Array.from(sessMap.values()).sort((a,b) => (b.tsStart||0) - (a.tsStart||0));
+        const localSess = toArray(prevData.sessions);
+        if (fbIsNewer || localSess.length === 0) {
+          const sessMap = new Map();
+          localSess.forEach(s => sessMap.set(s.id || s.fbKey || s.tsStart, s));
+          toArray(fbData.sessions).forEach(v => {
+            if (v) {
+              const k = v.id || v.fbKey || (v.tsStart ? `ts_${v.tsStart}` : null);
+              if (k) sessMap.set(String(k), v);
+            }
+          });
+          prevData.sessions = Array.from(sessMap.values()).sort((a,b) => (b.tsStart||0) - (a.tsStart||0));
+        }
       }
 
       if (fbData.exemptions) {
-        const exmMap = new Map();
-        toArray(prevData.exemptions).forEach(x => exmMap.set(x.id || x.fbKey, x));
-        toArray(fbData.exemptions).forEach(v => {
-          if (v) {
-            const k = v.id || v.fbKey || (v.timestamp ? `exm_${v.timestamp}` : null);
-            if (k) exmMap.set(String(k), v);
-          }
-        });
-        prevData.exemptions = Array.from(exmMap.values()).sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+        const localExm = toArray(prevData.exemptions);
+        if (fbIsNewer || localExm.length === 0) {
+          const exmMap = new Map();
+          localExm.forEach(x => exmMap.set(x.id || x.fbKey, x));
+          toArray(fbData.exemptions).forEach(v => {
+            if (v) {
+              const k = v.id || v.fbKey || (v.timestamp ? `exm_${v.timestamp}` : null);
+              if (k) exmMap.set(String(k), v);
+            }
+          });
+          prevData.exemptions = Array.from(exmMap.values()).sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+        }
       }
 
       if (fbData.weeklyTasks) {
-        const taskMap = new Map();
-        toArray(prevData.weeklyTasks).forEach(t => taskMap.set(String(t.id), t));
-        toArray(fbData.weeklyTasks).forEach(t => {
-          if (t && t.id !== undefined) taskMap.set(String(t.id), t);
-        });
-        prevData.weeklyTasks = Array.from(taskMap.values());
+        const localTasks = toArray(prevData.weeklyTasks);
+        if (fbIsNewer || localTasks.length === 0) {
+          prevData.weeklyTasks = toArray(fbData.weeklyTasks);
+        }
+      }
+
+      if (fbData.completedTaskIds) {
+        const localCompleted = toArray(prevData.completedTaskIds);
+        if (fbIsNewer || (localCompleted.length === 0 && toArray(prevData.weeklyTasks).length === 0)) {
+          prevData.completedTaskIds = Array.from(new Set(toArray(fbData.completedTaskIds)));
+        }
+      }
+
+      if (fbData.archivedWeeks) {
+        const localArchives = toArray(prevData.archivedWeeks);
+        if (fbIsNewer || localArchives.length === 0) {
+          prevData.archivedWeeks = toArray(fbData.archivedWeeks);
+        }
+      }
+
+      if (fbData.activeWeekStartKey && (fbIsNewer || !prevData.activeWeekStartKey)) {
+        prevData.activeWeekStartKey = fbData.activeWeekStartKey;
       }
 
       if (fbData.exams) {
-        const localLastUpdated = Number(currentDb.lastUpdated || 0);
-        const fbLastUpdated = Number(fbData.lastUpdated || 0);
         const localExams = toArray(prevData.exams);
         const fbExams = toArray(fbData.exams);
 
-        if (fbLastUpdated > localLastUpdated || localExams.length === 0) {
+        if (fbIsNewer || localExams.length === 0) {
           const examMap = new Map();
           localExams.forEach(e => { if (e && e.id) examMap.set(String(e.id), e); });
           fbExams.forEach(e => { if (e && e.id) examMap.set(String(e.id), e); });
           prevData.exams = Array.from(examMap.values()).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
         } else {
-          // Local database is newer or equal: preserve local edits & deletions while filling only missing records if local was partial
           const examMap = new Map();
           localExams.forEach(e => { if (e && e.id) examMap.set(String(e.id), e); });
           prevData.exams = Array.from(examMap.values()).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
         }
       }
 
-      if (fbData.completedTaskIds) {
-        prevData.completedTaskIds = Array.from(new Set([...toArray(prevData.completedTaskIds), ...toArray(fbData.completedTaskIds)]));
-      }
-
       if (fbData.lectures) {
-        const lecMap = new Map();
-        toArray(prevData.lectures).forEach(l => lecMap.set(String(l.id), l));
-        toArray(fbData.lectures).forEach(l => {
-          if (l && l.id) lecMap.set(String(l.id), l);
-        });
-        prevData.lectures = Array.from(lecMap.values());
+        const localLectures = toArray(prevData.lectures);
+        if (fbIsNewer || localLectures.length === 0) {
+          prevData.lectures = toArray(fbData.lectures);
+        }
       }
 
-      if (fbData.customAiInstructions) {
+      if (fbData.customAiInstructions && (fbIsNewer || !prevData.customAiInstructions)) {
         prevData.customAiInstructions = fbData.customAiInstructions;
       }
 
@@ -391,8 +409,14 @@ app.post('/api/db/sync', (req, res) => {
       : (prevData.weeklyTasks || []);
 
     const mergedCompleted = Array.isArray(incomingData.completedTaskIds)
-      ? incomingData.completedTaskIds
+      ? Array.from(new Set(incomingData.completedTaskIds))
       : (prevData.completedTaskIds || []);
+
+    const mergedArchives = Array.isArray(incomingData.archivedWeeks)
+      ? incomingData.archivedWeeks
+      : (prevData.archivedWeeks || []);
+
+    const mergedWeekKey = incomingData.activeWeekStartKey || prevData.activeWeekStartKey || '';
 
     const mergedSessions = Array.isArray(incomingData.sessions)
       ? incomingData.sessions.sort((a: any, b: any) => (b.tsStart || 0) - (a.tsStart || 0))
@@ -423,6 +447,8 @@ app.post('/api/db/sync', (req, res) => {
       exams: mergedExams,
       weeklyTasks: mergedTasks,
       completedTaskIds: mergedCompleted,
+      archivedWeeks: mergedArchives,
+      activeWeekStartKey: mergedWeekKey,
       sessions: mergedSessions,
       exemptions: mergedExemptions,
       lectures: mergedLectures,
