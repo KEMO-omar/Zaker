@@ -17,9 +17,28 @@ app.use(express.json({ limit: '20mb' }));
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
 const DB_BAK = path.join(DATA_DIR, 'database.json.bak');
+const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+if (!fs.existsSync(BACKUPS_DIR)) {
+  fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+}
+
+function getLocalYmdServer(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getBackupStamp(d: Date = new Date()): string {
+  const ymd = getLocalYmdServer(d);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${ymd}_${hh}-${mm}-${ss}`;
 }
 
 // Ensure database file exists
@@ -112,6 +131,7 @@ function buildServerSnapshotFromPayload(payload?: any): LiveStudySnapshot {
       : (Array.isArray(dbData.subjects) && dbData.subjects.length >= 4 ? dbData.subjects : DEFAULT_SERVER_SUBJECTS),
     exemptions: Array.isArray(payload?.exemptions) ? payload.exemptions : (dbData.exemptions || []),
     exams: Array.isArray(payload?.exams) ? payload.exams : (dbData.exams || []),
+    officialExams: Array.isArray(payload?.officialExams) ? payload.officialExams : (dbData.officialExams || []),
     weeklyTasks: Array.isArray(payload?.weeklyTasks) ? payload.weeklyTasks : (dbData.weeklyTasks || []),
     completedTaskIds: Array.isArray(payload?.completedTaskIds) ? payload.completedTaskIds : (dbData.completedTaskIds || []),
     lectures: Array.isArray(payload?.lectures) ? payload.lectures : (dbData.lectures || [])
@@ -233,6 +253,8 @@ async function pushToFirebaseRTDB(data: any) {
       fetch(`${FIREBASE_RTDB_URL}/subjects.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.subjects)) }),
       ...(data.archivedWeeks !== undefined ? [fetch(`${FIREBASE_RTDB_URL}/archivedWeeks.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.archivedWeeks)) })] : []),
       ...(data.activeWeekStartKey ? [fetch(`${FIREBASE_RTDB_URL}/activeWeekStartKey.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data.activeWeekStartKey) })] : []),
+      ...(data.officialExams !== undefined ? [fetch(`${FIREBASE_RTDB_URL}/officialExams.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.officialExams)) })] : []),
+      ...(data.changelog !== undefined ? [fetch(`${FIREBASE_RTDB_URL}/changelog.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.changelog).slice(0, 400)) })] : []),
       fetch(`${FIREBASE_RTDB_URL}/customAiInstructions.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data.customAiInstructions || '') }),
       fetch(`${FIREBASE_RTDB_URL}/lastUpdated.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now()) })
     ]);
@@ -336,6 +358,23 @@ app.get('/api/db/sync', async (req, res) => {
         }
       }
 
+      if (fbData.officialExams) {
+        const localOfficial = toArray(prevData.officialExams);
+        if (fbIsNewer || localOfficial.length === 0) {
+          prevData.officialExams = mergeItemLists(localOfficial, toArray(fbData.officialExams), (x) => x?.id)
+            .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+        }
+      }
+
+      if (fbData.changelog) {
+        const localLog = toArray(prevData.changelog);
+        if (fbIsNewer || localLog.length === 0) {
+          prevData.changelog = mergeItemLists(localLog, toArray(fbData.changelog), (x) => x?.id)
+            .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
+            .slice(0, 400);
+        }
+      }
+
       if (fbData.customAiInstructions && (fbIsNewer || !prevData.customAiInstructions)) {
         prevData.customAiInstructions = fbData.customAiInstructions;
       }
@@ -430,6 +469,19 @@ app.post('/api/db/sync', (req, res) => {
       ? incomingData.lectures
       : (prevData.lectures || []);
 
+    const mergedOfficialExams = Array.isArray(incomingData.officialExams)
+      ? incomingData.officialExams
+          .filter((oe: any) => oe && oe.title && oe.date)
+          .sort((a: any, b: any) => String(a.date || '').localeCompare(String(b.date || '')))
+      : (prevData.officialExams || []);
+
+    const mergedChangelog = Array.isArray(incomingData.changelog)
+      ? incomingData.changelog
+          .filter((c: any) => c && c.summary)
+          .sort((a: any, b: any) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
+          .slice(0, 400)
+      : (prevData.changelog || []);
+
     const mergedInstructions = (incomingData.customAiInstructions !== undefined)
       ? incomingData.customAiInstructions
       : (prevData.customAiInstructions || '');
@@ -445,6 +497,8 @@ app.post('/api/db/sync', (req, res) => {
       ...incomingData,
       subjects: mergedSubjects,
       exams: mergedExams,
+      officialExams: mergedOfficialExams,
+      changelog: mergedChangelog,
       weeklyTasks: mergedTasks,
       completedTaskIds: mergedCompleted,
       archivedWeeks: mergedArchives,
@@ -479,6 +533,117 @@ app.post('/api/db/sync', (req, res) => {
   } catch (err) {
     console.error('Error saving to database:', err);
     res.status(500).json({ success: false, error: 'فشل حفظ البيانات في قاعدة البيانات' });
+  }
+});
+
+// GET /api/db/export -> Downloads complete database snapshot as real JSON attachment
+app.get('/api/db/export', (req, res) => {
+  try {
+    const dbData = loadServerDbData();
+    const stamp = getBackupStamp();
+    const exportPayload = {
+      exportedAt: new Date().toISOString(),
+      exportedLocal: stamp,
+      app: 'شباب STUDY HUB - د. كريم عمر',
+      summary: {
+        sessionsCount: toArray(dbData.sessions).length,
+        lecturesCount: toArray(dbData.lectures).length,
+        examsCount: toArray(dbData.exams).length,
+        officialExamsCount: toArray(dbData.officialExams).length,
+        weeklyTasksCount: toArray(dbData.weeklyTasks).length,
+        archivedWeeksCount: toArray(dbData.archivedWeeks).length,
+        changelogCount: toArray(dbData.changelog).length
+      },
+      data: dbData
+    };
+    const jsonString = JSON.stringify(exportPayload, null, 2);
+    const filename = `kareem_full_backup_${stamp}.json`;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(jsonString);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'فشل تصدير النسخة الاحتياطية' });
+  }
+});
+
+// POST /api/db/backup-cloud -> Saves dated snapshot in data/backups/ AND Firebase RTDB /backups/
+app.post('/api/db/backup-cloud', async (req, res) => {
+  try {
+    const dbData = loadServerDbData();
+    const incomingData = req.body?.data && typeof req.body.data === 'object' ? req.body.data : null;
+    const snapshotData = incomingData ? { ...dbData, ...incomingData } : dbData;
+
+    const stamp = getBackupStamp();
+    const filename = `kareem_backup_${stamp}.json`;
+    const filePath = path.join(BACKUPS_DIR, filename);
+
+    const summary = {
+      sessionsCount: toArray(snapshotData.sessions).length,
+      lecturesCount: toArray(snapshotData.lectures).length,
+      examsCount: toArray(snapshotData.exams).length,
+      officialExamsCount: toArray(snapshotData.officialExams).length,
+      weeklyTasksCount: toArray(snapshotData.weeklyTasks).length,
+      archivedWeeksCount: toArray(snapshotData.archivedWeeks).length,
+      changelogCount: toArray(snapshotData.changelog).length
+    };
+
+    const snapshotRecord = {
+      backupKey: stamp,
+      createdAt: new Date().toISOString(),
+      summary,
+      data: snapshotData
+    };
+
+    fs.writeFileSync(filePath, JSON.stringify(snapshotRecord, null, 2), 'utf-8');
+
+    let cloudSaved = false;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const fbRes = await fetch(`${FIREBASE_RTDB_URL}/backups/${stamp}.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(snapshotRecord),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      cloudSaved = fbRes.ok;
+    } catch {}
+
+    res.json({
+      success: true,
+      backupKey: stamp,
+      filename,
+      timestamp: Date.now(),
+      cloudSaved,
+      summary
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'فشل حفظ النسخة السحابية' });
+  }
+});
+
+// GET /api/db/backups -> Lists recent local snapshots
+app.get('/api/db/backups', (req, res) => {
+  try {
+    if (!fs.existsSync(BACKUPS_DIR)) {
+      return res.json({ success: true, backups: [] });
+    }
+    const files = fs.readdirSync(BACKUPS_DIR)
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => {
+        const stat = fs.statSync(path.join(BACKUPS_DIR, f));
+        return {
+          filename: f,
+          sizeBytes: stat.size,
+          modifiedAt: stat.mtimeMs
+        };
+      })
+      .sort((a, b) => b.modifiedAt - a.modifiedAt)
+      .slice(0, 20);
+    res.json({ success: true, backups: files });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'فشل قراءة قائمة النسخ' });
   }
 });
 
@@ -564,7 +729,8 @@ const KAREEM_BASE_SYSTEM_PROMPT = `أنت "المراقب الأكاديمي ا�
   1) لغة عربية: أ. تقوى مرزوق (سنتر: سبت وثلاثاء 4:00 م) & أ. محمد صلاح (منصة: سبت وثلاثاء).
   2) فيزياء: أ. محمد عبد المعبود (منصة: أحد وأربعاء).
   3) لغة إنجليزية: أ. أيمن عبد العاطي (سنتر: سبت وثلاثاء 7:00 م).
-  4) تاريخ: أ. أحمد سمير (منصة/سنتر: إثنين وخميس 1:00 ظ).
+  4) تاريخ: أ. أحمد سمير (سنتر: إثنين وخميس 1:00 ظ).
+- قاعدة المنصات والسناتر والواجب: المنصات الأونلاين التي لها وقت فيديو وأجزاء هي فقط (أ. محمد صلاح وأ. محمد عبد المعبود)، بينما حصص السنتر (تقوى مرزوق، أيمن عبد العاطي، أحمد سمير) بدون وقت فيديو، والواجب يُقاس بعدد الصفحات أو الأسئلة.
 - أسلوب الخطاب الإجباري ("كلام يطلع من النافوخ"):
   • لا تكتفِ بسرد الأرقام أو الكلام البارد المجامِل أبداً! اربط كل رقم ومركم بضميره وحلم كلية الطب وتعب أهله في سدس/الفشن والوقت اللي بيجري.
   • زوّد حدة الكلام وقوته طردياً مع الواقع: كلما زادت ساعات الانقطاع أو الساعات الضائعة أو المحاضرات المتروكة أو نزلت الدرجات عن 95%، تكون نبرتك أشد، أجرأ، وتهز ضميره بصدق يوجع ويفوّق من الغفلة، ولو ملتزم ومنضبط فخّمه بشرف وحذّره من الغرور أو التراخي.
@@ -599,8 +765,8 @@ app.post('/api/ai/monitor', async (req, res) => {
 - مذاكرة اليوم (${snap.todayDayName}): ${snap.todayStudyHours}h | الأسبوع: ${snap.weekStudyHours}h | الفاقد اليوم: ${snap.wastedHours}h
 - توزيع المواد: ${JSON.stringify(snap.subjectStudies.map((s) => ({ name: s.subjName, totalHours: s.totalHours, weekMins: s.weekMinutes, pendingLectures: s.pendingLecturesCount })))}
 - جدول الأسبوع: ${snap.doneTasks}/${snap.totalTasks} (${snap.tasksCompletionPct}%) | مهام اليوم المتبقية: ${snap.todayPendingTasks.map((t) => t.text).join(' | ') || 'لا يوجد'}
-- المحاضرات الكلية: ${snap.doneLectures}/${snap.totalLectures} (${snap.lecturesCompletionPct}%)
-- مؤشر الامتحانات العام: ${snap.examsAvgPct}% عبر ${snap.examsCount} امتحانات.
+- المحاضرات والواجب: ${snap.doneLectures}/${snap.totalLectures} (${snap.lecturesCompletionPct}%) | متراكم المنصات (صلاح وعبد المعبود): ${snap.platformBacklogHours} ساعة (${snap.undonePlatformLectures.length} محاضرة) + ${snap.undoneCenterLectures.length} حصة سنتر | واجب متبقي: ${snap.homeworkPagesTotal} صفحة و ${snap.homeworkQuestionsTotal} سؤال.
+- مؤشر الامتحانات العام: ${snap.examsAvgPct}% عبر ${snap.examsCount} امتحانات | امتحانات الجدول الرسمي القادمة: ${JSON.stringify(snap.upcomingOfficialExams.slice(0, 5))}.
 
 اكتب التقرير الشامل باللهجة المصرية القوية والفصحى المنضبطة بأقسام واضحة (كلمة الضمير التي توجع وتفوّق، مؤشرات الوقت والفاقد، توازن المواد، وضع الخطة، الخلاصة والقرار الفوري) باستخدام هذه الأرقام الحقيقية فقط وبلا مجاملة باردة.`;
 
@@ -625,8 +791,10 @@ app.post('/api/ai/interrogate', async (req, res) => {
 دورك الآن: إدارة "جلسة محاكمة واستجواب عسكري للمتراكمات" (أسلوب حاد ولاذع ومؤثر يطلع من النافوخ — لا تسرد المتروكات ببرود أبداً، واجعل كريم يواجه ثمن كل تأجيل على مستقبله!).
 ركز على محاكمة المتروكات الحقيقية الموجودة الآن:
 - مدة الانقطاع عن المذاكرة: ${snap.inactivityLabel}
+- إجمالي متراكم المنصات بالساعات: ${snap.platformBacklogHours} ساعة (منصتي صلاح وعبد المعبود فقط)
 - محاضرات المنصات المتروكة (${snap.undonePlatformLectures.length}): ${JSON.stringify(snap.undonePlatformLectures.slice(0, 10).map((l) => l.title))}
-- حصص السناتر المتروكة (${snap.undoneCenterLectures.length}): ${JSON.stringify(snap.undoneCenterLectures.slice(0, 10).map((l) => l.title))}
+- حصص السناتر المتروكة (${snap.undoneCenterLectures.length} بدون وقت فيديو): ${JSON.stringify(snap.undoneCenterLectures.slice(0, 10).map((l) => l.title))}
+- الواجب المتراكم: ${snap.homeworkPagesTotal} صفحة و ${snap.homeworkQuestionsTotal} سؤال
 - مهام الجدول المعلقة الآن: ${JSON.stringify((snap.todayPendingTasks.length ? snap.todayPendingTasks : snap.urgentPendingTasks).slice(0, 8).map((t) => t.text))}
 - الامتحانات التي نزلت عن 95%: ${JSON.stringify(snap.examsBelow95.map((e) => ({ topic: e.topic, score: `${e.score}/${e.total}`, notes: e.notes })))}
 
@@ -772,9 +940,9 @@ app.post('/api/ai/chat', async (req, res) => {
 
 السياق اللحظي الحقيقي للطالب كريم الآن:
 - آخر جلسة: ${snap.inactivityLabel} | اليوم: ${snap.todayStudyHours}h | الأسبوع: ${snap.weekStudyHours}h | الفاقد اليوم: ${snap.wastedHours}h
-- توزيع المواد: ${JSON.stringify(snap.subjectStudies.map((s) => ({ subj: s.subjName, h: s.totalHours, pendingLecs: s.pendingLecturesCount })))}
-- متوسط الامتحانات: ${snap.examsAvgPct}% (${snap.examsCount} امتحانات)
-- المهام المتبقية: ${snap.pendingTasksCount} | محاضرات غير منجزة: ${snap.undoneLecturesCount}
+- توزيع المواد: ${JSON.stringify(snap.subjectStudies.map((s) => ({ subj: s.subjName, h: s.totalHours, pendingLecs: s.pendingLecturesCount, platformHours: s.platformBacklogHours })))}
+- متوسط الامتحانات: ${snap.examsAvgPct}% (${snap.examsCount} امتحانات) | امتحانات رسمية قادمة: ${snap.upcomingOfficialExams.length}
+- المهام المتبقية: ${snap.pendingTasksCount} | متراكم المنصات: ${snap.platformBacklogHours} ساعة (${snap.undonePlatformLectures.length} محاضرة) + ${snap.undoneCenterLectures.length} سنتر | واجب: ${snap.homeworkPagesTotal} صفحة و ${snap.homeworkQuestionsTotal} سؤال
 
 رسالة كريم:
 "${message}"

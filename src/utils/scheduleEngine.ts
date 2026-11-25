@@ -1,4 +1,6 @@
-import { Lecture, WeeklyTask } from '../types';
+import { Lecture, LecturePart, Session, WeeklyTask } from '../types';
+
+export const MAX_DAILY_SLOTS = 15; // Slots 0..14 (15 tasks/day max)
 
 export const ORDERED_WEEK_DAYS = [
   { id: 'sat', label: 'السبت', short: 'سبت' },
@@ -15,20 +17,53 @@ export interface LectureTrackMeta {
   label: string;
   shortLabel: string;
   subjId: string;
+  isPlatform?: boolean;
 }
 
 export const LECTURE_TRACKS: LectureTrackMeta[] = [
-  { id: 'physics', label: 'الفيزياء (أ. محمد عبد المعبود)', shortLabel: 'فيزياء · عبد المعبود', subjId: 'physics' },
-  { id: 'arabic_salah', label: 'عربي — مسار 1: أ. محمد صلاح (منصة)', shortLabel: 'عربي · محمد صلاح', subjId: 'arabic' },
-  { id: 'arabic_taqwa', label: 'عربي — مسار 2: أ. تقوى مرزوق (سنتر)', shortLabel: 'عربي · تقوى مرزوق', subjId: 'arabic' },
-  { id: 'english', label: 'الإنجليزي (أ. أيمن عبد العاطي)', shortLabel: 'إنجليزي · أيمن عبد العاطي', subjId: 'english' },
-  { id: 'history', label: 'التاريخ (أ. أحمد سمير)', shortLabel: 'تاريخ · أحمد سمير', subjId: 'history' }
+  { id: 'physics', label: 'الفيزياء (أ. محمد عبد المعبود — منصة)', shortLabel: 'فيزياء · عبد المعبود (منصة)', subjId: 'physics', isPlatform: true },
+  { id: 'arabic_salah', label: 'عربي — مسار 1: أ. محمد صلاح (منصة)', shortLabel: 'عربي · محمد صلاح (منصة)', subjId: 'arabic', isPlatform: true },
+  { id: 'arabic_taqwa', label: 'عربي — مسار 2: أ. تقوى مرزوق (سنتر)', shortLabel: 'عربي · تقوى مرزوق (سنتر)', subjId: 'arabic', isPlatform: false },
+  { id: 'english', label: 'الإنجليزي (أ. أيمن عبد العاطي — سنتر)', shortLabel: 'إنجليزي · أيمن (سنتر)', subjId: 'english', isPlatform: false },
+  { id: 'history', label: 'التاريخ (أ. أحمد سمير — سنتر)', shortLabel: 'تاريخ · أحمد سمير (سنتر)', subjId: 'history', isPlatform: false }
 ];
 
-/**
- * Resolves the independent ordering track for a lecture.
- * Supports two separate Arabic tracks (أ. محمد صلاح vs أ. تقوى مرزوق) plus each other subject.
- */
+export function isPlatformLecture(lec?: Partial<Lecture>): boolean {
+  if (!lec) return false;
+  const hay = `${lec.packageName || ''} ${lec.details || ''} ${lec.dueDay || ''} ${lec.title || ''} ${lec.tag || ''}`.toLowerCase();
+
+  // Only Muhammad Abdul-Maboud (Physics) and Muhammad Salah (Arabic) are online platforms with video duration
+  if (hay.includes('عبد المعبود') || hay.includes('عبدالمعبود') || hay.includes('محمد صلاح')) {
+    return true;
+  }
+
+  // Center teachers (Taqwa Marzouq, Ahmed Samir, Ayman Abdel-Aty) are NOT platforms (no video duration)
+  if (
+    hay.includes('تقوى') ||
+    hay.includes('أحمد سمير') ||
+    hay.includes('احمد سمير') ||
+    hay.includes('أيمن') ||
+    hay.includes('ايمن')
+  ) {
+    return false;
+  }
+
+  if (lec.trackKey === 'physics' || lec.trackKey === 'arabic_salah') return true;
+  if (lec.trackKey === 'arabic_taqwa' || lec.trackKey === 'english' || lec.trackKey === 'history') return false;
+
+  if (lec.tag === 'سنتر' || lec.type === 'center') return false;
+  if (lec.subjId === 'english' || lec.subjId === 'history') return false;
+  if (lec.subjId === 'physics') return true;
+
+  if (lec.subjId === 'arabic') {
+    const pkg = `${lec.packageName || ''} ${lec.details || ''} ${lec.tag || ''}`.toLowerCase();
+    if (pkg.includes('صلاح') || pkg.includes('منصة') || (lec.id || '').startsWith('ar-0')) return true;
+    return false;
+  }
+
+  return lec.tag === 'منصة' || lec.type === 'platform';
+}
+
 export function getLectureTrack(lec?: Lecture): LectureTrackMeta {
   if (!lec) return LECTURE_TRACKS[0];
   if (lec.trackKey) {
@@ -39,9 +74,9 @@ export function getLectureTrack(lec?: Lecture): LectureTrackMeta {
   if (lec.subjId === 'arabic') {
     const pkg = `${lec.packageName || ''} ${lec.details || ''} ${lec.tag || ''}`.toLowerCase();
     if (pkg.includes('صلاح') || pkg.includes('منصة') || lec.id.startsWith('ar-0')) {
-      return LECTURE_TRACKS[1]; // arabic_salah
+      return LECTURE_TRACKS[1];
     }
-    return LECTURE_TRACKS[2]; // arabic_taqwa
+    return LECTURE_TRACKS[2];
   }
 
   const bySubj = LECTURE_TRACKS.find((t) => t.subjId === lec.subjId);
@@ -55,7 +90,6 @@ export function getLectureTrack(lec?: Lecture): LectureTrackMeta {
   };
 }
 
-// Fixed weekly physical Center classes ONLY
 export const FIXED_WEEKLY_CLASSES: Array<{
   dayId: string;
   subjId: string;
@@ -66,7 +100,6 @@ export const FIXED_WEEKLY_CLASSES: Array<{
   time: string;
   slotIndex: number;
 }> = [
-  // Saturday Centers
   {
     dayId: 'sat',
     subjId: 'arabic',
@@ -87,7 +120,6 @@ export const FIXED_WEEKLY_CLASSES: Array<{
     time: '7:00 مساءً (سنتر)',
     slotIndex: 1
   },
-  // Monday Center
   {
     dayId: 'mon',
     subjId: 'history',
@@ -98,7 +130,6 @@ export const FIXED_WEEKLY_CLASSES: Array<{
     time: '1:00 ظهراً (سنتر)',
     slotIndex: 0
   },
-  // Tuesday Centers
   {
     dayId: 'tue',
     subjId: 'arabic',
@@ -119,7 +150,6 @@ export const FIXED_WEEKLY_CLASSES: Array<{
     time: '7:00 مساءً (سنتر)',
     slotIndex: 1
   },
-  // Thursday Center
   {
     dayId: 'thu',
     subjId: 'history',
@@ -153,8 +183,45 @@ const JS_DAY_TO_ID: Record<number, string> = {
   6: 'sat'
 };
 
+export function toLocalYmd(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function parseYmdLocal(ymd: string): Date {
+  const parts = String(ymd || '').split('-').map(Number);
+  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date();
+}
+
+export function addDaysYmd(ymd: string, deltaDays: number): string {
+  const d = parseYmdLocal(ymd);
+  d.setDate(d.getDate() + deltaDays);
+  return toLocalYmd(d);
+}
+
+export function diffDaysYmd(targetYmd: string, baseYmd: string = toLocalYmd()): number {
+  const t = parseYmdLocal(targetYmd).getTime();
+  const b = parseYmdLocal(baseYmd).getTime();
+  return Math.round((t - b) / (24 * 60 * 60 * 1000));
+}
+
+export function formatYmdShort(ymd: string): string {
+  const d = parseYmdLocal(ymd);
+  return `${d.getDate()}/${d.getMonth() + 1}`;
+}
+
 export function getCurrentArabicDayId(date: Date = new Date()): string {
   return JS_DAY_TO_ID[date.getDay()] || 'sat';
+}
+
+export function getDayIdFromYmd(ymd: string): string {
+  if (!ymd) return getCurrentArabicDayId();
+  return getCurrentArabicDayId(parseYmdLocal(ymd));
 }
 
 export function getNextArabicDayId(dayId: string): string {
@@ -175,10 +242,111 @@ export function getWeekStartSaturdayKey(date: Date = new Date()): string {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const diffToSaturday = (d.getDay() + 1) % 7;
   d.setDate(d.getDate() - diffToSaturday);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return toLocalYmd(d);
+}
+
+export function getWeekStartSaturdayKeyFromYmd(ymd: string): string {
+  return getWeekStartSaturdayKey(parseYmdLocal(ymd));
+}
+
+export function getYmdForWeekDay(weekStartSatKey: string, dayId: string): string {
+  const idx = ORDERED_WEEK_DAYS.findIndex(d => d.id === dayId);
+  if (idx === -1) return weekStartSatKey;
+  return addDaysYmd(weekStartSatKey, idx);
+}
+
+export function getWeekDaysWithDates(weekStartSatKey: string): Array<{
+  id: string;
+  label: string;
+  short: string;
+  dateStr: string;
+  displayDate: string;
+}> {
+  return ORDERED_WEEK_DAYS.map((d, idx) => {
+    const dateStr = addDaysYmd(weekStartSatKey, idx);
+    return {
+      ...d,
+      dateStr,
+      displayDate: formatYmdShort(dateStr)
+    };
+  });
+}
+
+/**
+ * Resolves the effective Saturday week key for a task (based on explicit `task.date`, or `activeWeekStartKey`).
+ */
+export function getTaskWeekKey(task: WeeklyTask, fallbackWeekStartKey?: string): string {
+  if (task.date && /^\d{4}-\d{2}-\d{2}$/.test(task.date)) {
+    return getWeekStartSaturdayKeyFromYmd(task.date);
+  }
+  return fallbackWeekStartKey || getWeekStartSaturdayKey();
+}
+
+/**
+ * Resolves the effective dayId (`sat`..`fri` or `'backlog'`) for a task.
+ * If `task.date` is set and task is not `'backlog'`, its date strictly determines its weekday column.
+ */
+export function getEffectiveTaskDayId(task: WeeklyTask): string {
+  if (task.dayId === 'backlog') return 'backlog';
+  if (task.date && /^\d{4}-\d{2}-\d{2}$/.test(task.date)) {
+    return getDayIdFromYmd(task.date);
+  }
+  return task.dayId;
+}
+
+export function filterTasksForWeek(
+  tasks: WeeklyTask[],
+  viewedWeekStartKey: string,
+  activeWeekStartKey?: string
+): WeeklyTask[] {
+  const defaultWeek = activeWeekStartKey || getWeekStartSaturdayKey();
+  return tasks
+    .filter((t) => {
+      if (!t || t.dayId === 'backlog') return false;
+      const wKey = getTaskWeekKey(t, defaultWeek);
+      return wKey === viewedWeekStartKey;
+    })
+    .map((t) => ({
+      ...t,
+      dayId: getEffectiveTaskDayId(t)
+    }));
+}
+
+export function canAddTaskToDay(
+  tasks: WeeklyTask[],
+  targetDayId: string,
+  targetDate?: string,
+  activeWeekStartKey?: string,
+  excludeTaskId?: string | number
+): { allowed: boolean; currentCount: number; max: number; reason?: string } {
+  if (targetDayId === 'backlog') {
+    return { allowed: true, currentCount: 0, max: MAX_DAILY_SLOTS };
+  }
+  const defaultWeek = activeWeekStartKey || getWeekStartSaturdayKey();
+  const targetWeekKey = targetDate && /^\d{4}-\d{2}-\d{2}$/.test(targetDate)
+    ? getWeekStartSaturdayKeyFromYmd(targetDate)
+    : defaultWeek;
+  const resolvedDayId = targetDate && /^\d{4}-\d{2}-\d{2}$/.test(targetDate)
+    ? getDayIdFromYmd(targetDate)
+    : targetDayId;
+
+  const dayTasks = tasks.filter(
+    (t) =>
+      (!excludeTaskId || String(t.id) !== String(excludeTaskId)) &&
+      t.dayId !== 'backlog' &&
+      getTaskWeekKey(t, defaultWeek) === targetWeekKey &&
+      getEffectiveTaskDayId(t) === resolvedDayId
+  );
+
+  if (dayTasks.length >= MAX_DAILY_SLOTS) {
+    return {
+      allowed: false,
+      currentCount: dayTasks.length,
+      max: MAX_DAILY_SLOTS,
+      reason: `يوم ${getArabicDayLabel(resolvedDayId)}${targetDate ? ` (${formatYmdShort(targetDate)})` : ''} وصل للحد الأقصى (${MAX_DAILY_SLOTS}/${MAX_DAILY_SLOTS} مهمة) — لن يتم نقل أي مهمة للمتراكم، اختر يوماً أو تاريخاً آخر.`
+    };
+  }
+  return { allowed: true, currentCount: dayTasks.length, max: MAX_DAILY_SLOTS };
 }
 
 export function shuffleArray<T>(list: T[]): T[] {
@@ -190,9 +358,6 @@ export function shuffleArray<T>(list: T[]): T[] {
   return copy;
 }
 
-/**
- * Sorts lectures according to Karim's explicit orderIndex (falling back to original array position).
- */
 export function sortLecturesByOrder(lectures: Lecture[]): Lecture[] {
   return lectures
     .map((lec, idx) => ({ lec, idx }))
@@ -205,9 +370,6 @@ export function sortLecturesByOrder(lectures: Lecture[]): Lecture[] {
     .map((entry) => entry.lec);
 }
 
-/**
- * Extracts numeric sequence from a lecture code/title/id for smart auto-ordering.
- */
 export function extractLectureSequenceNumber(lec: Lecture): number {
   const codeMatch = (lec.code || '').match(/(\d+)/);
   if (codeMatch) return Number(codeMatch[1]);
@@ -225,16 +387,10 @@ function getLectureKindRank(lec: Lecture): number {
   return 1;
 }
 
-/**
- * Normalizes orderIndex to clean sequential integers 0..N-1.
- */
 export function reindexLectures(lectures: Lecture[]): Lecture[] {
   return lectures.map((lec, idx) => ({ ...lec, orderIndex: idx }));
 }
 
-/**
- * Returns the 1-based position of `lecture` within its own track (e.g., Arabic-Salah vs Arabic-Taqwa).
- */
 export function getLectureRankInTrack(allLectures: Lecture[], lectureId: string): { rank: number; totalInTrack: number; track: LectureTrackMeta } | null {
   const ordered = sortLecturesByOrder(allLectures);
   const target = ordered.find((l) => l.id === lectureId);
@@ -249,9 +405,6 @@ export function getLectureRankInTrack(allLectures: Lecture[], lectureId: string)
   };
 }
 
-/**
- * Moves a lecture to a specific 1-based position inside its own track without disturbing other tracks' relative orders!
- */
 export function setLecturePositionInTrack(
   allLectures: Lecture[],
   updatedLecture: Lecture,
@@ -262,7 +415,6 @@ export function setLecturePositionInTrack(
   );
   const targetTrackId = getLectureTrack(updatedLecture).id;
 
-  // Gather indices in master `ordered` belonging to this track
   const trackSlots: number[] = [];
   const trackItems: Lecture[] = [];
   ordered.forEach((l, idx) => {
@@ -281,7 +433,6 @@ export function setLecturePositionInTrack(
     trackItems.splice(clampedPos, 0, item);
   }
 
-  // Write sorted trackItems back into the exact trackSlots positions in master list
   const result = [...ordered];
   trackSlots.forEach((masterIdx, i) => {
     result[masterIdx] = trackItems[i];
@@ -290,10 +441,6 @@ export function setLecturePositionInTrack(
   return reindexLectures(result);
 }
 
-/**
- * Auto-sorts lectures cleanly by track (keeping Arabic Muhammad Salah & Arabic Taqwa Marzouq separated!),
- * then numeric lecture code (00, 01, 02...) and natural lesson type.
- */
 export function autoSortLecturesByCode(lectures: Lecture[], onlyTrackId?: string): Lecture[] {
   const ordered = sortLecturesByOrder(lectures);
   const trackRank: Record<string, number> = {
@@ -348,33 +495,43 @@ export function autoSortLecturesByCode(lectures: Lecture[], onlyTrackId?: string
 }
 
 /**
- * Ensures every task in every day (sat..fri) has a unique, collision-free slotIndex in [0..9].
- * Slot 9 is reserved for Karim's user-added bottom tasks whenever possible.
+ * Normalizes daily slots cleanly PER (weekKey, dayId) with capacity up to MAX_DAILY_SLOTS (15 slots: 0..14).
+ * CRITICAL RULE: NEVER silently pushes any task to `dayId: 'backlog'`!
+ * Existing `'backlog'` items remain in `'backlog'` unless user explicitly restores/deletes them.
  */
-export function normalizeDaySlots(tasks: WeeklyTask[]): WeeklyTask[] {
+export function normalizeDaySlots(tasks: WeeklyTask[], fallbackWeekStartKey?: string): WeeklyTask[] {
   const dayIds = new Set(ORDERED_WEEK_DAYS.map((d) => d.id));
-  const byDay: Record<string, WeeklyTask[]> = {};
-  const backlogOrOther: WeeklyTask[] = [];
+  const defaultWeek = fallbackWeekStartKey || getWeekStartSaturdayKey();
+
+  const groupedByWeekDay = new Map<string, WeeklyTask[]>();
+  const backlogItems: WeeklyTask[] = [];
 
   tasks.forEach((t) => {
-    if (t && t.dayId && dayIds.has(t.dayId)) {
-      if (!byDay[t.dayId]) byDay[t.dayId] = [];
-      byDay[t.dayId].push({ ...t });
-    } else if (t) {
-      backlogOrOther.push({ ...t });
+    if (!t) return;
+    if (t.dayId === 'backlog' || (!dayIds.has(t.dayId) && !t.date)) {
+      backlogItems.push({ ...t, dayId: 'backlog', slotIndex: undefined });
+      return;
     }
+    const effectiveDayId = getEffectiveTaskDayId(t);
+    if (!dayIds.has(effectiveDayId)) {
+      backlogItems.push({ ...t, dayId: 'backlog', slotIndex: undefined });
+      return;
+    }
+    const wKey = getTaskWeekKey(t, defaultWeek);
+    const bucketKey = `${wKey}__${effectiveDayId}`;
+    if (!groupedByWeekDay.has(bucketKey)) groupedByWeekDay.set(bucketKey, []);
+    groupedByWeekDay.get(bucketKey)!.push({ ...t, dayId: effectiveDayId });
   });
 
   const normalized: WeeklyTask[] = [];
 
-  ORDERED_WEEK_DAYS.forEach((d) => {
-    const dayList = byDay[d.id] || [];
-    const grid: Array<WeeklyTask | null> = new Array(10).fill(null);
-    const overflow: WeeklyTask[] = [];
+  groupedByWeekDay.forEach((dayList) => {
+    const grid: Array<WeeklyTask | null> = new Array(MAX_DAILY_SLOTS).fill(null);
+    const extraOverflow: WeeklyTask[] = [];
 
-    // Pass 1: place tasks that have an explicit valid slotIndex
+    // Pass 1: preserve explicit valid slots (0..14)
     dayList.forEach((t) => {
-      if (typeof t.slotIndex === 'number' && t.slotIndex >= 0 && t.slotIndex <= 9) {
+      if (typeof t.slotIndex === 'number' && t.slotIndex >= 0 && t.slotIndex < MAX_DAILY_SLOTS) {
         const existing = grid[t.slotIndex];
         if (existing === null) {
           grid[t.slotIndex] = { ...t };
@@ -385,25 +542,26 @@ export function normalizeDaySlots(tasks: WeeklyTask[]): WeeklyTask[] {
           existing.category !== 'manual' &&
           existing.category !== 'center'
         ) {
-          overflow.push(existing);
+          extraOverflow.push(existing);
           grid[9] = { ...t };
         } else {
-          overflow.push({ ...t });
+          extraOverflow.push({ ...t });
         }
       } else {
-        overflow.push({ ...t });
+        extraOverflow.push({ ...t });
       }
     });
 
-    // Pass 2: assign open auto slots [0..8] then [9] for remaining tasks
-    overflow.forEach((t) => {
+    // Pass 2: place remaining tasks into open slots (user tasks prefer slot 9 or 10..14; auto tasks prefer 0..8 then 10..14)
+    const remainingBeyondCap: WeeklyTask[] = [];
+    extraOverflow.forEach((t) => {
       let placed = false;
-      const preferBottom = Boolean(t.slotIndex === 9 || t.isUserAdded || t.category === 'manual');
-      if (preferBottom && grid[9] === null) {
+      const preferUserSlot = Boolean(t.slotIndex === 9 || t.isUserAdded || t.category === 'manual');
+      if (preferUserSlot && grid[9] === null) {
         grid[9] = { ...t, slotIndex: 9 };
         placed = true;
       }
-      if (!placed) {
+      if (!placed && !preferUserSlot) {
         for (let s = 0; s <= 8; s++) {
           if (grid[s] === null) {
             grid[s] = { ...t, slotIndex: s };
@@ -412,30 +570,39 @@ export function normalizeDaySlots(tasks: WeeklyTask[]): WeeklyTask[] {
           }
         }
       }
-      if (!placed && grid[9] === null) {
-        grid[9] = { ...t, slotIndex: 9 };
-        placed = true;
-      }
-      if (!placed && (t.isUserAdded || t.category === 'manual')) {
-        const currentNine = grid[9];
-        if (currentNine && !currentNine.isUserAdded && currentNine.category !== 'manual' && currentNine.category !== 'center') {
-          grid[9] = { ...t, slotIndex: 9 };
-          placed = true;
+      if (!placed) {
+        for (let s = 10; s < MAX_DAILY_SLOTS; s++) {
+          if (grid[s] === null) {
+            grid[s] = { ...t, slotIndex: s };
+            placed = true;
+            break;
+          }
         }
       }
       if (!placed) {
-        backlogOrOther.push({ ...t, dayId: 'backlog', slotIndex: undefined });
+        for (let s = 0; s < MAX_DAILY_SLOTS; s++) {
+          if (grid[s] === null) {
+            grid[s] = { ...t, slotIndex: s };
+            placed = true;
+            break;
+          }
+        }
+      }
+      if (!placed) {
+        // Keep on its original day/date (NEVER throw into backlog!)
+        remainingBeyondCap.push(t);
       }
     });
 
-    for (let s = 0; s <= 9; s++) {
-      if (grid[s]) {
-        normalized.push({ ...grid[s]!, slotIndex: s });
-      }
+    for (let s = 0; s < MAX_DAILY_SLOTS; s++) {
+      if (grid[s]) normalized.push({ ...grid[s]!, slotIndex: s });
     }
+    remainingBeyondCap.forEach((t, idx) => {
+      normalized.push({ ...t, slotIndex: MAX_DAILY_SLOTS + idx });
+    });
   });
 
-  return [...normalized, ...backlogOrOther];
+  return [...normalized, ...backlogItems];
 }
 
 function extractLectureKeyFromTask(task: WeeklyTask): string | null {
@@ -455,14 +622,14 @@ export interface BuildScheduleOptions {
   startFromToday?: boolean;
   includeAllDays?: boolean;
   respectLectureOrder?: boolean;
+  weekStartSatKey?: string;
 }
 
 /**
- * Generates or partially refreshes a weekly schedule:
- * - Preserves ALL locked tasks (completed tasks ✓, fixed physical centers, user-added tasks) in their exact slots
- * - Fills slots 0..8 (9 slots per day) and LEAVES SLOT 9 (last bottom capsule) EMPTY for Karim's own additions!
- * - Pulls lessons strictly IN ORDER within EACH independent track (e.g., Arabic-Salah vs Arabic-Taqwa!)
- * - Never duplicates a lecture already locked in the current week
+ * Generates or partially refreshes a weekly schedule for `weekStartSatKey`:
+ * - Preserves ALL locked tasks (completed tasks, fixed physical centers, user-added tasks) in their exact slots
+ * - Fills slots 0..8 (9 slots per day) and leaves slots 9..14 open for manual additions
+ * - Attaches exact `date` (`YYYY-MM-DD`) when `weekStartSatKey` is supplied
  */
 export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): WeeklyTask[] {
   const {
@@ -470,7 +637,8 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
     preserveUserTasks = [],
     lockedTasks = [],
     startFromToday = false,
-    respectLectureOrder = true
+    respectLectureOrder = true,
+    weekStartSatKey = getWeekStartSaturdayKey()
   } = options;
   const nowSeed = Date.now();
 
@@ -489,11 +657,22 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
   const lockedLectureIds = new Set<string>();
   const lockedTexts = new Set<string>();
 
-  // Auto-slots strictly cover 0..8 so slot 9 (the 10th bottom box) stays free for Karim's own manual lectures/tasks!
   const claimNextAutoSlot = (dayId: string): number | null => {
     const used = occupiedSlots[dayId];
     if (!used) return null;
     for (let s = 0; s <= 8; s++) {
+      if (!used.has(s)) {
+        used.add(s);
+        return s;
+      }
+    }
+    return null;
+  };
+
+  const claimNextAnySlot = (dayId: string): number | null => {
+    const used = occupiedSlots[dayId];
+    if (!used) return null;
+    for (let s = 0; s < MAX_DAILY_SLOTS; s++) {
       if (!used.has(s)) {
         used.add(s);
         return s;
@@ -507,31 +686,46 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
     if (!lt || usedIds.has(String(lt.id))) return;
     usedIds.add(String(lt.id));
 
-    if (lt.dayId && occupiedSlots[lt.dayId]) {
-      const canUseSlot9 = Boolean(lt.isUserAdded || lt.category === 'manual' || (lt.category === 'exam' && lt.slotIndex === 9));
-      const maxAllowedSlot = canUseSlot9 ? 9 : 8;
-      let targetSlot =
-        typeof lt.slotIndex === 'number' && lt.slotIndex >= 0 && lt.slotIndex <= maxAllowedSlot && !occupiedSlots[lt.dayId].has(lt.slotIndex)
-          ? lt.slotIndex
-          : null;
-
-      if (targetSlot === null) {
-        targetSlot = canUseSlot9 && lt.slotIndex === 9 && !occupiedSlots[lt.dayId].has(9) ? 9 : claimNextAutoSlot(lt.dayId);
-      } else {
-        occupiedSlots[lt.dayId].add(targetSlot);
-      }
-
-      if (targetSlot !== null) {
-        resultTasks.push({ ...lt, slotIndex: targetSlot });
-        const lid = extractLectureKeyFromTask(lt);
-        if (lid) lockedLectureIds.add(lid);
-        if (lt.text) lockedTexts.add(lt.text.trim());
-      }
-    } else if (lt.dayId === 'backlog') {
+    const effectiveDayId = getEffectiveTaskDayId(lt);
+    if (effectiveDayId === 'backlog') {
       resultTasks.push({ ...lt });
       const lid = extractLectureKeyFromTask(lt);
       if (lid) lockedLectureIds.add(lid);
       if (lt.text) lockedTexts.add(lt.text.trim());
+      return;
+    }
+
+    // If task belongs to a DIFFERENT week via explicit `date`, preserve untouched!
+    if (lt.date && getWeekStartSaturdayKeyFromYmd(lt.date) !== weekStartSatKey) {
+      resultTasks.push({ ...lt });
+      return;
+    }
+
+    if (effectiveDayId && occupiedSlots[effectiveDayId]) {
+      const canUseExtendedSlots = Boolean(lt.isUserAdded || lt.category === 'manual' || (lt.category === 'exam' && (lt.slotIndex ?? 0) >= 9));
+      const maxAllowedSlot = canUseExtendedSlots ? MAX_DAILY_SLOTS - 1 : 8;
+      let targetSlot =
+        typeof lt.slotIndex === 'number' && lt.slotIndex >= 0 && lt.slotIndex <= maxAllowedSlot && !occupiedSlots[effectiveDayId].has(lt.slotIndex)
+          ? lt.slotIndex
+          : null;
+
+      if (targetSlot === null) {
+        targetSlot = canUseExtendedSlots ? claimNextAnySlot(effectiveDayId) : claimNextAutoSlot(effectiveDayId);
+      } else {
+        occupiedSlots[effectiveDayId].add(targetSlot);
+      }
+
+      if (targetSlot !== null) {
+        resultTasks.push({
+          ...lt,
+          dayId: effectiveDayId,
+          date: lt.date || getYmdForWeekDay(weekStartSatKey, effectiveDayId),
+          slotIndex: targetSlot
+        });
+        const lid = extractLectureKeyFromTask(lt);
+        if (lid) lockedLectureIds.add(lid);
+        if (lt.text) lockedTexts.add(lt.text.trim());
+      }
     }
   });
 
@@ -539,8 +733,9 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
   FIXED_WEEKLY_CLASSES.forEach((f, idx) => {
     const alreadyPresent = resultTasks.some(
       (t) =>
-        (t.category === 'center' && t.dayId === f.dayId && t.subjId === f.subjId && t.teacher === f.teacher) ||
-        (t.dayId === f.dayId && t.slotIndex === f.slotIndex && t.text === f.text)
+        getTaskWeekKey(t, weekStartSatKey) === weekStartSatKey &&
+        ((t.category === 'center' && t.dayId === f.dayId && t.subjId === f.subjId && t.teacher === f.teacher) ||
+          (t.dayId === f.dayId && t.slotIndex === f.slotIndex && t.text === f.text))
     );
     if (alreadyPresent) return;
 
@@ -551,6 +746,7 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
       resultTasks.push({
         id: `center_${f.dayId}_${idx}_${nowSeed}`,
         dayId: f.dayId,
+        date: getYmdForWeekDay(weekStartSatKey, f.dayId),
         subjId: f.subjId,
         text: f.text,
         category: 'center',
@@ -573,7 +769,7 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
       : allDaysOrder;
   }
 
-  // 3. Prepare queues PER INDEPENDENT TRACK (including separate queues for Arabic-Salah & Arabic-Taqwa!)
+  // 3. Queues per independent track
   const orderedAllLectures = respectLectureOrder ? sortLecturesByOrder(lectures) : lectures;
   const availableLectures = orderedAllLectures.filter((l) => {
     if (lockedLectureIds.has(l.id)) return false;
@@ -598,11 +794,12 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
     reviewByTrack[tId] = respectLectureOrder ? rList : shuffleArray(rList);
   });
 
-  // 4. Fill open auto slots [0..8] across days, leaving slot 9 EMPTY!
+  // 4. Fill open auto slots [0..8] across days
   const shuffledStudyPool = shuffleArray(DYNAMIC_STUDY_POOL);
   let studyPoolIdx = 0;
 
   targetDaysOrder.forEach((dayId, dayIdx) => {
+    const dayDate = getYmdForWeekDay(weekStartSatKey, dayId);
     const dayTrackOrder = shuffleArray(trackIds);
     let trackPointer = dayIdx % Math.max(1, dayTrackOrder.length);
     let guard = 0;
@@ -630,6 +827,7 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
           resultTasks.push({
             id: `lec_${lec.id}_${dayId}_${nowSeed}_${Math.random().toString(36).slice(2, 6)}`,
             dayId,
+            date: dayDate,
             subjId: lec.subjId,
             text: `${lec.code}: ${lec.title}`,
             category: 'platform',
@@ -648,6 +846,7 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
           resultTasks.push({
             id: `rev_${revLec.id}_${dayId}_${nowSeed}_${Math.random().toString(36).slice(2, 6)}`,
             dayId,
+            date: dayDate,
             subjId: revLec.subjId,
             text: `[مراجعة] ${revLec.code}: ${revLec.title}`,
             category: 'review',
@@ -671,6 +870,7 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
             resultTasks.push({
               id: `lec_${lec.id}_${dayId}_${nowSeed}_${Math.random().toString(36).slice(2, 6)}`,
               dayId,
+              date: dayDate,
               subjId: lec.subjId,
               text: `${lec.code}: ${lec.title}`,
               category: 'platform',
@@ -688,6 +888,7 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
             resultTasks.push({
               id: `rev_${revLec.id}_${dayId}_${nowSeed}_${Math.random().toString(36).slice(2, 6)}`,
               dayId,
+              date: dayDate,
               subjId: revLec.subjId,
               text: `[مراجعة] ${revLec.code}: ${revLec.title}`,
               category: 'review',
@@ -706,6 +907,7 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
             resultTasks.push({
               id: `dyn_study_${dayId}_${slot}_${nowSeed}_${Math.random().toString(36).slice(2, 6)}`,
               dayId,
+              date: dayDate,
               subjId: studyItem.subjId,
               text: studyItem.text,
               category: 'study',
@@ -718,14 +920,18 @@ export function buildRandomizedWeeklySchedule(options: BuildScheduleOptions): We
     }
   });
 
-  return normalizeDaySlots(resultTasks);
+  return normalizeDaySlots(resultTasks, weekStartSatKey);
 }
 
 /**
- * Automatically injects a newly added lecture into the first open auto slot (0..8)
- * on a matching day, or falls back to slot 9 if user explicitly added a manual lecture.
+ * Injects a newly added lecture into the first open slot (0..14) on a matching day in the active week.
+ * Respects 15-slot cap cleanly without moving anything to backlog.
  */
-export function injectLectureIntoSchedule(currentTasks: WeeklyTask[], newLecture: Lecture): WeeklyTask[] {
+export function injectLectureIntoSchedule(
+  currentTasks: WeeklyTask[],
+  newLecture: Lecture,
+  activeWeekStartKey: string = getWeekStartSaturdayKey()
+): WeeklyTask[] {
   const due = (newLecture.dueDay || '').trim();
   const candidateDays: string[] = [];
 
@@ -742,16 +948,24 @@ export function injectLectureIntoSchedule(currentTasks: WeeklyTask[], newLecture
   const orderedSearchDays = Array.from(new Set([...candidateDays, ...fallbackDays]));
 
   for (const dayId of orderedSearchDays) {
+    const dayDate = getYmdForWeekDay(activeWeekStartKey, dayId);
     const used = new Set(
       currentTasks
-        .filter((t) => t.dayId === dayId && typeof t.slotIndex === 'number')
+        .filter(
+          (t) =>
+            t.dayId !== 'backlog' &&
+            getTaskWeekKey(t, activeWeekStartKey) === activeWeekStartKey &&
+            getEffectiveTaskDayId(t) === dayId &&
+            typeof t.slotIndex === 'number'
+        )
         .map((t) => t.slotIndex as number)
     );
-    for (let slot = 0; slot <= 9; slot++) {
+    for (let slot = 0; slot < MAX_DAILY_SLOTS; slot++) {
       if (!used.has(slot)) {
         const injectedTask: WeeklyTask = {
           id: `lec_auto_${newLecture.id}_${Date.now()}`,
           dayId,
+          date: dayDate,
           subjId: newLecture.subjId,
           text: `${newLecture.code}: ${newLecture.title}`,
           category: newLecture.isDone ? 'review' : 'platform',
@@ -759,13 +973,517 @@ export function injectLectureIntoSchedule(currentTasks: WeeklyTask[], newLecture
           teacher: newLecture.packageName,
           time: newLecture.dueDay,
           lectureId: newLecture.id,
-          isUserAdded: slot === 9 ? true : undefined,
+          isUserAdded: slot >= 9 ? true : undefined,
           slotIndex: slot
         };
-        return normalizeDaySlots([...currentTasks, injectedTask]);
+        return normalizeDaySlots([...currentTasks, injectedTask], activeWeekStartKey);
       }
     }
   }
 
-  return normalizeDaySlots(currentTasks);
+  return normalizeDaySlots(currentTasks, activeWeekStartKey);
+}
+
+/**
+ * Computes total backlog time in hours strictly from PLATFORM lectures (Muhammad Salah & Muhammad Abdul-Maboud),
+ * while center classes (Taqwa, Ahmed Samir, Ayman) have 0 lecture video duration,
+ * and tracks homework strictly in pages or questions.
+ */
+export interface BacklogHoursSummary {
+  pendingLecturesCount: number;
+  pendingPlatformLecturesCount: number;
+  pendingCenterLecturesCount: number;
+  lectureMinutesTotal: number;
+  homeworkMinutesTotal: number;
+  homeworkPagesTotal: number;
+  homeworkQuestionsTotal: number;
+  homeworkLegacyLecturesCount: number;
+  explicitDurationsCount: number;
+  estimatedDurationsCount: number;
+  backlogTasksCount: number;
+  backlogTasksMinutes: number;
+  totalMinutes: number;
+  totalHours: number;
+  lecturesTotalHours: number;
+  homeworkTotalHours: number;
+}
+
+export const DEFAULT_LECTURE_MINUTES = 90;
+export const DEFAULT_HOMEWORK_MINUTES = 45;
+export const DEFAULT_BACKLOG_TASK_MINUTES = 45;
+
+export interface LectureLoadMeta {
+  isPlatform: boolean;
+  lectureMins: number;
+  fullDurationMins: number;
+  partsCount: number;
+  donePartsCount: number;
+  hasHomework: boolean;
+  homeworkDone: boolean;
+  homeworkUnit: 'pages' | 'questions';
+  homeworkAmount: number;
+  homeworkMins: number;
+  totalMinutes: number;
+  isEstimated: boolean;
+}
+
+export function isHomeworkPartItem(item?: { isHomework?: boolean; title?: string } | null): boolean {
+  if (!item) return false;
+  return Boolean(item.isHomework || (item.title || '').trim() === 'الواجب');
+}
+
+export function isLectureHomeworkDone(lec?: Partial<Lecture> | null): boolean {
+  if (!lec || !lec.hasHomework) return true;
+  if (lec.isDone) return true;
+  if (lec.homeworkDone) return true;
+  const parts = Array.isArray(lec.parts) ? lec.parts : [];
+  for (const p of parts) {
+    if (isHomeworkPartItem(p) && p.isDone) return true;
+    const subs = Array.isArray(p.subParts) ? p.subParts : [];
+    for (const s of subs) {
+      if (isHomeworkPartItem(s) && s.isDone) return true;
+    }
+  }
+  return false;
+}
+
+export function syncHomeworkPartOnLecture(lec: Lecture): Lecture {
+  const isPlatform = isPlatformLecture(lec);
+  const rawParts = Array.isArray(lec.parts) ? lec.parts : [];
+  let foundExistingHwSubId = '';
+  let foundExistingHwDone = false;
+
+  const strippedParts: LecturePart[] = rawParts
+    .filter((p) => {
+      if (isHomeworkPartItem(p)) {
+        if (p.isDone) foundExistingHwDone = true;
+        return false;
+      }
+      return true;
+    })
+    .map((p) => {
+      const subs = Array.isArray(p.subParts) ? p.subParts : [];
+      const nonHwSubs = subs.filter((s) => {
+        if (isHomeworkPartItem(s)) {
+          if (!foundExistingHwSubId) foundExistingHwSubId = s.id;
+          if (s.isDone) foundExistingHwDone = true;
+          return false;
+        }
+        return true;
+      });
+      return {
+        ...p,
+        subParts: nonHwSubs
+      };
+    });
+
+  if (!lec.hasHomework) {
+    return {
+      ...lec,
+      homeworkDone: false,
+      ...(isPlatform ? { parts: strippedParts.length > 0 ? strippedParts : undefined } : { parts: undefined })
+    };
+  }
+
+  const hwDone = Boolean(lec.isDone || lec.homeworkDone || foundExistingHwDone);
+
+  if (isPlatform && strippedParts.length > 0) {
+    const lastIdx = strippedParts.length - 1;
+    const lastPart = strippedParts[lastIdx];
+    const existingSubs = Array.isArray(lastPart.subParts) ? lastPart.subParts : [];
+    const hwSub = {
+      id: foundExistingHwSubId || `sub_hw_${lec.id || 'new'}`,
+      title: 'الواجب',
+      durationMinutes: 0,
+      isDone: hwDone,
+      isHomework: true
+    };
+    const nextParts = strippedParts.map((p, idx) =>
+      idx === lastIdx ? { ...p, subParts: [...existingSubs, hwSub] } : p
+    );
+    return {
+      ...lec,
+      homeworkDone: hwDone,
+      parts: nextParts
+    };
+  }
+
+  return {
+    ...lec,
+    homeworkDone: hwDone,
+    ...(isPlatform ? { parts: strippedParts.length > 0 ? strippedParts : undefined } : { parts: undefined })
+  };
+}
+
+export function getLecturePartDuration(part: LecturePart): {
+  totalMins: number;
+  remainingMins: number;
+  hasSubParts: boolean;
+  doneSubParts: number;
+  totalSubParts: number;
+} {
+  if (isHomeworkPartItem(part)) {
+    return {
+      totalMins: 0,
+      remainingMins: 0,
+      hasSubParts: false,
+      doneSubParts: 0,
+      totalSubParts: 0
+    };
+  }
+
+  const subs = Array.isArray(part.subParts) ? part.subParts : [];
+  const nonHwSubs = subs.filter((s) => !isHomeworkPartItem(s));
+
+  if (nonHwSubs.length > 0) {
+    let totalMins = 0;
+    let remainingMins = 0;
+    let doneSubParts = 0;
+    nonHwSubs.forEach((s) => {
+      const m = Math.max(0, Number(s.durationMinutes) || 0);
+      totalMins += m;
+      const done = Boolean(part.isDone || s.isDone);
+      if (done) doneSubParts += 1;
+      else remainingMins += m;
+    });
+    return {
+      totalMins,
+      remainingMins: part.isDone ? 0 : remainingMins,
+      hasSubParts: true,
+      doneSubParts,
+      totalSubParts: nonHwSubs.length
+    };
+  }
+
+  const m = Math.max(0, Number(part.durationMinutes) || 0);
+  return {
+    totalMins: m,
+    remainingMins: part.isDone ? 0 : m,
+    hasSubParts: false,
+    doneSubParts: 0,
+    totalSubParts: 0
+  };
+}
+
+export function getLecturePartsTotals(parts?: LecturePart[]): {
+  totalMins: number;
+  remainingMins: number;
+  partsCount: number;
+  donePartsCount: number;
+} {
+  const list = (Array.isArray(parts) ? parts : []).filter((p) => !isHomeworkPartItem(p));
+  let totalMins = 0;
+  let remainingMins = 0;
+  let donePartsCount = 0;
+  list.forEach((p) => {
+    const meta = getLecturePartDuration(p);
+    totalMins += meta.totalMins;
+    remainingMins += meta.remainingMins;
+    if (p.isDone || (meta.hasSubParts && meta.doneSubParts === meta.totalSubParts)) {
+      donePartsCount += 1;
+    }
+  });
+  return {
+    totalMins,
+    remainingMins,
+    partsCount: list.length,
+    donePartsCount
+  };
+}
+
+export function toggleLectureHomeworkDone(lec: Lecture): Lecture {
+  if (!lec.hasHomework) return lec;
+  const nextHwDone = !isLectureHomeworkDone(lec);
+  const parts = Array.isArray(lec.parts) ? lec.parts : [];
+  const updatedParts = parts.map((p) => {
+    const subs = Array.isArray(p.subParts) ? p.subParts : [];
+    const nextSubs = subs.map((s) => (isHomeworkPartItem(s) ? { ...s, isDone: nextHwDone } : s));
+    return {
+      ...p,
+      ...(isHomeworkPartItem(p) ? { isDone: nextHwDone } : {}),
+      subParts: nextSubs
+    };
+  });
+
+  const videoParts = updatedParts.filter((p) => !isHomeworkPartItem(p));
+  const hasVideoParts = isPlatformLecture(lec) && videoParts.length > 0;
+  const allVideoPartsDone = hasVideoParts
+    ? videoParts.every((p) => {
+        const nonHwSubs = (Array.isArray(p.subParts) ? p.subParts : []).filter((s) => !isHomeworkPartItem(s));
+        if (nonHwSubs.length > 0) return p.isDone || nonHwSubs.every((s) => Boolean(s.isDone));
+        return Boolean(p.isDone);
+      })
+    : lec.isDone;
+
+  const nextIsDone = nextHwDone ? (hasVideoParts ? allVideoPartsDone : lec.isDone) : false;
+
+  return {
+    ...lec,
+    homeworkDone: nextHwDone,
+    ...(updatedParts.length > 0 ? { parts: updatedParts } : {}),
+    isDone: nextIsDone
+  };
+}
+
+export function toggleLecturePartDone(
+  lec: Lecture,
+  partId: string,
+  subPartId?: string
+): Lecture {
+  const parts = Array.isArray(lec.parts) ? lec.parts : [];
+  if (parts.length === 0) return lec;
+
+  if (subPartId) {
+    const targetSub = parts
+      .find((p) => p.id === partId)
+      ?.subParts?.find((s) => s.id === subPartId);
+    if (isHomeworkPartItem(targetSub)) {
+      return toggleLectureHomeworkDone(lec);
+    }
+  }
+
+  let nextHwDone = Boolean(lec.homeworkDone || isLectureHomeworkDone({ ...lec, isDone: false }));
+
+  const updatedParts: LecturePart[] = parts.map((p) => {
+    if (p.id !== partId) return p;
+    const subs = Array.isArray(p.subParts) ? p.subParts : [];
+    const nonHwSubs = subs.filter((s) => !isHomeworkPartItem(s));
+
+    if (isHomeworkPartItem(p)) {
+      nextHwDone = !p.isDone;
+      return { ...p, isDone: nextHwDone };
+    }
+
+    if (subPartId && subs.length > 0) {
+      const nextSubs = subs.map((s) => (s.id === subPartId ? { ...s, isDone: !s.isDone } : s));
+      const nextNonHwSubs = nextSubs.filter((s) => !isHomeworkPartItem(s));
+      const allNonHwDone = nextNonHwSubs.length > 0 ? nextNonHwSubs.every((s) => Boolean(s.isDone)) : Boolean(p.isDone);
+      return {
+        ...p,
+        isDone: allNonHwDone,
+        subParts: nextSubs
+      };
+    }
+
+    const nextDone = !p.isDone;
+    return {
+      ...p,
+      isDone: nextDone,
+      subParts: subs.length > 0
+        ? subs.map((s) => (isHomeworkPartItem(s) ? s : { ...s, isDone: nextDone }))
+        : subs
+    };
+  });
+
+  const videoParts = updatedParts.filter((p) => !isHomeworkPartItem(p));
+  const allVideoPartsDone = videoParts.every((p) => {
+    const nonHwSubs = (Array.isArray(p.subParts) ? p.subParts : []).filter((s) => !isHomeworkPartItem(s));
+    if (nonHwSubs.length > 0) return p.isDone || nonHwSubs.every((s) => Boolean(s.isDone));
+    return Boolean(p.isDone);
+  });
+
+  const finalIsDone = allVideoPartsDone && (!lec.hasHomework || nextHwDone);
+
+  return {
+    ...lec,
+    homeworkDone: lec.hasHomework ? nextHwDone : false,
+    parts: updatedParts,
+    isDone: finalIsDone
+  };
+}
+
+export function formatLectureHomeworkLabel(lec: Partial<Lecture>): string {
+  if (!lec.hasHomework) return 'بدون واجب';
+  const amount = typeof lec.homeworkAmount === 'number' && lec.homeworkAmount > 0 ? lec.homeworkAmount : 0;
+  if (amount > 0) {
+    return lec.homeworkUnit === 'questions' ? `واجب: ${amount} سؤال` : `واجب: ${amount} صفحة`;
+  }
+  if (typeof lec.homeworkMinutes === 'number' && lec.homeworkMinutes > 0) {
+    return `واجب (${lec.homeworkMinutes} د)`;
+  }
+  return 'يوجد واجب';
+}
+
+export function getLectureTotalMinutes(lec: Lecture): LectureLoadMeta {
+  const isPlatform = isPlatformLecture(lec);
+  const parts = isPlatform && Array.isArray(lec.parts) ? lec.parts : [];
+  const videoParts = parts.filter((p) => !isHomeworkPartItem(p));
+
+  let fullDurationMins = 0;
+  let lectureMins = 0;
+  let donePartsCount = 0;
+  let isEstimated = false;
+
+  if (isPlatform) {
+    if (videoParts.length > 0) {
+      const partTotals = getLecturePartsTotals(videoParts);
+      fullDurationMins = partTotals.totalMins > 0 ? partTotals.totalMins : (Number(lec.durationMinutes) || DEFAULT_LECTURE_MINUTES);
+      lectureMins = lec.isDone ? 0 : (partTotals.totalMins > 0 ? partTotals.remainingMins : fullDurationMins);
+      donePartsCount = partTotals.donePartsCount;
+      isEstimated = partTotals.totalMins <= 0 && !(typeof lec.durationMinutes === 'number' && lec.durationMinutes > 0);
+    } else {
+      const hasExplicitLec = typeof lec.durationMinutes === 'number' && lec.durationMinutes > 0;
+      fullDurationMins = hasExplicitLec ? Number(lec.durationMinutes) : DEFAULT_LECTURE_MINUTES;
+      lectureMins = lec.isDone ? 0 : fullDurationMins;
+      isEstimated = !hasExplicitLec;
+    }
+  }
+
+  const homeworkAmount = typeof lec.homeworkAmount === 'number' && lec.homeworkAmount > 0
+    ? Number(lec.homeworkAmount)
+    : 0;
+  const homeworkUnit: 'pages' | 'questions' = lec.homeworkUnit === 'questions' ? 'questions' : 'pages';
+  const homeworkMins = homeworkAmount === 0 && lec.hasHomework && typeof lec.homeworkMinutes === 'number' && lec.homeworkMinutes > 0
+    ? Number(lec.homeworkMinutes)
+    : 0;
+  const homeworkDone = isLectureHomeworkDone(lec);
+
+  return {
+    isPlatform,
+    lectureMins,
+    fullDurationMins,
+    partsCount: videoParts.length,
+    donePartsCount,
+    hasHomework: Boolean(lec.hasHomework),
+    homeworkDone,
+    homeworkUnit,
+    homeworkAmount,
+    homeworkMins,
+    totalMinutes: lectureMins,
+    isEstimated
+  };
+}
+
+export function computeBacklogHoursSummary(
+  lectures: Lecture[],
+  weeklyTasks: WeeklyTask[] = [],
+  completedTaskIds: Set<string | number> = new Set()
+): BacklogHoursSummary {
+  const pendingLectures = lectures.filter((l) => !l.isDone);
+  let pendingPlatformLecturesCount = 0;
+  let pendingCenterLecturesCount = 0;
+  let lectureMinutesTotal = 0;
+  let homeworkMinutesTotal = 0;
+  let homeworkPagesTotal = 0;
+  let homeworkQuestionsTotal = 0;
+  let homeworkLegacyLecturesCount = 0;
+  let explicitDurationsCount = 0;
+  let estimatedDurationsCount = 0;
+
+  pendingLectures.forEach((l) => {
+    const meta = getLectureTotalMinutes(l);
+    if (meta.isPlatform) {
+      pendingPlatformLecturesCount += 1;
+      lectureMinutesTotal += meta.lectureMins;
+      if (meta.isEstimated) estimatedDurationsCount += 1;
+      else explicitDurationsCount += 1;
+    } else {
+      pendingCenterLecturesCount += 1;
+    }
+
+    if (meta.hasHomework && !meta.homeworkDone) {
+      if (meta.homeworkAmount > 0) {
+        if (meta.homeworkUnit === 'questions') homeworkQuestionsTotal += meta.homeworkAmount;
+        else homeworkPagesTotal += meta.homeworkAmount;
+      } else if (meta.homeworkMins > 0) {
+        homeworkMinutesTotal += meta.homeworkMins;
+        homeworkLegacyLecturesCount += 1;
+      }
+    }
+  });
+
+  const backlogTasks = weeklyTasks.filter(
+    (t) => t.dayId === 'backlog' && !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))
+  );
+  const backlogTasksMinutes = backlogTasks.length * DEFAULT_BACKLOG_TASK_MINUTES;
+  const totalMinutes = lectureMinutesTotal;
+
+  return {
+    pendingLecturesCount: pendingLectures.length,
+    pendingPlatformLecturesCount,
+    pendingCenterLecturesCount,
+    lectureMinutesTotal,
+    homeworkMinutesTotal,
+    homeworkPagesTotal,
+    homeworkQuestionsTotal,
+    homeworkLegacyLecturesCount,
+    explicitDurationsCount,
+    estimatedDurationsCount,
+    backlogTasksCount: backlogTasks.length,
+    backlogTasksMinutes,
+    totalMinutes,
+    totalHours: Number((totalMinutes / 60).toFixed(1)),
+    lecturesTotalHours: Number((lectureMinutesTotal / 60).toFixed(1)),
+    homeworkTotalHours: Number((homeworkMinutesTotal / 60).toFixed(1))
+  };
+}
+
+/**
+ * Computes consecutive study streak in days and today's total minutes using local YYYY-MM-DD dates.
+ */
+export function computeStudyStreakStats(sessions: Session[]): {
+  todayMinutes: number;
+  todayHours: number;
+  todaySessionsCount: number;
+  currentStreakDays: number;
+  longestStreakDays: number;
+  totalActiveDays: number;
+  studiedToday: boolean;
+} {
+  const todayStr = toLocalYmd(new Date());
+  const minsByDay = new Map<string, number>();
+  let todaySessionsCount = 0;
+
+  sessions.forEach((s) => {
+    const mins = Number(s.minutes) || 0;
+    if (mins <= 0) return;
+    let ymd = '';
+    if (s.tsStart) {
+      ymd = toLocalYmd(new Date(s.tsStart));
+    } else if (s.date && /^\d{4}-\d{2}-\d{2}/.test(s.date)) {
+      ymd = s.date.slice(0, 10);
+    }
+    if (!ymd) return;
+    minsByDay.set(ymd, (minsByDay.get(ymd) || 0) + mins);
+    if (ymd === todayStr) todaySessionsCount += 1;
+  });
+
+  const todayMinutes = minsByDay.get(todayStr) || 0;
+  const studiedToday = todayMinutes > 0;
+
+  // Current streak: start from today if studied today, otherwise yesterday (active streak not yet broken today)
+  let currentStreakDays = 0;
+  let cursor = studiedToday ? todayStr : addDaysYmd(todayStr, -1);
+  while ((minsByDay.get(cursor) || 0) > 0) {
+    currentStreakDays += 1;
+    cursor = addDaysYmd(cursor, -1);
+    if (currentStreakDays > 3650) break;
+  }
+
+  // Longest streak across all recorded active days
+  const sortedDays = Array.from(minsByDay.entries())
+    .filter(([, m]) => m > 0)
+    .map(([d]) => d)
+    .sort();
+  let longestStreakDays = currentStreakDays;
+  let run = 0;
+  for (let i = 0; i < sortedDays.length; i++) {
+    if (i === 0) {
+      run = 1;
+    } else {
+      const diff = diffDaysYmd(sortedDays[i], sortedDays[i - 1]);
+      run = diff === 1 ? run + 1 : 1;
+    }
+    if (run > longestStreakDays) longestStreakDays = run;
+  }
+
+  return {
+    todayMinutes,
+    todayHours: Number((todayMinutes / 60).toFixed(1)),
+    todaySessionsCount,
+    currentStreakDays,
+    longestStreakDays,
+    totalActiveDays: sortedDays.length,
+    studiedToday
+  };
 }

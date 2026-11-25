@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Subject, Session, ExamRecord, WeeklyTask, Lecture } from '../types';
+import { Subject, Session, ExamRecord, OfficialExam, WeeklyTask, Lecture } from '../types';
 import { callAiChat } from '../services/api';
 import {
   Bot,
@@ -21,6 +21,7 @@ interface AISupervisorViewProps {
   sessions: Session[];
   subjects: Subject[];
   exams: ExamRecord[];
+  officialExams?: OfficialExam[];
   weeklyTasks: WeeklyTask[];
   completedTaskIds: Set<string | number>;
   lectures?: Lecture[];
@@ -45,6 +46,7 @@ export const AISupervisorView: React.FC<AISupervisorViewProps> = ({
   sessions,
   subjects,
   exams,
+  officialExams = [],
   weeklyTasks,
   completedTaskIds,
   lectures = [],
@@ -121,6 +123,7 @@ export const AISupervisorView: React.FC<AISupervisorViewProps> = ({
       sessions,
       subjects,
       lectures,
+      officialExams,
       weeklyTasks,
       completedTaskIds: Array.from(completedTaskIds),
       todayStudyMins: todayMins,

@@ -9,7 +9,8 @@ import {
   Timer,
   History,
   Grid,
-  Hourglass
+  Hourglass,
+  Gauge
 } from 'lucide-react';
 
 interface ViewNavProps {
@@ -94,6 +95,15 @@ export const ViewNav: React.FC<ViewNavProps> = ({ currentTab, onSelectTab }) => 
       >
         <Grid size={16} />
         <span>المصفوفة الكبرى (كل الأيام) ⚡</span>
+      </button>
+
+      <button
+        className={`tab-btn ${currentTab === 'quickStatsView' ? 'active' : ''}`}
+        onClick={() => onSelectTab('quickStatsView')}
+        title="شاشة قراءة فقط لساعات اليوم والسلسلة والمتراكم (?view=stats)"
+      >
+        <Gauge size={16} />
+        <span>ملخص الإحصائيات (قراءة فقط)</span>
       </button>
     </nav>
   );

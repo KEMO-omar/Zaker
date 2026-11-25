@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Subject, WeeklyTask, Session, ExamRecord, Lecture, ArchivedWeek } from '../types';
+import { Subject, WeeklyTask, Session, ExamRecord, Lecture, ArchivedWeek, ChangelogEntry, OfficialExam } from '../types';
 import { PastWeeksAnalytics } from '../components/PastWeeksAnalytics';
 import { DynamicScheduleBoard } from '../components/DynamicScheduleBoard';
 import { CalendarCheck, BarChart3 } from 'lucide-react';
@@ -9,7 +9,7 @@ interface WeeklyViewProps {
   subjects: Subject[];
   completedTaskIds: Set<string | number>;
   onToggleTask: (taskId: string | number) => void;
-  onOpenNewTaskModal: () => void;
+  onOpenNewTaskModal: (initialDate?: string) => void;
   onOpenEditTask: (task: WeeklyTask) => void;
   onDeleteTask?: (taskId: string | number) => void;
   onUpdateAllTasks?: (tasks: WeeklyTask[]) => void;
@@ -20,6 +20,10 @@ interface WeeklyViewProps {
   archivedWeeks?: ArchivedWeek[];
   onArchiveWeek?: (archive: ArchivedWeek, cleanTasks: WeeklyTask[]) => void;
   onOpenNotificationsCenter?: () => void;
+  activeWeekStartKey?: string;
+  changelog?: ChangelogEntry[];
+  officialExams?: OfficialExam[];
+  onLogEvent?: (entry: Omit<ChangelogEntry, 'id' | 'timestamp'>) => void;
 }
 
 export const WeeklyView: React.FC<WeeklyViewProps> = ({
@@ -37,7 +41,11 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
   onStartFocus,
   archivedWeeks = [],
   onArchiveWeek,
-  onOpenNotificationsCenter
+  onOpenNotificationsCenter,
+  activeWeekStartKey,
+  changelog = [],
+  officialExams = [],
+  onLogEvent
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'tasks' | 'history'>('tasks');
 
@@ -75,7 +83,7 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
               الجدول الأسبوعي والمهام
             </h2>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-              كل التعديلات والتبديلات والإنجاز تُحفظ تلقائياً حتى نهاية الأسبوع
+              كل التعديلات والتبديلات والتواريخ والإنجاز تُحفظ تلقائياً حتى 15 خانة يومياً
             </p>
           </div>
         </div>
@@ -127,7 +135,8 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
           subjects={subjects}
           completedTaskIds={completedTaskIds}
           onToggleTask={onToggleTask}
-          onOpenNewTaskModal={onOpenNewTaskModal}
+          onOpenNewTaskModal={() => onOpenNewTaskModal()}
+          onOpenNewTaskForDate={(dateStr) => onOpenNewTaskModal(dateStr)}
           onOpenEditTask={onOpenEditTask}
           onDeleteTask={onDeleteTask}
           onUpdateAllTasks={onUpdateAllTasks}
@@ -135,6 +144,10 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
           onArchiveWeek={onArchiveWeek}
           lectures={lectures}
           onOpenNotificationsCenter={onOpenNotificationsCenter}
+          activeWeekStartKey={activeWeekStartKey}
+          changelog={changelog}
+          officialExams={officialExams}
+          onLogEvent={onLogEvent}
         />
       )}
 

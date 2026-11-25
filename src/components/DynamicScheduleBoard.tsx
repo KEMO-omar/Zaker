@@ -1,15 +1,26 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import confetti from 'canvas-confetti';
-import { Subject, WeeklyTask, Lecture, ArchivedWeek } from '../types';
+import { Subject, WeeklyTask, Lecture, ArchivedWeek, ChangelogEntry, OfficialExam } from '../types';
 import {
   FIXED_WEEKLY_CLASSES,
   ORDERED_WEEK_DAYS,
   DYNAMIC_STUDY_POOL,
+  MAX_DAILY_SLOTS,
+  addDaysYmd,
   buildRandomizedWeeklySchedule,
-  getCurrentArabicDayId,
+  canAddTaskToDay,
+  filterTasksForWeek,
+  formatYmdShort,
   getArabicDayLabel,
+  getCurrentArabicDayId,
+  getDayIdFromYmd,
+  getTaskWeekKey,
+  getWeekDaysWithDates,
+  getWeekStartSaturdayKey,
+  getYmdForWeekDay,
   normalizeDaySlots,
-  sortLecturesByOrder
+  sortLecturesByOrder,
+  toLocalYmd
 } from '../utils/scheduleEngine';
 import {
   Calendar,
@@ -32,7 +43,12 @@ import {
   Star,
   LayoutGrid,
   Check,
-  X
+  X,
+  ChevronRight,
+  ChevronLeft,
+  AlertTriangle,
+  FileText,
+  Sparkles
 } from 'lucide-react';
 
 // Exact calibrated coordinates measured directly from public/weekly_schedule_template.png (2000x1414)
@@ -86,6 +102,7 @@ interface DynamicScheduleBoardProps {
   completedTaskIds: Set<string | number>;
   onToggleTask: (taskId: string | number) => void;
   onOpenNewTaskModal: () => void;
+  onOpenNewTaskForDate?: (dateStr: string, dayId: string) => void;
   onOpenEditTask: (task: WeeklyTask) => void;
   onDeleteTask?: (taskId: string | number) => void;
   onUpdateAllTasks?: (tasks: WeeklyTask[]) => void;
@@ -93,6 +110,10 @@ interface DynamicScheduleBoardProps {
   onArchiveWeek?: (archive: ArchivedWeek, cleanTasks: WeeklyTask[]) => void;
   lectures?: Lecture[];
   onOpenNotificationsCenter?: () => void;
+  activeWeekStartKey?: string;
+  changelog?: ChangelogEntry[];
+  officialExams?: OfficialExam[];
+  onLogEvent?: (entry: Omit<ChangelogEntry, 'id' | 'timestamp'>) => void;
 }
 
 export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
@@ -101,16 +122,24 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
   completedTaskIds,
   onToggleTask,
   onOpenNewTaskModal,
+  onOpenNewTaskForDate,
   onOpenEditTask,
   onDeleteTask,
   onUpdateAllTasks,
   archivedWeeks = [],
   onArchiveWeek,
   lectures = [],
-  onOpenNotificationsCenter
+  onOpenNotificationsCenter,
+  activeWeekStartKey,
+  changelog = [],
+  officialExams = [],
+  onLogEvent
 }) => {
-  // Primary schedule view is the Official Image Poster with crisp full-text capsules; Cards / Checklist / Timeblock / Archive are 1 click away
-  const [activeViewMode, setActiveViewMode] = useState<'poster' | 'cards' | 'checklist' | 'timeblock' | 'archive'>('poster');
+  // Primary schedule view is the Official Image Poster; Cards / Checklist / Backlog / Changelog / Timeblock / Archive are 1 click away
+  const [activeViewMode, setActiveViewMode] = useState<
+    'poster' | 'cards' | 'checklist' | 'backlog' | 'changelog' | 'timeblock' | 'archive'
+  >('poster');
+  const [weekOffset, setWeekOffset] = useState<number>(0);
   const [boardDayFocus, setBoardDayFocus] = useState<string>('all');
   const [boardSubjFilter, setBoardSubjFilter] = useState<string>('all');
 
@@ -121,6 +150,10 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
   const [quickAddSubj, setQuickAddSubj] = useState<{ [dayId: string]: string }>({});
   const [boardNotice, setBoardNotice] = useState<string | null>(null);
   const [notificationStatus, setNotificationStatus] = useState<string>('default');
+
+  // Backlog move target dates & Changelog filter
+  const [backlogMoveDates, setBacklogMoveDates] = useState<Record<string, string>>({});
+  const [changelogFilter, setChangelogFilter] = useState<'all' | ChangelogEntry['entityType']>('all');
 
   // Inline day/slot quick-add modal state
   const [slotQuickAddDay, setSlotQuickAddDay] = useState<string | null>(null);
@@ -146,11 +179,17 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
   const [swapBankSelect, setSwapBankSelect] = useState<string>('');
 
   const templateImgRef = useRef<HTMLImageElement | null>(null);
+  const todayYmd = toLocalYmd();
   const todayDayId = getCurrentArabicDayId();
+  const currentSystemWeekKey = getWeekStartSaturdayKey();
+  const baseWeekKey = activeWeekStartKey || currentSystemWeekKey;
+  const viewedWeekStartKey = addDaysYmd(baseWeekKey, weekOffset * 7);
+  const viewedWeekEndKey = addDaysYmd(viewedWeekStartKey, 6);
+  const weekDays = useMemo(() => getWeekDaysWithDates(viewedWeekStartKey), [viewedWeekStartKey]);
 
   const flashNotice = (msg: string) => {
     setBoardNotice(msg);
-    setTimeout(() => setBoardNotice(null), 5000);
+    setTimeout(() => setBoardNotice(null), 5500);
   };
 
   const isTaskDone = (taskId: string | number) =>
@@ -171,32 +210,106 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     }
   }, []);
 
-  // Deterministic slot mapping per day (0..9)
+  // Tasks scoped strictly to viewedWeekStartKey, preserving other weeks & backlog separately
+  const viewedWeekTasks = useMemo(
+    () => filterTasksForWeek(tasks, viewedWeekStartKey, baseWeekKey),
+    [tasks, viewedWeekStartKey, baseWeekKey]
+  );
+
+  const backlogTasks = useMemo(
+    () => tasks.filter((t) => t.dayId === 'backlog'),
+    [tasks]
+  );
+
+  // Detect duplicates in backlog (either already scheduled or repeated in backlog)
+  const duplicateBacklogIds = useMemo(() => {
+    const normalizeText = (txt: string) => (txt || '').replace(/\s+/g, ' ').trim();
+    const scheduledKeys = new Set<string>();
+    tasks.forEach((t) => {
+      if (t.dayId !== 'backlog') {
+        scheduledKeys.add(`${t.subjId}::${normalizeText(t.text)}`);
+        if (t.lectureId) scheduledKeys.add(`lec::${t.lectureId}`);
+      }
+    });
+
+    const seenInBacklog = new Set<string>();
+    const dupIds: Array<string | number> = [];
+
+    backlogTasks.forEach((bt) => {
+      const key = `${bt.subjId}::${normalizeText(bt.text)}`;
+      const lecKey = bt.lectureId ? `lec::${bt.lectureId}` : null;
+      if (scheduledKeys.has(key) || (lecKey && scheduledKeys.has(lecKey)) || seenInBacklog.has(key)) {
+        dupIds.push(bt.id);
+      } else {
+        seenInBacklog.add(key);
+        if (lecKey) seenInBacklog.add(lecKey);
+      }
+    });
+
+    return dupIds;
+  }, [tasks, backlogTasks]);
+
+  const weekOfficialExams = useMemo(() => {
+    return officialExams
+      .filter((oe) => oe.date >= viewedWeekStartKey && oe.date <= viewedWeekEndKey)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [officialExams, viewedWeekStartKey, viewedWeekEndKey]);
+
+  // Deterministic slot mapping per day (0..14, MAX_DAILY_SLOTS = 15) for the viewed week
   const daySlotsMap = useMemo(() => {
     const map = new Map<string, Array<WeeklyTask | null>>();
     ORDERED_WEEK_DAYS.forEach(d => {
-      map.set(d.id, new Array(10).fill(null));
+      map.set(d.id, new Array(MAX_DAILY_SLOTS).fill(null));
     });
 
-    const normalized = normalizeDaySlots(tasks);
+    const normalized = normalizeDaySlots(viewedWeekTasks, baseWeekKey);
     normalized.forEach(t => {
       if (t.dayId && map.has(t.dayId)) {
         const slots = map.get(t.dayId)!;
-        if (typeof t.slotIndex === 'number' && t.slotIndex >= 0 && t.slotIndex <= 9 && slots[t.slotIndex] === null) {
+        if (
+          typeof t.slotIndex === 'number' &&
+          t.slotIndex >= 0 &&
+          t.slotIndex < MAX_DAILY_SLOTS &&
+          slots[t.slotIndex] === null
+        ) {
           slots[t.slotIndex] = t;
         }
       }
     });
 
     return map;
-  }, [tasks]);
+  }, [viewedWeekTasks, baseWeekKey]);
+
+  // Extra overflow tasks in slots 10..14 (visible right beneath Poster)
+  const posterOverflowTasks = useMemo(() => {
+    const list: Array<{ dayLabel: string; dayId: string; dateStr: string; slotNum: number; task: WeeklyTask }> = [];
+    weekDays.forEach((wd) => {
+      const slots = daySlotsMap.get(wd.id) || [];
+      for (let i = 10; i < MAX_DAILY_SLOTS; i++) {
+        const t = slots[i];
+        if (t) {
+          list.push({ dayLabel: wd.label, dayId: wd.id, dateStr: wd.dateStr, slotNum: i + 1, task: t });
+        }
+      }
+    });
+    return list;
+  }, [weekDays, daySlotsMap]);
+
+  // Helper to commit changes to viewedWeekTasks while leaving other weeks + backlog untouched
+  const commitTasksWithScope = (mutatedViewedTasks: WeeklyTask[], baseTasks: WeeklyTask[] = tasks) => {
+    if (!onUpdateAllTasks) return;
+    const preservedOther = baseTasks.filter(
+      (t) => t.dayId === 'backlog' || getTaskWeekKey(t, baseWeekKey) !== viewedWeekStartKey
+    );
+    onUpdateAllTasks([...preservedOther, ...mutatedViewedTasks]);
+  };
 
   // Lectures sorted strictly by Karim's defined order
   const orderedLectures = useMemo(() => sortLecturesByOrder(lectures), [lectures]);
 
-  // Overall statistics
-  const totalTasksCount = tasks.length;
-  const completedCount = tasks.filter(t => isTaskDone(t.id)).length;
+  // Viewed week statistics
+  const totalTasksCount = viewedWeekTasks.length;
+  const completedCount = viewedWeekTasks.filter(t => isTaskDone(t.id)).length;
   const pendingCount = totalTasksCount - completedCount;
   const completionPercentage = totalTasksCount > 0 ? Math.round((completedCount / totalTasksCount) * 100) : 0;
 
@@ -215,10 +328,17 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     }
   };
 
-  // Quick add task in checklist (places cleanly in bottom slot 9 or open slot)
+  // Quick add task in checklist (enforces 15-slot cap; never drops old tasks into backlog)
   const handleQuickAdd = (dayId: string) => {
     const text = quickAddInput[dayId]?.trim();
     if (!text || !onUpdateAllTasks) return;
+
+    const targetDate = getYmdForWeekDay(viewedWeekStartKey, dayId);
+    const capCheck = canAddTaskToDay(tasks, dayId, targetDate, baseWeekKey);
+    if (!capCheck.allowed) {
+      flashNotice(`⚠️ ${capCheck.reason}`);
+      return;
+    }
 
     const chosenSubj = quickAddSubj[dayId] || 'physics';
     const slots = daySlotsMap.get(dayId) || [];
@@ -227,6 +347,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     const newTask: WeeklyTask = {
       id: `task_quick_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       dayId,
+      date: targetDate,
       subjId: chosenSubj,
       text,
       priority: 'urgent',
@@ -236,18 +357,33 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     };
 
     onUpdateAllTasks([...tasks, newTask]);
+    onLogEvent?.({
+      action: 'add',
+      entityType: 'task',
+      summary: `إضافة مهمة سريعة: ${text}`,
+      details: `${getArabicDayLabel(dayId)} (${targetDate}) · ${SUBJECT_SHORT_LABELS[chosenSubj]?.name || chosenSubj}`
+    });
     setQuickAddInput(prev => ({ ...prev, [dayId]: '' }));
-    flashNotice(`⚡ تمت إضافة مهمتك (${SUBJECT_SHORT_LABELS[chosenSubj]?.name || chosenSubj}) ليوم ${getArabicDayLabel(dayId)} وحفظها!`);
+    flashNotice(`⚡ تمت إضافة مهمتك (${SUBJECT_SHORT_LABELS[chosenSubj]?.name || chosenSubj}) ليوم ${getArabicDayLabel(dayId)} (${formatYmdShort(targetDate)}) وحفظها!`);
   };
 
-  // Save inline modal for a day slot
+  // Save inline modal for a day slot (enforces 15-slot cap)
   const handleSaveSlotQuickAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!slotQuickAddDay || !slotQuickText.trim() || !onUpdateAllTasks) return;
 
+    const targetDate = getYmdForWeekDay(viewedWeekStartKey, slotQuickAddDay);
+    const capCheck = canAddTaskToDay(tasks, slotQuickAddDay, targetDate, baseWeekKey);
+    if (!capCheck.allowed) {
+      flashNotice(`⚠️ ${capCheck.reason}`);
+      setSlotQuickAddDay(null);
+      return;
+    }
+
     const newTask: WeeklyTask = {
       id: `task_manual_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       dayId: slotQuickAddDay,
+      date: targetDate,
       subjId: slotQuickSubj,
       text: slotQuickText.trim(),
       priority: slotQuickCategory === 'exam' ? 'exam' : 'urgent',
@@ -257,21 +393,44 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     };
 
     onUpdateAllTasks([...tasks, newTask]);
-    flashNotice(`✅ تم تثبيت المهمة (${SUBJECT_SHORT_LABELS[slotQuickSubj]?.name || slotQuickSubj}) ليوم ${getArabicDayLabel(slotQuickAddDay)}!`);
+    onLogEvent?.({
+      action: 'add',
+      entityType: 'task',
+      summary: `إضافة مهمة بالجدول: ${newTask.text}`,
+      details: `${getArabicDayLabel(slotQuickAddDay)} (${targetDate}) · خانة ${slotQuickSlotIdx + 1}`
+    });
+    flashNotice(`✅ تم تثبيت المهمة (${SUBJECT_SHORT_LABELS[slotQuickSubj]?.name || slotQuickSubj}) ليوم ${getArabicDayLabel(slotQuickAddDay)} (${formatYmdShort(targetDate)})!`);
     setSlotQuickAddDay(null);
     setSlotQuickText('');
   };
 
+  // Auto-fill future week when empty
+  const handleFillViewedFutureWeek = () => {
+    if (!onUpdateAllTasks) return;
+    const generated = buildRandomizedWeeklySchedule({
+      lectures: orderedLectures,
+      respectLectureOrder: true,
+      weekStartSatKey: viewedWeekStartKey
+    });
+    commitTasksWithScope(generated);
+    onLogEvent?.({
+      action: 'add',
+      entityType: 'schedule',
+      summary: `تعبئة أسبوع ${formatYmdShort(viewedWeekStartKey)} تلقائياً (${generated.length} مهمة)`,
+      details: 'تم بناء الجدول من المحاضرات والسناتر الحضورية مع ترك الخانة 10 فارغة'
+    });
+    flashNotice(`🎲 تم تعبئة أسبوع ${formatYmdShort(viewedWeekStartKey)} بـ ${generated.length} مهمة من دروسك والسناتر!`);
+  };
+
   /**
-   * Smart Partial Randomizer:
+   * Smart Partial Randomizer (scoped strictly to viewedWeekTasks):
    * - LOCKS all completed tasks (isDone === true), fixed center classes, and Karim's user-added tasks in their exact slots!
-   * - Fills ALL 10 slots (0..9) per day so no day is left missing a task!
    * - ONLY randomizes/replaces UNCOMPLETED auto tasks using Karim's ordered lectures!
    */
   const handleRandomizeUndoneOnly = () => {
     if (!onUpdateAllTasks) return;
 
-    const lockedTasks = tasks.filter(
+    const lockedTasks = viewedWeekTasks.filter(
       (t) =>
         isTaskDone(t.id) ||
         t.category === 'center' ||
@@ -280,39 +439,48 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
         t.category === 'exam'
     );
 
-    const lockedDoneCount = tasks.filter((t) => isTaskDone(t.id)).length;
-    const replacedCount = Math.max(0, tasks.length - lockedTasks.length);
+    const lockedDoneCount = viewedWeekTasks.filter((t) => isTaskDone(t.id)).length;
+    const replacedCount = Math.max(0, viewedWeekTasks.length - lockedTasks.length);
 
     const freshTasks = buildRandomizedWeeklySchedule({
       lectures: orderedLectures,
       lockedTasks,
-      respectLectureOrder: true
+      respectLectureOrder: true,
+      weekStartSatKey: viewedWeekStartKey
     });
 
-    onUpdateAllTasks(freshTasks);
+    commitTasksWithScope(freshTasks);
+    onLogEvent?.({
+      action: 'edit',
+      entityType: 'schedule',
+      summary: `تغيير عشوائي لـ ${replacedCount} مهمة غير منجزة بأسبوع ${formatYmdShort(viewedWeekStartKey)}`,
+      details: `تم الحفاظ على ${lockedDoneCount} مهمة منجزة + السناتر والمهام اليدوية`
+    });
     flashNotice(
-      `🎲 تم تجديد ${replacedCount} مهمة غير منجزة في الخانات التسع الأولى وفق ترتيب دروسك (مع ترك الخانة الأخيرة فارغة لإضافاتك والحفاظ على ${lockedDoneCount} منجزة والسناتر ومهامك اليدوية)!`
+      `🎲 تم تجديد ${replacedCount} مهمة غير منجزة في أسبوع ${formatYmdShort(viewedWeekStartKey)} وفق ترتيب دروسك (مع الحفاظ على ${lockedDoneCount} منجزة والسناتر ومهامك اليدوية)!`
     );
   };
 
-  // Rollover uncompleted non-center tasks to next day cleanly without slot collisions
+  // Rollover uncompleted non-center tasks to next day cleanly respecting 15-slot cap
   const handleRolloverTasks = () => {
     if (!onUpdateAllTasks) return;
 
     const dayKeys = ORDERED_WEEK_DAYS.map(d => d.id);
     let rolledCount = 0;
 
-    const rolledTasks = tasks.map(t => {
+    const rolledTasks = viewedWeekTasks.map(t => {
       if (isTaskDone(t.id) || t.category === 'center' || t.dayId === 'fri' || t.dayId === 'backlog') {
         return t;
       }
       const idx = dayKeys.indexOf(t.dayId);
       if (idx === -1 || idx >= dayKeys.length - 1) return t;
       const nextDay = dayKeys[idx + 1];
+      const nextDate = getYmdForWeekDay(viewedWeekStartKey, nextDay);
       rolledCount++;
       return {
         ...t,
         dayId: nextDay,
+        date: nextDate,
         slotIndex: undefined,
         priority: 'urgent' as const,
         isRolled: true,
@@ -322,7 +490,13 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     });
 
     if (rolledCount > 0) {
-      onUpdateAllTasks(normalizeDaySlots(rolledTasks));
+      commitTasksWithScope(normalizeDaySlots(rolledTasks, baseWeekKey));
+      onLogEvent?.({
+        action: 'move',
+        entityType: 'schedule',
+        summary: `ترحيل ${rolledCount} مهمة غير منجزة لليوم التالي`,
+        details: `أسبوع ${formatYmdShort(viewedWeekStartKey)}`
+      });
       flashNotice(`🚨 تم ترحيل ${rolledCount} مهمة غير منجزة إلى اليوم التالي بأولوية عاجلة وحفظ الجدول!`);
     } else {
       flashNotice('✅ ممتاز يا دكتور! كل مهام الأيام السابقة منجزة ولا توجد مهام متأخرة.');
@@ -345,36 +519,44 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
   const handleExecuteSwap = () => {
     if (!taskToSwap || !onUpdateAllTasks) return;
 
-    const currentNormalized = normalizeDaySlots(tasks);
+    const currentNormalized = normalizeDaySlots(viewedWeekTasks, baseWeekKey);
     const sourceTask = currentNormalized.find(t => String(t.id) === String(taskToSwap.id)) || taskToSwap;
-    let updatedTasks = [...currentNormalized];
+    let updatedViewed = [...currentNormalized];
 
     if (swapMode === 'schedule' && selectedScheduleTargetId) {
       const targetTask = currentNormalized.find(t => String(t.id) === selectedScheduleTargetId);
       if (!targetTask) return;
 
       const sourceDay = sourceTask.dayId;
+      const sourceDate = sourceTask.date || getYmdForWeekDay(viewedWeekStartKey, sourceDay);
       const sourceSlot = sourceTask.slotIndex;
       const destDay = targetTask.dayId;
+      const destDate = targetTask.date || getYmdForWeekDay(viewedWeekStartKey, destDay);
       const destSlot = targetTask.slotIndex;
 
-      updatedTasks = updatedTasks.map(t => {
+      updatedViewed = updatedViewed.map(t => {
         if (String(t.id) === String(sourceTask.id)) {
-          return { ...t, dayId: destDay, slotIndex: destSlot };
+          return { ...t, dayId: destDay, date: destDate, slotIndex: destSlot };
         }
         if (String(t.id) === String(targetTask.id)) {
-          return { ...t, dayId: sourceDay, slotIndex: sourceSlot };
+          return { ...t, dayId: sourceDay, date: sourceDate, slotIndex: sourceSlot };
         }
         return t;
       });
 
-      onUpdateAllTasks(updatedTasks);
+      commitTasksWithScope(updatedViewed);
+      onLogEvent?.({
+        action: 'swap',
+        entityType: 'task',
+        summary: `تبديل مهمتين: «${sourceTask.text}» ⇄ «${targetTask.text}»`,
+        details: `${getArabicDayLabel(sourceDay)} ⇄ ${getArabicDayLabel(destDay)}`
+      });
       flashNotice(`🔁 تم تبديل المهمتين وحفظهما في الجدول حتى نهاية الأسبوع!`);
     } else if (swapMode === 'lectures' && selectedLectureId) {
       const lec = orderedLectures.find(l => l.id === selectedLectureId);
       if (!lec) return;
 
-      updatedTasks = updatedTasks.map(t => {
+      updatedViewed = updatedViewed.map(t => {
         if (String(t.id) === String(sourceTask.id)) {
           return {
             ...t,
@@ -390,52 +572,57 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
         return t;
       });
 
-      onUpdateAllTasks(updatedTasks);
+      commitTasksWithScope(updatedViewed);
+      onLogEvent?.({
+        action: 'swap',
+        entityType: 'task',
+        summary: `استبدال خانة بالمحاضرة: ${lec.title}`,
+        details: `بدلاً من «${sourceTask.text}»`
+      });
       flashNotice(`📚 تم استبدال الخانة بالمحاضرة «${lec.title}» وحفظ الجدول!`);
     } else if (swapMode === 'move') {
       if (swapBankSelect) {
         const bankItem = DYNAMIC_STUDY_POOL.find(item => item.text === swapBankSelect);
         if (bankItem) {
-          updatedTasks = updatedTasks.map(t =>
+          updatedViewed = updatedViewed.map(t =>
             String(t.id) === String(sourceTask.id)
               ? { ...t, subjId: bankItem.subjId, text: bankItem.text, category: 'study', lectureId: undefined }
               : t
           );
-          onUpdateAllTasks(updatedTasks);
+          commitTasksWithScope(updatedViewed);
+          onLogEvent?.({
+            action: 'swap',
+            entityType: 'task',
+            summary: `استبدال من بنك المذاكرة: ${bankItem.text}`,
+            details: `بدلاً من «${sourceTask.text}»`
+          });
           flashNotice('✅ تم استبدال المهمة من بنك المذاكرة وحفظ الجدول.');
         }
       } else if (swapTargetDay !== sourceTask.dayId) {
-        const destTasks = updatedTasks.filter(t => t.dayId === swapTargetDay);
+        const destDate = getYmdForWeekDay(viewedWeekStartKey, swapTargetDay);
+        const destTasks = updatedViewed.filter(t => t.dayId === swapTargetDay);
         const usedInDest = new Set(destTasks.map(t => t.slotIndex).filter((s): s is number => typeof s === 'number'));
         let freeSlot: number | undefined = undefined;
-        for (let i = 0; i <= 9; i++) {
+        for (let i = 0; i < MAX_DAILY_SLOTS; i++) {
           if (!usedInDest.has(i)) { freeSlot = i; break; }
         }
 
         if (freeSlot !== undefined) {
-          updatedTasks = updatedTasks.map(t =>
+          updatedViewed = updatedViewed.map(t =>
             String(t.id) === String(sourceTask.id)
-              ? { ...t, dayId: swapTargetDay, slotIndex: freeSlot }
+              ? { ...t, dayId: swapTargetDay, date: destDate, slotIndex: freeSlot }
               : t
           );
-          onUpdateAllTasks(updatedTasks);
-          flashNotice(`📅 تم نقل المهمة إلى يوم ${getArabicDayLabel(swapTargetDay)} وحفظها.`);
+          commitTasksWithScope(updatedViewed);
+          onLogEvent?.({
+            action: 'move',
+            entityType: 'task',
+            summary: `نقل مهمة إلى ${getArabicDayLabel(swapTargetDay)} (${destDate})`,
+            details: sourceTask.text
+          });
+          flashNotice(`📅 تم نقل المهمة إلى يوم ${getArabicDayLabel(swapTargetDay)} (${formatYmdShort(destDate)}) وحفظها.`);
         } else {
-          const candidateInDest = [...destTasks]
-            .reverse()
-            .find(t => !isTaskDone(t.id) && t.category !== 'center');
-          if (candidateInDest) {
-            const sourceDay = sourceTask.dayId;
-            const sourceSlot = sourceTask.slotIndex;
-            const destSlot = candidateInDest.slotIndex;
-            updatedTasks = updatedTasks.map(t => {
-              if (String(t.id) === String(sourceTask.id)) return { ...t, dayId: swapTargetDay, slotIndex: destSlot };
-              if (String(t.id) === String(candidateInDest.id)) return { ...t, dayId: sourceDay, slotIndex: sourceSlot };
-              return t;
-            });
-            onUpdateAllTasks(updatedTasks);
-            flashNotice(`🔁 يوم ${getArabicDayLabel(swapTargetDay)} مكتمل — تم التبادل مع «${candidateInDest.text}» وحفظ الجدول!`);
-          }
+          flashNotice(`⚠️ يوم ${getArabicDayLabel(swapTargetDay)} ممتلئ بالحد الأقصى (${MAX_DAILY_SLOTS}/${MAX_DAILY_SLOTS} خانة) — لن يتم نقل أي مهمة للمتراكم تلقائياً. استخدم وضع «تبديل مع مهمة بالجدول» للمبادلة المباشرة.`);
         }
       }
     }
@@ -444,13 +631,66 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     setTaskToSwap(null);
   };
 
-  // Execute Week Archive & Start Fresh Schedule respecting Karim's lecture order (10/10 full)
+  // Backlog Actions: Move to Date + Delete + Clean Duplicates
+  const handleMoveBacklogTaskToDate = (task: WeeklyTask) => {
+    if (!onUpdateAllTasks) return;
+    const targetDate = backlogMoveDates[String(task.id)] || todayYmd;
+    if (!targetDate) {
+      flashNotice('⚠️ اختر تاريخاً أولاً لنقل المهمة إليه.');
+      return;
+    }
+
+    const targetDayId = getDayIdFromYmd(targetDate);
+    const capCheck = canAddTaskToDay(tasks, targetDayId, targetDate, baseWeekKey, task.id);
+    if (!capCheck.allowed) {
+      flashNotice(`⚠️ ${capCheck.reason}`);
+      return;
+    }
+
+    const updated = tasks.map((t) =>
+      String(t.id) === String(task.id)
+        ? {
+            ...t,
+            dayId: targetDayId,
+            date: targetDate,
+            slotIndex: undefined,
+            priority: t.priority === 'urgent' ? 'high' : t.priority
+          }
+        : t
+    );
+
+    onUpdateAllTasks(updated);
+    onLogEvent?.({
+      action: 'move',
+      entityType: 'task',
+      summary: `نقل من المتراكم إلى ${getArabicDayLabel(targetDayId)} (${targetDate})`,
+      details: task.text
+    });
+    flashNotice(`✅ تم نقل «${task.text}» إلى ${getArabicDayLabel(targetDayId)} (${formatYmdShort(targetDate)}) بنجاح!`);
+  };
+
+  const handleCleanDuplicateBacklog = () => {
+    if (!onUpdateAllTasks || duplicateBacklogIds.length === 0) return;
+    const dupSet = new Set(duplicateBacklogIds.map(String));
+    const filtered = tasks.filter((t) => !dupSet.has(String(t.id)));
+    onUpdateAllTasks(filtered);
+    onLogEvent?.({
+      action: 'delete',
+      entityType: 'task',
+      summary: `تنظيف ${duplicateBacklogIds.length} نسخة مكررة من المتراكم`,
+      details: 'تم إبقاء نسخة واحدة أو النسخ المجدولة بالجدول'
+    });
+    flashNotice(`🧹 تم حذف ${duplicateBacklogIds.length} نسخة مكررة من قائمة المتراكم!`);
+  };
+
+  // Execute Week Archive & Start Fresh Schedule respecting Karim's lecture order
   const confirmExecuteArchive = (autoFillNewWeek: boolean) => {
     if (!onArchiveWeek) return;
 
     const archiveRecord: ArchivedWeek = {
       id: `archive_${Date.now()}`,
-      weekTitle: `الأسبوع المنتهي في ${new Date().toLocaleDateString('ar-EG')}`,
+      weekTitle: `الأسبوع المنتهي (${formatYmdShort(viewedWeekStartKey)} - ${formatYmdShort(viewedWeekEndKey)})`,
+      weekKey: viewedWeekStartKey,
       archivedAt: new Date().toISOString(),
       totalCount: totalTasksCount,
       completedCount,
@@ -462,11 +702,13 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
       ? buildRandomizedWeeklySchedule({
           lectures: orderedLectures,
           preserveUserTasks: [],
-          respectLectureOrder: true
+          respectLectureOrder: true,
+          weekStartSatKey: currentSystemWeekKey
         })
       : FIXED_WEEKLY_CLASSES.map((f, idx) => ({
           id: `fixed_${f.dayId}_${idx}_${Date.now()}`,
           dayId: f.dayId,
+          date: getYmdForWeekDay(currentSystemWeekKey, f.dayId),
           subjId: f.subjId,
           text: f.text,
           category: f.category,
@@ -477,6 +719,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
         }));
 
     onArchiveWeek(archiveRecord, cleanTasks);
+    setWeekOffset(0);
     setArchiveConfirmOpen(false);
     flashNotice('📦 تمت أرشفة الأسبوع وتجهيز الأسبوع الجديد بنجاح وفق ترتيب دروسك!');
   };
@@ -499,10 +742,10 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     });
   }, [orderedLectures, swapLectureFilter, swapLectureSubjFilter, swapLectureSearch]);
 
-  // Other tasks on schedule for 2-way Swap Tab 1 (supports search)
+  // Other tasks on viewed week schedule for 2-way Swap Tab 1 (supports search)
   const swappableScheduleTasks = useMemo(() => {
     if (!taskToSwap) return [];
-    return tasks
+    return viewedWeekTasks
       .filter(t => String(t.id) !== String(taskToSwap.id) && t.dayId !== 'backlog')
       .filter(t => {
         if (!swapScheduleSearch.trim()) return true;
@@ -511,7 +754,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
         const subjLbl = (SUBJECT_SHORT_LABELS[t.subjId]?.name || '').toLowerCase();
         return t.text.toLowerCase().includes(q) || dayLbl.includes(q) || subjLbl.includes(q);
       });
-  }, [tasks, taskToSwap, swapScheduleSearch]);
+  }, [viewedWeekTasks, taskToSwap, swapScheduleSearch]);
 
   // Crisp PNG Poster Export using legible Cairo font + safe horizontal capsule bounds
   const generateScheduleCanvas = async () => {
@@ -662,7 +905,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     setIsGeneratingImage(false);
 
     const link = document.createElement('a');
-    link.download = `جدول_المذاكرة_الأسبوعي_${new Date().toISOString().slice(0, 10)}.png`;
+    link.download = `جدول_المذاكرة_الأسبوعي_${viewedWeekStartKey}.png`;
     link.href = dataUrl;
     link.click();
     flashNotice('🖼️ تم توليد وتحميل صورة الجدول بتصميم واضح ومنسق!');
@@ -681,10 +924,20 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
     }
   };
 
+  const weekOffsetBadge =
+    weekOffset === 0
+      ? 'الأسبوع الحالي'
+      : weekOffset === 1
+      ? 'الأسبوع القادم (+1)'
+      : weekOffset === -1
+      ? 'الأسبوع السابق (-1)'
+      : weekOffset > 1
+      ? `بعد ${weekOffset} أسابيع (+${weekOffset})`
+      : `منذ ${Math.abs(weekOffset)} أسابيع (${weekOffset})`;
+
   const weekLabelText = useMemo(() => {
-    const d = new Date();
-    return `الأسبوع الحالي · ${completedCount}/${totalTasksCount}`;
-  }, [completedCount, totalTasksCount]);
+    return `${formatYmdShort(viewedWeekStartKey)} ← ${formatYmdShort(viewedWeekEndKey)} (${completedCount}/${totalTasksCount})`;
+  }, [viewedWeekStartKey, viewedWeekEndKey, completedCount, totalTasksCount]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -751,7 +1004,11 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <button
               className="btn btn-sm btn-primary"
-              onClick={onOpenNewTaskModal}
+              onClick={() =>
+                onOpenNewTaskForDate
+                  ? onOpenNewTaskForDate(weekOffset === 0 ? todayYmd : viewedWeekStartKey, weekOffset === 0 ? todayDayId : 'sat')
+                  : onOpenNewTaskModal()
+              }
               style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
             >
               <Plus size={14} />
@@ -815,6 +1072,110 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
           </div>
         </div>
 
+        {/* Week Navigation Bar (Before / After Week Switcher) */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 10,
+            marginTop: 12,
+            padding: '10px 14px',
+            borderRadius: 10,
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-subtle)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setWeekOffset((w) => Math.max(-4, w - 1))}
+              disabled={weekOffset <= -4}
+              style={{ whiteSpace: 'nowrap', fontWeight: 700 }}
+            >
+              <ChevronRight size={14} />
+              <span>الأسبوع السابق</span>
+            </button>
+
+            <div style={{ padding: '0 8px', fontSize: 13, fontWeight: 800, color: 'var(--text-main)' }}>
+              <span className="tabular" style={{ color: 'var(--accent-primary)' }}>
+                {formatYmdShort(viewedWeekStartKey)} ← {formatYmdShort(viewedWeekEndKey)}
+              </span>
+              <span style={{ color: 'var(--text-muted)', margin: '0 6px' }}>·</span>
+              <span style={{ color: weekOffset === 0 ? '#10b981' : '#fbbf24' }}>{weekOffsetBadge}</span>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setWeekOffset((w) => Math.min(8, w + 1))}
+              disabled={weekOffset >= 8}
+              style={{ whiteSpace: 'nowrap', fontWeight: 700 }}
+            >
+              <span>الأسبوع التالي</span>
+              <ChevronLeft size={14} />
+            </button>
+
+            {weekOffset !== 0 && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setWeekOffset(0)}
+                style={{ fontSize: 11.5, color: 'var(--accent-secondary)', borderColor: 'rgba(56, 189, 248, 0.35)', whiteSpace: 'nowrap' }}
+              >
+                العودة للأسبوع الحالي
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12 }}>
+            {weekOfficialExams.length > 0 && (
+              <span style={{ color: '#c4b5fd', fontWeight: 700 }}>
+                <Bell size={12} style={{ display: 'inline', marginLeft: 4 }} />
+                {weekOfficialExams.length} امتحان رسمي بهذا الأسبوع
+              </span>
+            )}
+            <span className="tabular" style={{ color: 'var(--text-muted)', fontWeight: 700 }}>
+              السعة اليومية: حتى {MAX_DAILY_SLOTS} خانة
+            </span>
+          </div>
+        </div>
+
+        {/* Empty Future Week Helper Strip */}
+        {weekOffset > 0 && viewedWeekTasks.length === 0 && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: '10px 14px',
+              borderRadius: 10,
+              background: 'rgba(56, 189, 248, 0.08)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 10
+            }}
+          >
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-main)' }}>
+              أسبوع <span className="tabular">{formatYmdShort(viewedWeekStartKey)}</span> فارغ حالياً — يمكنك إضافة مهام بتواريخها أو تعبئة الأسبوع تلقائياً:
+            </span>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={handleFillViewedFutureWeek}
+                style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+              >
+                <Sparkles size={13} />
+                <span>تعبئة الأسبوع تلقائياً من المحاضرات والسناتر</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* View Mode Switcher Bar */}
         <div
           style={{
@@ -835,7 +1196,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
             >
               <Eye size={14} />
-              <span>البوستر الرسمي (الرئيسي)</span>
+              <span>البوستر الرسمي</span>
             </button>
 
             <button
@@ -844,7 +1205,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
             >
               <LayoutGrid size={14} />
-              <span>الجدول المنسق (كروت)</span>
+              <span>الجدول المنسق (<span className="tabular">{totalTasksCount}</span>)</span>
             </button>
 
             <button
@@ -853,7 +1214,30 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
             >
               <CalendarCheck size={14} />
-              <span>قائمة التفصيل (<span className="tabular">{totalTasksCount}</span>)</span>
+              <span>قائمة التفصيل</span>
+            </button>
+
+            <button
+              className={`btn btn-sm ${activeViewMode === 'backlog' ? 'btn-primary' : ''}`}
+              onClick={() => setActiveViewMode('backlog')}
+              style={{
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                borderColor: activeViewMode !== 'backlog' && backlogTasks.length > 0 ? 'rgba(239, 68, 68, 0.45)' : undefined,
+                color: activeViewMode !== 'backlog' && backlogTasks.length > 0 ? '#f87171' : undefined
+              }}
+            >
+              <AlertTriangle size={14} />
+              <span>المتراكم (<span className="tabular">{backlogTasks.length}</span>)</span>
+            </button>
+
+            <button
+              className={`btn btn-sm ${activeViewMode === 'changelog' ? 'btn-primary' : ''}`}
+              onClick={() => setActiveViewMode('changelog')}
+              style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+            >
+              <FileText size={14} />
+              <span>سجل التغييرات (<span className="tabular">{changelog.length}</span>)</span>
             </button>
 
             <button
@@ -977,12 +1361,16 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               alignItems: 'start'
             }}
           >
-            {ORDERED_WEEK_DAYS
+            {weekDays
               .filter(d => boardDayFocus === 'all' || boardDayFocus === d.id)
               .map(day => {
                 const slots = daySlotsMap.get(day.id) || [];
                 const dayTasks = slots.filter((t): t is WeeklyTask => t !== null);
-                const visibleSlots = slots.map((t, idx) => ({ task: t, slotIdx: idx }))
+                const maxSlotUsed = slots.reduce((mx, item, idx) => (item ? idx : mx), -1);
+                const displayLimit = Math.min(MAX_DAILY_SLOTS, Math.max(10, maxSlotUsed + 2));
+                const visibleSlots = slots
+                  .slice(0, displayLimit)
+                  .map((t, idx) => ({ task: t, slotIdx: idx }))
                   .filter(item => {
                     if (!item.task) return boardSubjFilter === 'all';
                     if (boardSubjFilter !== 'all' && item.task.subjId !== boardSubjFilter) return false;
@@ -990,7 +1378,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                   });
                 const dayDone = dayTasks.filter(t => isTaskDone(t.id)).length;
                 const dayPct = dayTasks.length > 0 ? Math.round((dayDone / dayTasks.length) * 100) : 0;
-                const isToday = day.id === todayDayId;
+                const isToday = day.dateStr === todayYmd;
 
                 return (
                   <div
@@ -1012,6 +1400,9 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                           <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: isToday ? 'var(--accent-primary)' : 'var(--text-main)' }}>
                             {day.label}
                           </h3>
+                          <span className="tabular" style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 700 }}>
+                            {formatYmdShort(day.dateStr)}
+                          </span>
                           {isToday && (
                             <span style={{ fontSize: 11, fontWeight: 800, color: '#10b981' }}>
                               · النهاردة ★
@@ -1021,18 +1412,22 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span className="tabular" style={{ fontSize: 12, fontWeight: 700, color: dayDone === dayTasks.length && dayTasks.length > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
-                            {dayDone}/{dayTasks.length}
+                            {dayDone}/{dayTasks.length} (حد {MAX_DAILY_SLOTS})
                           </span>
                           <button
                             type="button"
                             className="btn btn-sm"
                             onClick={() => {
                               const firstEmpty = slots.findIndex(s => s === null);
+                              if (firstEmpty === -1) {
+                                flashNotice(`⚠️ هذا اليوم وصل للحد الأقصى (${MAX_DAILY_SLOTS} خانة).`);
+                                return;
+                              }
                               setSlotQuickAddDay(day.id);
-                              setSlotQuickSlotIdx(firstEmpty !== -1 ? firstEmpty : 9);
+                              setSlotQuickSlotIdx(firstEmpty);
                               setSlotQuickText('');
                             }}
-                            title={`إضافة مهمة ليوم ${day.label}`}
+                            title={`إضافة مهمة ليوم ${day.label} (${formatYmdShort(day.dateStr)})`}
                             style={{ padding: '4px 8px', fontSize: 11 }}
                           >
                             <Plus size={12} />
@@ -1274,9 +1669,10 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                 {weekLabelText}
               </div>
 
-              {/* Clean Today Indicator above day pill */}
+              {/* Clean Today Indicator above day pill (only in viewed week matching todayYmd) */}
               {SCHEDULE_GRID_CONFIG.columns.map(col => {
-                if (col.dayId !== todayDayId) return null;
+                const colDate = getYmdForWeekDay(viewedWeekStartKey, col.dayId);
+                if (colDate !== todayYmd) return null;
                 return (
                   <div
                     key={`today_badge_${col.dayId}`}
@@ -1296,7 +1692,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                       pointerEvents: 'none'
                     }}
                   >
-                    اليوم ★
+                    النهاردة ★ ({formatYmdShort(colDate)})
                   </div>
                 );
               })}
@@ -1480,6 +1876,49 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               })}
             </div>
           </div>
+
+          {/* Extra Slots 11-15 Strip directly under Poster so high-density days remain 100% visible */}
+          {posterOverflowTasks.length > 0 && (
+            <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+              <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--accent-primary)', marginBottom: 10 }}>
+                مهام إضافية في هذا الأسبوع (الخانات 11–15):
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
+                {posterOverflowTasks.map(({ dayLabel, dateStr, slotNum, task }) => {
+                  const done = isTaskDone(task.id);
+                  const subjMeta = SUBJECT_SHORT_LABELS[task.subjId] || { name: task.subjId, color: '#64748b' };
+                  return (
+                    <div
+                      key={task.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        background: done ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-elevated)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRight: `3px solid ${subjMeta.color}`
+                      }}
+                    >
+                      <div onClick={() => handleCheck(task.id)} style={{ cursor: 'pointer', minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: done ? 'var(--text-muted)' : 'var(--text-main)', textDecoration: done ? 'line-through' : 'none' }}>
+                          {task.text}
+                        </div>
+                        <div className="tabular" style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                          <span style={{ color: subjMeta.color, fontWeight: 700 }}>{subjMeta.name}</span> · {dayLabel} ({formatYmdShort(dateStr)}) · خانة {slotNum}
+                        </div>
+                      </div>
+                      <button type="button" className="btn btn-sm" onClick={() => onOpenEditTask(task)} style={{ padding: '3px 7px' }}>
+                        <Pencil size={11} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1495,10 +1934,10 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
               >
                 جميع الأيام (<span className="tabular">{totalTasksCount}</span>)
               </button>
-              {ORDERED_WEEK_DAYS.map(d => {
-                const dayTasks = tasks.filter(t => t.dayId === d.id);
+              {weekDays.map(d => {
+                const dayTasks = viewedWeekTasks.filter(t => t.dayId === d.id);
                 const doneCount = dayTasks.filter(t => isTaskDone(t.id)).length;
-                const isToday = d.id === todayDayId;
+                const isToday = d.dateStr === todayYmd;
                 return (
                   <button
                     key={d.id}
@@ -1511,7 +1950,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                       borderColor: isToday && selectedDayTab !== d.id ? 'var(--accent-primary)' : undefined
                     }}
                   >
-                    <span>{d.label} {isToday ? '★' : ''}</span>
+                    <span>{d.label} ({formatYmdShort(d.dateStr)}) {isToday ? '★' : ''}</span>
                     <span className="tabular" style={{ fontSize: 11, opacity: 0.85 }}>({doneCount}/{dayTasks.length})</span>
                   </button>
                 );
@@ -1535,7 +1974,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                 style={{ fontSize: 12 }}
               >
                 <Star size={12} style={{ color: '#f97316' }} />
-                <span>مهامك المضافة (<span className="tabular">{tasks.filter(t => t.category === 'manual' || t.isUserAdded).length}</span>)</span>
+                <span>مهامك المضافة (<span className="tabular">{viewedWeekTasks.filter(t => t.category === 'manual' || t.isUserAdded).length}</span>)</span>
               </button>
               <button
                 className={`btn btn-sm ${selectedCategoryFilter === 'pending' ? 'btn-primary' : ''}`}
@@ -1543,7 +1982,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                 style={{ fontSize: 12 }}
               >
                 <Laptop size={12} style={{ color: '#fbbf24' }} />
-                <span>محاضرات للإنجاز (<span className="tabular">{tasks.filter(t => t.category === 'platform' || t.category === 'study').length}</span>)</span>
+                <span>محاضرات للإنجاز (<span className="tabular">{viewedWeekTasks.filter(t => t.category === 'platform' || t.category === 'study').length}</span>)</span>
               </button>
               <button
                 className={`btn btn-sm ${selectedCategoryFilter === 'review' ? 'btn-primary' : ''}`}
@@ -1551,7 +1990,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                 style={{ fontSize: 12 }}
               >
                 <RotateCcw size={12} style={{ color: '#14b8a6' }} />
-                <span>للمراجعة (<span className="tabular">{tasks.filter(t => t.category === 'review').length}</span>)</span>
+                <span>للمراجعة (<span className="tabular">{viewedWeekTasks.filter(t => t.category === 'review').length}</span>)</span>
               </button>
               <button
                 className={`btn btn-sm ${selectedCategoryFilter === 'center' ? 'btn-primary' : ''}`}
@@ -1559,16 +1998,16 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                 style={{ fontSize: 12 }}
               >
                 <Building2 size={12} style={{ color: '#38bdf8' }} />
-                <span>السناتر (<span className="tabular">{tasks.filter(t => t.category === 'center').length}</span>)</span>
+                <span>السناتر (<span className="tabular">{viewedWeekTasks.filter(t => t.category === 'center').length}</span>)</span>
               </button>
             </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {ORDERED_WEEK_DAYS
+            {weekDays
               .filter(d => selectedDayTab === 'all' || selectedDayTab === d.id)
               .map(d => {
-                const dayTasks = tasks
+                const dayTasks = viewedWeekTasks
                   .filter(t => t.dayId === d.id)
                   .filter(t => {
                     if (selectedCategoryFilter === 'manual') return t.category === 'manual' || t.isUserAdded;
@@ -1580,6 +2019,7 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                   .sort((a, b) => (a.slotIndex ?? 5) - (b.slotIndex ?? 5));
 
                 const dayDoneCount = dayTasks.filter(t => isTaskDone(t.id)).length;
+                const isToday = d.dateStr === todayYmd;
 
                 return (
                   <div
@@ -1588,16 +2028,16 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                       background: 'var(--bg-elevated)',
                       borderRadius: 10,
                       padding: 14,
-                      border: d.id === todayDayId ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)'
+                      border: isToday ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                       <strong style={{ fontSize: 15, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Calendar size={16} />
-                        <span>يوم {d.label} {d.id === todayDayId ? '(النهاردة ★)' : ''}</span>
+                        <span>يوم {d.label} ({formatYmdShort(d.dateStr)}) {isToday ? '(النهاردة ★)' : ''}</span>
                       </strong>
                       <span className="tabular" style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>
-                        {dayDoneCount} من {dayTasks.length} منجز
+                        {dayDoneCount} من {dayTasks.length} منجز (حد {MAX_DAILY_SLOTS})
                       </span>
                     </div>
 
@@ -1742,6 +2182,236 @@ export const DynamicScheduleBoard: React.FC<DynamicScheduleBoardProps> = ({
                 );
               })}
           </div>
+        </div>
+      )}
+
+      {/* VIEW MODE 3.5: VISIBLE & CONTROLLABLE BACKLOG TAB */}
+      {activeViewMode === 'backlog' && (
+        <div className="card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+            <div>
+              <h3 style={{ fontSize: 16.5, fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                <AlertTriangle size={18} style={{ color: '#f87171' }} />
+                <span>قائمة المتراكم والتحكم فيها (<span className="tabular">{backlogTasks.length}</span>)</span>
+              </h3>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                كل مهمة موجودة في المتراكم تقدر تنقلها لتاريخ محدد بالجدول أو تمسحها فوراً — ولا يتم نقل أي مهمة للمتراكم تلقائياً أبداً
+              </p>
+            </div>
+
+            {duplicateBacklogIds.length > 0 && onUpdateAllTasks && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={handleCleanDuplicateBacklog}
+                style={{
+                  borderColor: 'rgba(245, 158, 11, 0.5)',
+                  color: '#fbbf24',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Trash2 size={13} />
+                <span>تنظيف المكرر (<span className="tabular">{duplicateBacklogIds.length}</span>)</span>
+              </button>
+            )}
+          </div>
+
+          {backlogTasks.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px 12px', color: 'var(--text-muted)' }}>
+              لا توجد مهام في قائمة المتراكم حالياً — كل مهامك منظمة في أيامها!
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {backlogTasks.map((t) => {
+                const subj = getSubject(t.subjId);
+                const catMeta = getCategoryMeta(t);
+                const isDup = duplicateBacklogIds.some((did) => String(did) === String(t.id));
+                const chosenDate = backlogMoveDates[String(t.id)] || todayYmd;
+
+                return (
+                  <div
+                    key={t.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 12,
+                      padding: '12px 14px',
+                      borderRadius: 10,
+                      background: 'var(--bg-elevated)',
+                      border: `1px solid ${isDup ? 'rgba(245, 158, 11, 0.45)' : 'var(--border-subtle)'}`,
+                      borderRight: `3.5px solid ${subj?.color || '#64748b'}`
+                    }}
+                  >
+                    <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-main)', wordBreak: 'break-word' }}>
+                        {t.text}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ color: subj?.color || 'var(--accent-primary)', fontWeight: 700 }}>
+                          {subj?.name || t.subjId}
+                        </span>
+                        <span>·</span>
+                        <span style={{ color: catMeta.color, fontWeight: 700 }}>{catMeta.label}</span>
+                        {t.teacher && (
+                          <>
+                            <span>·</span>
+                            <span>{t.teacher}</span>
+                          </>
+                        )}
+                        {isDup && (
+                          <>
+                            <span>·</span>
+                            <span style={{ color: '#fbbf24', fontWeight: 800 }}>نسخة مكررة</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
+                      <input
+                        type="date"
+                        className="input-field tabular"
+                        value={chosenDate}
+                        onChange={(e) =>
+                          setBacklogMoveDates((prev) => ({
+                            ...prev,
+                            [String(t.id)]: e.target.value
+                          }))
+                        }
+                        style={{ margin: 0, width: 155, fontSize: 12, padding: '5px 8px' }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        onClick={() => handleMoveBacklogTaskToDate(t)}
+                        style={{ whiteSpace: 'nowrap', fontWeight: 700 }}
+                      >
+                        <Calendar size={12} />
+                        <span>نقل لتاريخ</span>
+                      </button>
+                      {onDeleteTask && (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => onDeleteTask(t.id)}
+                          style={{ color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.35)', whiteSpace: 'nowrap' }}
+                          title="مسح المهمة نهائياً"
+                        >
+                          <Trash2 size={12} />
+                          <span>مسح</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* VIEW MODE 3.6: SIMPLE AUDIT CHANGELOG TAB */}
+      {activeViewMode === 'changelog' && (
+        <div className="card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+            <div>
+              <h3 style={{ fontSize: 16.5, fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                <FileText size={18} style={{ color: 'var(--accent-primary)' }} />
+                <span>سجل التغييرات التلقائي (<span className="tabular">{changelog.length}</span>)</span>
+              </h3>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                يسجل كل إضافة أو تعديل أو نقل أو حذف أو تبديل أو أرشفة بالوقت الدقيق
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[
+                { id: 'all' as const, label: 'الكل' },
+                { id: 'task' as const, label: 'المهام' },
+                { id: 'lecture' as const, label: 'المحاضرات' },
+                { id: 'exam' as const, label: 'الامتحانات' },
+                { id: 'official_exam' as const, label: 'الجدول الرسمي' },
+                { id: 'backup' as const, label: 'النسخ' }
+              ].map((flt) => (
+                <button
+                  key={flt.id}
+                  type="button"
+                  className={`btn btn-sm ${changelogFilter === flt.id ? 'btn-primary' : ''}`}
+                  onClick={() => setChangelogFilter(flt.id)}
+                  style={{ fontSize: 11.5 }}
+                >
+                  {flt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {(() => {
+            const visibleLogs = changelog.filter((c) => changelogFilter === 'all' || c.entityType === changelogFilter);
+            if (visibleLogs.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)' }}>
+                  لا توجد تغييرات مسجلة في هذا التصنيف بعد.
+                </div>
+              );
+            }
+            const actionLabels: Record<ChangelogEntry['action'], { label: string; color: string }> = {
+              add: { label: 'إضافة', color: '#10b981' },
+              edit: { label: 'تعديل', color: '#38bdf8' },
+              delete: { label: 'مسح', color: '#ef4444' },
+              move: { label: 'نقل', color: '#f59e0b' },
+              swap: { label: 'تبديل', color: '#a78bfa' },
+              complete: { label: 'إنجاز', color: '#10b981' },
+              uncomplete: { label: 'إلغاء إنجاز', color: '#94a3b8' },
+              archive: { label: 'أرشفة', color: '#fbbf24' },
+              backup: { label: 'نسخة احتياطية', color: '#14b8a6' }
+            };
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 520, overflowY: 'auto' }}>
+                {visibleLogs.map((entry) => {
+                  const meta = actionLabels[entry.action] || { label: entry.action, color: 'var(--text-muted)' };
+                  const timeStr = new Date(entry.timestamp).toLocaleString('ar-EG', {
+                    month: 'numeric',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+                  return (
+                    <div
+                      key={entry.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        padding: '9px 12px',
+                        borderRadius: 8,
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border-subtle)',
+                        fontSize: 12.5
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+                        <span style={{ color: meta.color, fontWeight: 800, flexShrink: 0 }}>{meta.label}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>·</span>
+                        <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{entry.summary}</span>
+                        {entry.details && (
+                          <span style={{ color: 'var(--text-muted)', fontSize: 11.5 }}>({entry.details})</span>
+                        )}
+                      </div>
+                      <span className="tabular" style={{ fontSize: 11, color: 'var(--text-faint)', flexShrink: 0 }}>
+                        {timeStr}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 

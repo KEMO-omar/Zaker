@@ -1,10 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Subject, ExamRecord, WeeklyTask, Lecture } from '../types';
+import { Subject, ExamRecord, WeeklyTask, Lecture, LecturePart, LectureSubPart, OfficialExam } from '../types';
 import { compressImageFile } from '../services/imageUtils';
 import {
   LECTURE_TRACKS,
   getLectureTrack,
-  getLectureRankInTrack
+  getLectureRankInTrack,
+  getLecturePartDuration,
+  getLecturePartsTotals,
+  isHomeworkPartItem,
+  isLectureHomeworkDone,
+  isPlatformLecture,
+  syncHomeworkPartOnLecture,
+  getDayIdFromYmd,
+  getYmdForWeekDay,
+  getWeekStartSaturdayKey,
+  getWeekStartSaturdayKeyFromYmd,
+  toLocalYmd,
+  formatYmdShort,
+  diffDaysYmd
 } from '../utils/scheduleEngine';
 import {
   Coffee,
@@ -1030,8 +1043,11 @@ interface NewTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   subjects: Subject[];
+  defaultWeekStartKey?: string;
+  initialDate?: string;
   onSave: (task: {
     dayId: string;
+    date?: string;
     subjId: string;
     text: string;
     priority: WeeklyTask['priority'];
@@ -1043,8 +1059,16 @@ interface NewTaskModalProps {
   }) => void;
 }
 
-export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, subjects, onSave }) => {
+export const NewTaskModal: React.FC<NewTaskModalProps> = ({
+  isOpen,
+  onClose,
+  subjects,
+  defaultWeekStartKey,
+  initialDate,
+  onSave
+}) => {
   const [dayId, setDayId] = useState('sat');
+  const [date, setDate] = useState<string>(() => toLocalYmd());
   const [subjId, setSubjId] = useState('physics');
   const [category, setCategory] = useState<NonNullable<WeeklyTask['category']>>('manual');
   const [text, setText] = useState('');
@@ -1053,16 +1077,51 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, sub
   const [priority, setPriority] = useState<WeeklyTask['priority']>('high');
   const [placeInBottomSlot, setPlaceInBottomSlot] = useState<boolean>(true);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const baseDate = initialDate || toLocalYmd();
+    setDate(baseDate);
+    setDayId(getDayIdFromYmd(baseDate));
+    setText('');
+    setTeacher('');
+    setTime('');
+    setCategory('manual');
+    setPriority('high');
+    setPlaceInBottomSlot(true);
+  }, [isOpen, initialDate]);
+
   if (!isOpen) return null;
 
   const selectedSubject = subjects.find(s => s.id === subjId);
   const selectedCatObj = TASK_CATEGORIES.find(c => c.id === category);
+  const resolvedWeekKey = date
+    ? getWeekStartSaturdayKeyFromYmd(date)
+    : (defaultWeekStartKey || getWeekStartSaturdayKey());
+
+  const handleDateChange = (nextDate: string) => {
+    setDate(nextDate);
+    if (nextDate && dayId !== 'backlog') {
+      setDayId(getDayIdFromYmd(nextDate));
+    } else if (nextDate && dayId === 'backlog') {
+      setDayId(getDayIdFromYmd(nextDate));
+    }
+  };
+
+  const handleDaySelect = (nextDayId: string) => {
+    setDayId(nextDayId);
+    if (nextDayId === 'backlog') {
+      return;
+    }
+    const weekAnchor = date ? getWeekStartSaturdayKeyFromYmd(date) : (defaultWeekStartKey || getWeekStartSaturdayKey());
+    setDate(getYmdForWeekDay(weekAnchor, nextDayId));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
     onSave({
       dayId,
+      date: dayId === 'backlog' ? undefined : (date || undefined),
       subjId,
       text: text.trim(),
       priority: category === 'exam' ? 'exam' : category === 'center' ? 'class' : priority,
@@ -1175,11 +1234,26 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, sub
             </div>
           </div>
 
-          {/* Target Day Chips */}
+          {/* Target Day Chips + Exact Date YYYY-MM-DD */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
-              3. اليوم المستهدف:
+              3. التاريخ الدقيق واليوم المستهدف (يمكن الإضافة لأي أسبوع قادم أو سابق):
             </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '190px 1fr', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+              <input
+                type="date"
+                className="input-field tabular"
+                value={dayId === 'backlog' ? '' : date}
+                disabled={dayId === 'backlog'}
+                onChange={(e) => handleDateChange(e.target.value)}
+                style={{ margin: 0, fontSize: 12.5, fontWeight: 700 }}
+              />
+              <div className="tabular" style={{ fontSize: 11.5, color: 'var(--accent-primary)', fontWeight: 700 }}>
+                {dayId === 'backlog'
+                  ? 'سيتم الحفظ في قائمة المتراكم لإدارتها لاحقاً'
+                  : `أسبوع السبت ${formatYmdShort(resolvedWeekKey)}`}
+              </div>
+            </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {TASK_DAY_OPTIONS.map((d) => {
                 const active = dayId === d.id;
@@ -1187,7 +1261,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, sub
                   <button
                     key={d.id}
                     type="button"
-                    onClick={() => setDayId(d.id)}
+                    onClick={() => handleDaySelect(d.id)}
                     className={`btn btn-sm ${active ? 'btn-primary' : ''}`}
                     style={{ fontSize: 11, padding: '4px 10px' }}
                   >
@@ -1269,7 +1343,7 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, sub
                 style={{ width: 16, height: 16, accentColor: '#f97316' }}
               />
               <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>
-                وضع المهمة في الخانة الأخيرة أسفل الجدول (الخانة اليدوية المخصصة) ⚡
+                وضع المهمة في الخانة الأخيرة أسفل البوستر (أو أول خانة متاحة حتى 15) ⚡
               </span>
             </label>
           )}
@@ -1305,6 +1379,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
   onDelete
 }) => {
   const [dayId, setDayId] = useState('sat');
+  const [date, setDate] = useState('');
   const [subjId, setSubjId] = useState('arabic');
   const [category, setCategory] = useState<NonNullable<WeeklyTask['category']>>('study');
   const [text, setText] = useState('');
@@ -1315,6 +1390,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
   useEffect(() => {
     if (task) {
       setDayId(task.dayId);
+      setDate(task.dayId === 'backlog' ? '' : (task.date || getYmdForWeekDay(getWeekStartSaturdayKey(), task.dayId)));
       setSubjId(task.subjId);
       setCategory(task.category || 'study');
       setText(task.text);
@@ -1326,6 +1402,23 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
 
   if (!isOpen || !task) return null;
 
+  const handleDateChange = (nextDate: string) => {
+    setDate(nextDate);
+    if (nextDate) {
+      setDayId(getDayIdFromYmd(nextDate));
+    }
+  };
+
+  const handleDayDropdownChange = (nextDayId: string) => {
+    setDayId(nextDayId);
+    if (nextDayId === 'backlog') {
+      setDate('');
+    } else {
+      const weekAnchor = date ? getWeekStartSaturdayKeyFromYmd(date) : getWeekStartSaturdayKey();
+      setDate(getYmdForWeekDay(weekAnchor, nextDayId));
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
@@ -1333,6 +1426,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     onUpdate({
       ...task,
       dayId,
+      date: dayId === 'backlog' ? undefined : (date || undefined),
       subjId,
       category,
       text: text.trim(),
@@ -1349,7 +1443,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
         <div className="modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Pencil size={18} style={{ color: 'var(--accent-primary)' }} />
-            <span>تعديل بيانات وتصنيف المهمة</span>
+            <span>تعديل بيانات وتاريخ وتصنيف المهمة</span>
           </div>
           <button
             type="button"
@@ -1438,10 +1532,21 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>التاريخ (YYYY-MM-DD):</label>
+              <input
+                type="date"
+                className="input-field tabular"
+                value={dayId === 'backlog' ? '' : date}
+                disabled={dayId === 'backlog'}
+                onChange={(e) => handleDateChange(e.target.value)}
+                style={{ margin: 0, fontSize: 12 }}
+              />
+            </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>اليوم المستهدف:</label>
-              <select className="input-field" value={dayId} onChange={(e) => setDayId(e.target.value)} style={{ margin: 0 }}>
+              <select className="input-field" value={dayId} onChange={(e) => handleDayDropdownChange(e.target.value)} style={{ margin: 0 }}>
                 {TASK_DAY_OPTIONS.map(d => (
                   <option key={d.id} value={d.id}>{d.label}</option>
                 ))}
@@ -1533,12 +1638,12 @@ export const LECTURE_AUTOMATION_PRESETS = [
   },
   {
     key: 'history',
-    label: 'تاريخ (أ. أحمد سمير - منصة الإثنين والخميس 1:00 ظ)',
+    label: 'تاريخ (أ. أحمد سمير - سنتر الإثنين والخميس 1:00 ظ)',
     subjId: 'history',
-    teacher: 'أ. أحمد سمير (منصة)',
-    dueDay: 'الإثنين والخميس (الساعة 1:00 ظهراً - منصة)',
-    tag: 'منصة',
-    type: 'platform'
+    teacher: 'أ. أحمد سمير (سنتر)',
+    dueDay: 'الإثنين والخميس (الساعة 1:00 ظهراً - سنتر)',
+    tag: 'سنتر',
+    type: 'center'
   },
   {
     key: 'physics',
@@ -1560,6 +1665,310 @@ export const LECTURE_AUTOMATION_PRESETS = [
   }
 ];
 
+interface LecturePartsEditorProps {
+  parts: LecturePart[];
+  onChange: (next: LecturePart[]) => void;
+  hasHomework?: boolean;
+  homeworkDone?: boolean;
+  onToggleHomeworkDone?: (done: boolean) => void;
+  homeworkLabel?: string;
+}
+
+const sanitizeLectureParts = (parts: LecturePart[]): LecturePart[] =>
+  parts
+    .filter((p) => !isHomeworkPartItem(p))
+    .map((p, pIdx) => {
+      const subs = (Array.isArray(p.subParts) ? p.subParts : [])
+        .filter((s) => !isHomeworkPartItem(s) && (s.title.trim() || (Number(s.durationMinutes) || 0) > 0))
+        .map((s, sIdx) => ({
+          id: s.id || `sub_${Date.now()}_${pIdx}_${sIdx}`,
+          title: s.title.trim() || `جزء فرعي ${sIdx + 1}`,
+          durationMinutes: Math.max(1, Number(s.durationMinutes) || 15),
+          isDone: Boolean(s.isDone)
+        }));
+      const partDuration = subs.length > 0
+        ? subs.reduce((acc, s) => acc + s.durationMinutes, 0)
+        : Math.max(1, Number(p.durationMinutes) || 20);
+      return {
+        id: p.id || `part_${Date.now()}_${pIdx}`,
+        title: p.title.trim() || `الجزء ${pIdx + 1}`,
+        durationMinutes: partDuration,
+        isDone: subs.length > 0 ? subs.every((s) => s.isDone) : Boolean(p.isDone),
+        ...(subs.length > 0 ? { subParts: subs } : {})
+      };
+    });
+
+const LecturePartsEditor: React.FC<LecturePartsEditorProps> = ({
+  parts,
+  onChange,
+  hasHomework = false,
+  homeworkDone = false,
+  onToggleHomeworkDone,
+  homeworkLabel
+}) => {
+  const videoParts = parts.filter((p) => !isHomeworkPartItem(p));
+  const totals = getLecturePartsTotals(videoParts);
+
+  const handleAddPart = () => {
+    const idx = videoParts.length + 1;
+    onChange([
+      ...videoParts,
+      {
+        id: `part_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+        title: `الجزء ${idx}`,
+        durationMinutes: 30,
+        isDone: false,
+        subParts: []
+      }
+    ]);
+  };
+
+  const handleUpdatePart = (partId: string, patch: Partial<LecturePart>) => {
+    onChange(videoParts.map((p) => (p.id === partId ? { ...p, ...patch } : p)));
+  };
+
+  const handleDeletePart = (partId: string) => {
+    onChange(videoParts.filter((p) => p.id !== partId));
+  };
+
+  const handleAddSubPart = (partId: string) => {
+    onChange(
+      videoParts.map((p) => {
+        if (p.id !== partId) return p;
+        const subs = (Array.isArray(p.subParts) ? p.subParts : []).filter((s) => !isHomeworkPartItem(s));
+        const newSub: LectureSubPart = {
+          id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+          title: `تقسيمة ${subs.length + 1}`,
+          durationMinutes: 15,
+          isDone: Boolean(p.isDone)
+        };
+        return { ...p, subParts: [...subs, newSub] };
+      })
+    );
+  };
+
+  const handleUpdateSubPart = (partId: string, subId: string, patch: Partial<LectureSubPart>) => {
+    onChange(
+      videoParts.map((p) => {
+        if (p.id !== partId) return p;
+        const subs = (Array.isArray(p.subParts) ? p.subParts : [])
+          .filter((s) => !isHomeworkPartItem(s))
+          .map((s) => (s.id === subId ? { ...s, ...patch } : s));
+        return { ...p, subParts: subs };
+      })
+    );
+  };
+
+  const handleDeleteSubPart = (partId: string, subId: string) => {
+    onChange(
+      videoParts.map((p) => {
+        if (p.id !== partId) return p;
+        const subs = (Array.isArray(p.subParts) ? p.subParts : [])
+          .filter((s) => !isHomeworkPartItem(s) && s.id !== subId);
+        return { ...p, subParts: subs };
+      })
+    );
+  };
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+        <div>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--accent-primary)' }}>
+            تقسيم المحاضرة إلى أجزاء وأجزاء فرعية (منصات أ. عبد المعبود و أ. صلاح):
+          </div>
+          {videoParts.length > 0 && (
+            <div className="tabular" style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+              إجمالي وقت الأجزاء: <strong style={{ color: 'var(--text-main)' }}>{totals.totalMins} دقيقة</strong> ({(totals.totalMins / 60).toFixed(1)} ساعة) · يُعتمد تلقائياً كمدة المحاضرة
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={handleAddPart}
+          style={{ fontSize: 11, padding: '4px 10px', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', whiteSpace: 'nowrap' }}
+        >
+          + إضافة جزء
+        </button>
+      </div>
+
+      {videoParts.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto', paddingLeft: 2 }}>
+          {videoParts.map((part, pIdx) => {
+            const pMeta = getLecturePartDuration(part);
+            const subs = (Array.isArray(part.subParts) ? part.subParts : []).filter((s) => !isHomeworkPartItem(s));
+            const isLastPart = pIdx === videoParts.length - 1;
+            return (
+              <div
+                key={part.id}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(part.isDone)}
+                    onChange={(e) => {
+                      const nextDone = e.target.checked;
+                      handleUpdatePart(part.id, {
+                        isDone: nextDone,
+                        subParts: subs.map((s) => ({ ...s, isDone: nextDone }))
+                      });
+                    }}
+                    title="تم إنجاز الجزء"
+                    style={{ width: 14, height: 14, accentColor: 'var(--accent-primary)', flexShrink: 0 }}
+                  />
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder={`اسم الجزء ${pIdx + 1}...`}
+                    value={part.title}
+                    onChange={(e) => handleUpdatePart(part.id, { title: e.target.value })}
+                    style={{ flex: '1 1 150px', margin: 0, fontSize: 12, padding: '5px 8px' }}
+                  />
+                  {subs.length > 0 ? (
+                    <span
+                      className="tabular"
+                      title="يُحسب تلقائياً من مجموع الأجزاء الفرعية"
+                      style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--accent-secondary)', padding: '0 6px', whiteSpace: 'nowrap' }}
+                    >
+                      = {pMeta.totalMins} د
+                    </span>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <input
+                        type="number"
+                        min={1}
+                        max={480}
+                        className="input-field tabular"
+                        value={part.durationMinutes}
+                        onChange={(e) => handleUpdatePart(part.id, { durationMinutes: Math.max(0, Number(e.target.value) || 0) })}
+                        style={{ width: 64, margin: 0, fontSize: 12, padding: '5px 6px', textAlign: 'center' }}
+                      />
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>د</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => handleAddSubPart(part.id)}
+                    style={{ fontSize: 10.5, padding: '3px 7px', color: 'var(--accent-secondary)', whiteSpace: 'nowrap' }}
+                    title="إضافة جزء فرعي داخل هذا الجزء"
+                  >
+                    + جزء فرعي
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => handleDeletePart(part.id)}
+                    style={{ padding: '4px 6px', color: 'var(--danger)' }}
+                    title="حذف الجزء"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+
+                {/* Nested Sub-parts (+ automatic 'الواجب' zero-time checkable sub-item when hasHomework is enabled) */}
+                {(subs.length > 0 || (isLastPart && hasHomework)) && (
+                  <div
+                    style={{
+                      marginRight: 16,
+                      paddingRight: 10,
+                      borderRight: '2px solid var(--accent-secondary)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 5
+                    }}
+                  >
+                    {subs.map((sub, sIdx) => (
+                      <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(sub.isDone)}
+                          onChange={(e) => handleUpdateSubPart(part.id, sub.id, { isDone: e.target.checked })}
+                          style={{ width: 13, height: 13, accentColor: 'var(--accent-secondary)', flexShrink: 0 }}
+                        />
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder={`جزء فرعي ${sIdx + 1}...`}
+                          value={sub.title}
+                          onChange={(e) => handleUpdateSubPart(part.id, sub.id, { title: e.target.value })}
+                          style={{ flex: '1 1 130px', margin: 0, fontSize: 11.5, padding: '4px 8px' }}
+                        />
+                        <input
+                          type="number"
+                          min={1}
+                          max={480}
+                          className="input-field tabular"
+                          value={sub.durationMinutes}
+                          onChange={(e) => handleUpdateSubPart(part.id, sub.id, { durationMinutes: Math.max(0, Number(e.target.value) || 0) })}
+                          style={{ width: 58, margin: 0, fontSize: 11.5, padding: '4px 6px', textAlign: 'center' }}
+                        />
+                        <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>د</span>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => handleDeleteSubPart(part.id, sub.id)}
+                          style={{ padding: '3px 5px', color: 'var(--danger)' }}
+                          title="حذف الجزء الفرعي"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {isLastPart && hasHomework && (
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8,
+                          padding: '4px 8px',
+                          borderRadius: 6,
+                          background: 'rgba(56, 189, 248, 0.08)',
+                          border: '1px dashed rgba(56, 189, 248, 0.35)',
+                          cursor: onToggleHomeworkDone ? 'pointer' : 'default',
+                          fontSize: 11.5
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(homeworkDone)}
+                            onChange={(e) => onToggleHomeworkDone?.(e.target.checked)}
+                            disabled={!onToggleHomeworkDone}
+                            style={{ width: 13, height: 13, accentColor: 'var(--accent-secondary)', flexShrink: 0 }}
+                          />
+                          <strong style={{ color: homeworkDone ? 'var(--text-faint)' : 'var(--text-main)', textDecoration: homeworkDone ? 'line-through' : 'none' }}>
+                            الواجب {homeworkLabel ? `(${homeworkLabel})` : ''}
+                          </strong>
+                        </span>
+                        <span style={{ fontSize: 10.5, color: 'var(--accent-secondary)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                          بدون وقت · تلقائي
+                        </span>
+                      </label>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const NewLectureModal: React.FC<NewLectureModalProps> = ({ isOpen, onClose, subjects, onSave }) => {
   const [selectedPreset, setSelectedPreset] = useState<string>('physics');
   const [code, setCode] = useState('المحاضرة (01)');
@@ -1569,9 +1978,46 @@ export const NewLectureModal: React.FC<NewLectureModalProps> = ({ isOpen, onClos
   const [subjId, setSubjId] = useState('physics');
   const [packageName, setPackageName] = useState('باقة الفيزياء (أ. محمد عبد المعبود)');
   const [tag, setTag] = useState('منصة');
+  const [durationMinutes, setDurationMinutes] = useState('90');
+  const [parts, setParts] = useState<LecturePart[]>([]);
+  const [hasHomework, setHasHomework] = useState(true);
+  const [homeworkUnit, setHomeworkUnit] = useState<'pages' | 'questions'>('pages');
+  const [homeworkAmount, setHomeworkAmount] = useState('10');
   const [autoFilledNotice, setAutoFilledNotice] = useState<string>('تم تطبيق قاعدة الأتمتة للفيزياء (أ. محمد عبد المعبود)');
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setTitle('');
+    setDetails('');
+    setDurationMinutes('90');
+    setParts([]);
+    setHasHomework(true);
+    setHomeworkUnit('pages');
+    setHomeworkAmount('10');
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const currentTrackHint =
+    selectedPreset === 'arabic_platform'
+      ? 'arabic_salah'
+      : selectedPreset === 'arabic_center'
+      ? 'arabic_taqwa'
+      : selectedPreset;
+
+  const isPlatform = isPlatformLecture({
+    subjId,
+    packageName,
+    tag,
+    type: tag === 'سنتر' ? 'center' : 'platform',
+    trackKey: currentTrackHint
+  });
+
+  const partsTotals = getLecturePartsTotals(parts);
+  const hasDefinedParts = isPlatform && parts.length > 0;
+  const effectivePlatformDuration = hasDefinedParts
+    ? Math.max(1, partsTotals.totalMins)
+    : Math.max(5, Number(durationMinutes) || 90);
 
   const handleApplyPreset = (key: string) => {
     setSelectedPreset(key);
@@ -1602,26 +2048,59 @@ export const NewLectureModal: React.FC<NewLectureModalProps> = ({ isOpen, onClos
             dueDay,
             packageName,
             tag,
-            type: tag === 'سنتر' ? 'center' : 'platform',
+            type: isPlatform ? 'platform' : 'center',
             isDone: false
           }).id;
-    onSave({
+    const cleanedParts = isPlatform && parts.length > 0 ? sanitizeLectureParts(parts) : undefined;
+    const finalDuration = isPlatform
+      ? (cleanedParts && cleanedParts.length > 0 ? getLecturePartsTotals(cleanedParts).totalMins : Math.max(5, Number(durationMinutes) || 90))
+      : 0;
+
+    const prepared = syncHomeworkPartOnLecture({
+      id: 'new',
+      isDone: false,
       code,
       title: title.trim(),
       details: details.trim(),
       dueDay,
       subjId,
       packageName,
-      tag,
-      type: tag === 'سنتر' ? 'center' : 'platform',
-      trackKey: resolvedTrackKey
+      tag: isPlatform ? 'منصة' : 'سنتر',
+      type: isPlatform ? 'platform' : 'center',
+      trackKey: resolvedTrackKey,
+      durationMinutes: finalDuration,
+      ...(cleanedParts && cleanedParts.length > 0 ? { parts: cleanedParts } : {}),
+      hasHomework,
+      homeworkDone: false,
+      homeworkUnit,
+      homeworkAmount: hasHomework ? Math.max(1, Number(homeworkAmount) || 1) : 0,
+      homeworkMinutes: 0
+    });
+
+    onSave({
+      code: prepared.code,
+      title: prepared.title,
+      details: prepared.details,
+      dueDay: prepared.dueDay,
+      subjId: prepared.subjId,
+      packageName: prepared.packageName,
+      tag: prepared.tag,
+      type: prepared.type,
+      trackKey: prepared.trackKey,
+      durationMinutes: prepared.durationMinutes,
+      ...(prepared.parts && prepared.parts.length > 0 ? { parts: prepared.parts } : {}),
+      hasHomework: prepared.hasHomework,
+      homeworkDone: prepared.homeworkDone,
+      homeworkUnit: prepared.homeworkUnit,
+      homeworkAmount: prepared.homeworkAmount,
+      homeworkMinutes: 0
     });
     onClose();
   };
 
   return (
     <div className="modal-overlay show" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 540 }}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
         <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <BookOpen size={18} style={{ color: 'var(--accent-primary)' }} />
           <span>إضافة محاضرة منصة أو سنتر (أتمتة ذكية)</span>
@@ -1701,6 +2180,102 @@ export const NewLectureModal: React.FC<NewLectureModalProps> = ({ isOpen, onClos
             </div>
           </div>
 
+          {/* Lecture Duration (Platform Only) & Homework (Pages or Questions) */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              padding: 12,
+              borderRadius: 10,
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-subtle)',
+              marginTop: 6
+            }}
+          >
+            {isPlatform ? (
+              <>
+                <div>
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--accent-primary)', display: 'block', marginBottom: 4 }}>
+                    مدة محاضرة المنصة (بالدقائق — أ. محمد صلاح / أ. عبد المعبود):
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={600}
+                    step={5}
+                    className="input-field tabular"
+                    disabled={hasDefinedParts}
+                    value={hasDefinedParts ? String(effectivePlatformDuration) : durationMinutes}
+                    onChange={(e) => setDurationMinutes(e.target.value)}
+                    style={{ margin: 0, opacity: hasDefinedParts ? 0.75 : 1 }}
+                  />
+                </div>
+                <LecturePartsEditor
+                  parts={parts}
+                  onChange={setParts}
+                  hasHomework={hasHomework}
+                  homeworkDone={false}
+                  homeworkLabel={
+                    hasHomework && Number(homeworkAmount) > 0
+                      ? `${Number(homeworkAmount)} ${homeworkUnit === 'questions' ? 'سؤال' : 'صفحة'}`
+                      : undefined
+                  }
+                />
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700, padding: '4px 0' }}>
+                حصة سنتر حضوري — لا يوجد وقت فيديو للمحاضرة (الوقت والأجزاء لمنصتي أ. محمد صلاح و أ. عبد المعبود فقط)
+              </div>
+            )}
+
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: hasHomework ? 8 : 0, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={hasHomework}
+                  onChange={(e) => setHasHomework(e.target.checked)}
+                  style={{ width: 15, height: 15, accentColor: 'var(--accent-secondary)' }}
+                />
+                <span>يوجد واجب / شيت للدرس؟</span>
+              </label>
+
+              {hasHomework && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+                      قياس الواجب بـ:
+                    </label>
+                    <select
+                      className="input-field"
+                      value={homeworkUnit}
+                      onChange={(e) => setHomeworkUnit(e.target.value === 'questions' ? 'questions' : 'pages')}
+                      style={{ margin: 0, fontSize: 12 }}
+                    >
+                      <option value="pages">عدد الصفحات</option>
+                      <option value="questions">عدد الأسئلة</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+                      {homeworkUnit === 'questions' ? 'عدد الأسئلة:' : 'عدد الصفحات:'}
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={2000}
+                      className="input-field tabular"
+                      placeholder={homeworkUnit === 'questions' ? 'مثال: 40 سؤال' : 'مثال: 10 صفحات'}
+                      value={homeworkAmount}
+                      onChange={(e) => setHomeworkAmount(e.target.value)}
+                      style={{ margin: 0 }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
             <button type="button" className="btn" onClick={onClose}>إلغاء</button>
             <button type="submit" className="btn btn-primary">إضافة المحاضرة وحفظها</button>
@@ -1742,6 +2317,12 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
   const [trackOrder, setTrackOrder] = useState<number>(1);
   const [totalInTrack, setTotalInTrack] = useState<number>(1);
   const [isDone, setIsDone] = useState(false);
+  const [durationMinutes, setDurationMinutes] = useState('90');
+  const [parts, setParts] = useState<LecturePart[]>([]);
+  const [hasHomework, setHasHomework] = useState(true);
+  const [homeworkDone, setHomeworkDone] = useState(false);
+  const [homeworkUnit, setHomeworkUnit] = useState<'pages' | 'questions'>('pages');
+  const [homeworkAmount, setHomeworkAmount] = useState('10');
 
   useEffect(() => {
     if (lecture) {
@@ -1753,6 +2334,26 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
       setPackageName(lecture.packageName || '');
       setTag(lecture.tag || '');
       setIsDone(lecture.isDone);
+      setDurationMinutes(String(lecture.durationMinutes && lecture.durationMinutes > 0 ? lecture.durationMinutes : 90));
+      setParts(
+        Array.isArray(lecture.parts)
+          ? lecture.parts
+              .filter((p) => !isHomeworkPartItem(p))
+              .map((p) => ({
+                ...p,
+                subParts: Array.isArray(p.subParts)
+                  ? p.subParts.filter((s) => !isHomeworkPartItem(s)).map((s) => ({ ...s }))
+                  : []
+              }))
+          : []
+      );
+      const hwEnabled = lecture.hasHomework !== undefined
+        ? lecture.hasHomework
+        : (lecture.homeworkAmount ?? 0) > 0 || (lecture.homeworkMinutes ?? 0) > 0;
+      setHasHomework(hwEnabled);
+      setHomeworkDone(hwEnabled ? isLectureHomeworkDone(lecture) : false);
+      setHomeworkUnit(lecture.homeworkUnit === 'questions' ? 'questions' : 'pages');
+      setHomeworkAmount(String(lecture.homeworkAmount && lecture.homeworkAmount > 0 ? lecture.homeworkAmount : 10));
 
       const resolvedTrack = getLectureTrack(lecture);
       setTrackKey(resolvedTrack.id);
@@ -1771,6 +2372,21 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
 
   if (!isOpen || !lecture) return null;
 
+  const isPlatform = isPlatformLecture({
+    ...lecture,
+    subjId,
+    packageName,
+    tag,
+    trackKey,
+    type: tag === 'سنتر' ? 'center' : 'platform'
+  });
+
+  const partsTotals = getLecturePartsTotals(parts);
+  const hasDefinedParts = isPlatform && parts.length > 0;
+  const effectivePlatformDuration = hasDefinedParts
+    ? Math.max(1, partsTotals.totalMins)
+    : Math.max(5, Number(durationMinutes) || 90);
+
   const availableTracksForSubj = LECTURE_TRACKS.filter((t) =>
     subjId === 'arabic' ? t.subjId === 'arabic' : t.subjId === subjId || t.id === trackKey
   );
@@ -1788,6 +2404,10 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
       } else if (nextTrackId === 'arabic_taqwa') {
         setTag('سنتر');
         if (!packageName || packageName.includes('صلاح')) setPackageName('أ. تقوى مرزوق (سنتر)');
+      } else if (nextTrackId === 'history' || nextTrackId === 'english') {
+        setTag('سنتر');
+      } else if (nextTrackId === 'physics') {
+        setTag('منصة');
       }
     }
   };
@@ -1796,7 +2416,12 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
     e.preventDefault();
     if (!title.trim()) return;
 
-    const updatedLecture: Lecture = {
+    const cleanedParts = isPlatform && parts.length > 0 ? sanitizeLectureParts(parts) : undefined;
+    const finalDuration = isPlatform
+      ? (cleanedParts && cleanedParts.length > 0 ? getLecturePartsTotals(cleanedParts).totalMins : Math.max(5, Number(durationMinutes) || 90))
+      : 0;
+
+    const updatedLecture = syncHomeworkPartOnLecture({
       ...lecture,
       code,
       title: title.trim(),
@@ -1804,11 +2429,18 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
       dueDay,
       subjId,
       packageName,
-      tag,
-      type: tag === 'سنتر' ? 'center' : 'platform',
+      tag: isPlatform ? 'منصة' : 'سنتر',
+      type: isPlatform ? 'platform' : 'center',
       trackKey: trackKey || getLectureTrack({ ...lecture, subjId, packageName, tag }).id,
+      durationMinutes: finalDuration,
+      parts: cleanedParts,
+      hasHomework,
+      homeworkDone: hasHomework ? Boolean(isDone || homeworkDone) : false,
+      homeworkUnit,
+      homeworkAmount: hasHomework ? Math.max(1, Number(homeworkAmount) || 1) : 0,
+      homeworkMinutes: 0,
       isDone
-    };
+    });
 
     onUpdate(updatedLecture, Math.max(1, Number(trackOrder) || 1));
     onClose();
@@ -1953,6 +2585,101 @@ export const EditLectureModal: React.FC<EditLectureModalProps> = ({
             <div>
               <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>الباقة / المدرس:</label>
               <input type="text" className="input-field" value={packageName} onChange={(e) => setPackageName(e.target.value)} />
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              padding: 12,
+              borderRadius: 10,
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-subtle)',
+              marginTop: 4
+            }}
+          >
+            {isPlatform ? (
+              <>
+                <div>
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--accent-primary)', display: 'block', marginBottom: 4 }}>
+                    مدة محاضرة المنصة (بالدقائق — أ. محمد صلاح / أ. عبد المعبود):
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={600}
+                    step={5}
+                    className="input-field tabular"
+                    disabled={hasDefinedParts}
+                    value={hasDefinedParts ? String(effectivePlatformDuration) : durationMinutes}
+                    onChange={(e) => setDurationMinutes(e.target.value)}
+                    style={{ margin: 0, opacity: hasDefinedParts ? 0.75 : 1 }}
+                  />
+                </div>
+                <LecturePartsEditor
+                  parts={parts}
+                  onChange={setParts}
+                  hasHomework={hasHomework}
+                  homeworkDone={homeworkDone}
+                  onToggleHomeworkDone={setHomeworkDone}
+                  homeworkLabel={
+                    hasHomework && Number(homeworkAmount) > 0
+                      ? `${Number(homeworkAmount)} ${homeworkUnit === 'questions' ? 'سؤال' : 'صفحة'}`
+                      : undefined
+                  }
+                />
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700, padding: '2px 0' }}>
+                حصة سنتر حضوري — المحاضرة ملهاش وقت فيديو أو أجزاء منصة
+              </div>
+            )}
+
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: hasHomework ? 8 : 0, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={hasHomework}
+                  onChange={(e) => setHasHomework(e.target.checked)}
+                  style={{ width: 15, height: 15, accentColor: 'var(--accent-secondary)' }}
+                />
+                <span>يوجد واجب / شيت؟</span>
+              </label>
+
+              {hasHomework && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+                      نوع الواجب:
+                    </label>
+                    <select
+                      className="input-field"
+                      value={homeworkUnit}
+                      onChange={(e) => setHomeworkUnit(e.target.value === 'questions' ? 'questions' : 'pages')}
+                      style={{ margin: 0, fontSize: 12 }}
+                    >
+                      <option value="pages">عدد الصفحات</option>
+                      <option value="questions">عدد الأسئلة</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+                      {homeworkUnit === 'questions' ? 'عدد الأسئلة:' : 'عدد الصفحات:'}
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={2000}
+                      className="input-field tabular"
+                      value={homeworkAmount}
+                      onChange={(e) => setHomeworkAmount(e.target.value)}
+                      style={{ margin: 0 }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -2708,5 +3435,190 @@ export const PwaInstallModal: React.FC<PwaInstallModalProps> = ({
     </div>
   );
 };
+
+// ================= OFFICIAL TIMETABLE EXAM MODAL =================
+interface OfficialExamModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  subjects: Subject[];
+  officialExam?: OfficialExam | null;
+  onSave: (exam: Omit<OfficialExam, 'id'> & { id?: string }) => void;
+  onDelete?: (id: string) => void;
+}
+
+export const OfficialExamModal: React.FC<OfficialExamModalProps> = ({
+  isOpen,
+  onClose,
+  subjects,
+  officialExam,
+  onSave,
+  onDelete
+}) => {
+  const [subjId, setSubjId] = useState('physics');
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState(() => toLocalYmd());
+  const [period, setPeriod] = useState('الحصة الأولى');
+  const [syllabus, setSyllabus] = useState('');
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (officialExam) {
+      setSubjId(officialExam.subjId);
+      setTitle(officialExam.title);
+      setDate(officialExam.date || toLocalYmd());
+      setPeriod(officialExam.period || 'الحصة الأولى');
+      setSyllabus(officialExam.syllabus || '');
+      setNotes(officialExam.notes || '');
+    } else {
+      setSubjId(subjects[0]?.id || 'physics');
+      setTitle('');
+      setDate(toLocalYmd());
+      setPeriod('الحصة الأولى');
+      setSyllabus('');
+      setNotes('');
+    }
+  }, [isOpen, officialExam, subjects]);
+
+  if (!isOpen) return null;
+
+  const today = toLocalYmd();
+  const diff = date ? diffDaysYmd(date, today) : 99;
+  const countdownText =
+    diff === 0
+      ? 'موعده النهاردة! 🔥'
+      : diff === 1
+      ? 'موعده غداً — سيصلك تنبيه ليلة الامتحان 🔔'
+      : diff > 1
+      ? `متبقي ${diff} يوم — يظهر التنبيه في الليلة السابقة له تلقائياً`
+      : `انتهى منذ ${Math.abs(diff)} يوم`;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !date) return;
+    onSave({
+      id: officialExam?.id,
+      subjId,
+      title: title.trim(),
+      date,
+      period: period.trim() || 'الحصة الأولى',
+      syllabus: syllabus.trim() || undefined,
+      notes: notes.trim() || undefined
+    });
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay show" onClick={onClose}>
+      <div className="modal-box" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Calendar size={18} style={{ color: '#a78bfa' }} />
+            <span>{officialExam ? 'تعديل امتحان الجدول الرسمي' : 'إضافة امتحان بالجدول الرسمي'}</span>
+          </div>
+          {officialExam && onDelete && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => {
+                onDelete(officialExam.id);
+                onClose();
+              }}
+              style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: 11 }}
+            >
+              <Trash2 size={12} />
+              <span>حذف</span>
+            </button>
+          )}
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>المادة:</label>
+              <select className="input-field" value={subjId} onChange={(e) => setSubjId(e.target.value)} style={{ margin: 0 }}>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>الحصة / الموعد:</label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="مثال: الحصة الثالثة (10:15 ص)"
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                required
+                style={{ margin: 0 }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>اسم / نوع الامتحان:</label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="مثال: امتحان شهر نوفمبر الرسمي — فيزياء"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              style={{ margin: 0 }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>تاريخ الامتحان (YYYY-MM-DD):</label>
+            <input
+              type="date"
+              className="input-field tabular"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+              style={{ margin: 0 }}
+            />
+            <div style={{ fontSize: 11.5, color: diff <= 1 && diff >= 0 ? '#f59e0b' : 'var(--accent-primary)', fontWeight: 700, marginTop: 4 }}>
+              {countdownText}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>المقرر / الفصول المطلوبة (اختياري):</label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="مثال: الفصل الثاني كامل + مسائل المقاومات"
+              value={syllabus}
+              onChange={(e) => setSyllabus(e.target.value)}
+              style={{ margin: 0 }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>ملاحظات (اختياري):</label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="أي تعليمات إضافية للجنة..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              style={{ margin: 0 }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
+            <button type="button" className="btn" onClick={onClose}>إلغاء</button>
+            <button type="submit" className="btn btn-primary">
+              {officialExam ? 'حفظ التعديلات ✓' : 'إضافة للجدول الرسمي ✓'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 
 

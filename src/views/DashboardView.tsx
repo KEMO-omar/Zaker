@@ -2,6 +2,7 @@ import React from 'react';
 import { Subject, Session, Exemption, ExamRecord, WeeklyTask, Lecture, ArchivedWeek } from '../types';
 import { Visualizer } from '../components/Visualizer';
 import { PastWeeksAnalytics } from '../components/PastWeeksAnalytics';
+import { computeBacklogHoursSummary } from '../utils/scheduleEngine';
 import {
   Clock,
   Calendar,
@@ -232,13 +233,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setTimeout(() => setSaveStatus(null), 3000);
   };
 
-  const undoneLectures = lectures.filter((l) => !l.isDone);
-  const undoneCenterCount = undoneLectures.filter((l) => {
-    const h = `${l.type || ''} ${l.tag || ''} ${l.details || ''} ${l.title || ''}`.toLowerCase();
-    return h.includes('سنتر') || h.includes('حضور');
-  }).length;
-  const undonePlatformCount = undoneLectures.length - undoneCenterCount;
+  const backlogSummary = React.useMemo(
+    () => computeBacklogHoursSummary(lectures, weeklyTasks, completedTaskIds),
+    [lectures, weeklyTasks, completedTaskIds]
+  );
+  const undoneLecturesCount = backlogSummary.pendingLecturesCount;
+  const undoneCenterCount = backlogSummary.pendingCenterLecturesCount;
+  const undonePlatformCount = backlogSummary.pendingPlatformLecturesCount;
   const pendingTasksCount = weeklyTasks.filter((t) => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))).length;
+  const hwPartsText = [
+    backlogSummary.homeworkPagesTotal > 0 ? `${backlogSummary.homeworkPagesTotal} صفحة واجب` : '',
+    backlogSummary.homeworkQuestionsTotal > 0 ? `${backlogSummary.homeworkQuestionsTotal} سؤال واجب` : ''
+  ].filter(Boolean).join(' + ');
 
   return (
     <section className="view-panel active">
@@ -262,8 +268,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-main)' }}>
-                {undoneLectures.length > 0
-                  ? `🚨 موقف التنفيذ الحي: متبقي ${undoneLectures.length} محاضرة و ${pendingTasksCount} مهمة جدول`
+                {undoneLecturesCount > 0
+                  ? `🚨 موقف التنفيذ الحي: متبقي ${undoneLecturesCount} محاضرة و ${pendingTasksCount} مهمة جدول`
                   : `✅ جدول المحاضرات مكتمل (${pendingTasksCount} مهمة جدول متبقية)`}
               </strong>
               <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(239, 68, 68, 0.2)', color: 'var(--danger)', fontWeight: 700 }}>
@@ -271,7 +277,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             </div>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: 1.5 }}>
-              يا دكتور كريم: لديك الآن <strong>{undonePlatformCount}</strong> محاضرة منصة أونلاين و <strong>{undoneCenterCount}</strong> حصة سنتر غير منجزة، وأولويتك الزمنية الآن هي <strong>{prioritySubjName}</strong>. ابدأ بـ 25 دقيقة فوراً!
+              يا دكتور كريم: متبقي <strong className="tabular">{undonePlatformCount}</strong> محاضرة منصة (<strong className="tabular">{backlogSummary.lecturesTotalHours} ساعة</strong>) و <strong className="tabular">{undoneCenterCount}</strong> حصة سنتر
+              {hwPartsText ? <> · واجب متراكم: <strong className="tabular">{hwPartsText}</strong></> : null}
+              ، وأولويتك الزمنية الآن هي <strong>{prioritySubjName}</strong>. ابدأ بـ 25 دقيقة فوراً!
             </p>
           </div>
         </div>

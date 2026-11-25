@@ -5,7 +5,14 @@ import {
   getLectureTrack,
   sortLecturesByOrder,
   autoSortLecturesByCode,
-  reindexLectures
+  reindexLectures,
+  computeBacklogHoursSummary,
+  formatLectureHomeworkLabel,
+  getLecturePartDuration,
+  getLectureTotalMinutes,
+  isHomeworkPartItem,
+  isLectureHomeworkDone,
+  isPlatformLecture
 } from '../utils/scheduleEngine';
 import {
   BookOpen,
@@ -31,6 +38,8 @@ interface LecturesViewProps {
   lectures: Lecture[];
   subjects: Subject[];
   onToggleLecture: (id: string) => void;
+  onToggleLecturePart?: (lectureId: string, partId: string, subPartId?: string) => void;
+  onToggleLectureHomework?: (lectureId: string) => void;
   onOpenNewLectureModal: () => void;
   onOpenEditLecture: (lecture: Lecture) => void;
   onDeleteLecture: (id: string) => void;
@@ -42,6 +51,8 @@ export const LecturesView: React.FC<LecturesViewProps> = ({
   lectures,
   subjects,
   onToggleLecture,
+  onToggleLecturePart,
+  onToggleLectureHomework,
   onOpenNewLectureModal,
   onOpenEditLecture,
   onDeleteLecture,
@@ -106,7 +117,9 @@ export const LecturesView: React.FC<LecturesViewProps> = ({
 
   const total = lectures.length;
   const doneCount = lectures.filter((l) => l.isDone).length;
+  const pendingCount = total - doneCount;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+  const backlogSummary = useMemo(() => computeBacklogHoursSummary(lectures), [lectures]);
 
   // Swap/Move lecture inside visible list (preserves track boundaries cleanly!)
   const moveLectureRelative = (lecId: string, direction: 'up' | 'down' | 'top') => {
@@ -201,7 +214,25 @@ export const LecturesView: React.FC<LecturesViewProps> = ({
             <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.6, marginBottom: 0 }}>
               <strong className="tabular" style={{ color: 'var(--accent-primary)' }}>{doneCount}</strong> من <strong className="tabular">{total}</strong> مكتمل (<span className="tabular">{pct}%</span>)
               {' · '}
-              للعربي مساران مستقلان تماماً: <strong>أ. محمد صلاح (منصة)</strong> و <strong>أ. تقوى مرزوق (سنتر)</strong> — رتّب كل مسار بالأسهم أو بالسحب أو من زر تعديل رقم الترتيب!
+              متراكم المنصات (صلاح وعبد المعبود): <strong className="tabular" style={{ color: 'var(--danger)' }}>{backlogSummary.lecturesTotalHours} ساعة</strong>{' '}
+              (<span className="tabular">{backlogSummary.pendingPlatformLecturesCount}</span> محاضرة منصة)
+              {backlogSummary.pendingCenterLecturesCount > 0 && (
+                <>
+                  {' · '}
+                  سناتر متبقية: <strong className="tabular" style={{ color: 'var(--text-main)' }}>{backlogSummary.pendingCenterLecturesCount}</strong> حصة (بدون وقت فيديو)
+                </>
+              )}
+              {(backlogSummary.homeworkPagesTotal > 0 || backlogSummary.homeworkQuestionsTotal > 0) && (
+                <>
+                  {' · '}
+                  الواجب المتراكم:{' '}
+                  <strong className="tabular" style={{ color: 'var(--accent-secondary)' }}>
+                    {backlogSummary.homeworkPagesTotal > 0 ? `${backlogSummary.homeworkPagesTotal} صفحة` : ''}
+                    {backlogSummary.homeworkPagesTotal > 0 && backlogSummary.homeworkQuestionsTotal > 0 ? ' + ' : ''}
+                    {backlogSummary.homeworkQuestionsTotal > 0 ? `${backlogSummary.homeworkQuestionsTotal} سؤال` : ''}
+                  </strong>
+                </>
+              )}
             </p>
           </div>
 
@@ -343,11 +374,7 @@ export const LecturesView: React.FC<LecturesViewProps> = ({
             const trackMeta = trackOrderMap.get(lec.id);
             const trackSeq = trackMeta?.seq || visIndex + 1;
             const trackShort = trackMeta?.trackLabel || subj?.name || lec.subjId;
-            const isCenter =
-              lec.tag === 'سنتر' ||
-              lec.type === 'center' ||
-              (lec.dueDay && lec.dueDay.includes('سنتر')) ||
-              (lec.packageName && lec.packageName.includes('سنتر'));
+            const isCenter = !isPlatformLecture(lec);
             const isDragTarget = dragOverId === lec.id && draggedId !== lec.id;
 
             return (
@@ -487,6 +514,231 @@ export const LecturesView: React.FC<LecturesViewProps> = ({
                       <Calendar size={12} style={{ color: 'var(--accent-secondary)', flexShrink: 0 }} />
                       <span>المواعيد: <strong style={{ color: 'var(--text-main)' }}>{lec.dueDay || 'أسبوعي'}</strong></span>
                     </div>
+                    {(() => {
+                      const dur = getLectureTotalMinutes(lec);
+                      const hwLabel = formatLectureHomeworkLabel(lec);
+                      const hwDone = isLectureHomeworkDone(lec);
+                      const allParts = dur.isPlatform && Array.isArray(lec.parts) ? lec.parts : [];
+                      const lecParts = allParts.filter((p) => !isHomeworkPartItem(p));
+                      const hasEmbeddedHwInParts = lecParts.some((p) =>
+                        Array.isArray(p.subParts) && p.subParts.some((s) => isHomeworkPartItem(s))
+                      );
+                      const hwAmountDetail =
+                        dur.homeworkAmount > 0
+                          ? ` (${dur.homeworkAmount} ${dur.homeworkUnit === 'questions' ? 'سؤال' : 'صفحة'})`
+                          : '';
+                      return (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Clock size={12} style={{ color: dur.isPlatform ? 'var(--accent-primary)' : 'var(--text-muted)', flexShrink: 0 }} />
+                            <span className="tabular">
+                              {dur.isPlatform ? (
+                                <>
+                                  المدة: <strong style={{ color: 'var(--text-main)' }}>{dur.fullDurationMins} د شرح</strong>
+                                  {dur.partsCount > 0 && !lec.isDone && dur.lectureMins !== dur.fullDurationMins
+                                    ? ` (متبقي ${dur.lectureMins} د)`
+                                    : ''}
+                                  {dur.isEstimated ? ' (تقديري)' : ''}
+                                </>
+                              ) : (
+                                <span>حصة سنتر (بدون وقت فيديو)</span>
+                              )}
+                              {' · '}
+                              <strong style={{ color: dur.hasHomework ? (hwDone ? 'var(--success)' : 'var(--accent-secondary)') : 'var(--text-muted)' }}>
+                                {hwLabel}{dur.hasHomework && hwDone ? ' ✓' : ''}
+                              </strong>
+                            </span>
+                          </div>
+
+                          {lecParts.length > 0 && (
+                            <div
+                              style={{
+                                marginTop: 4,
+                                padding: '8px 10px',
+                                borderRadius: 8,
+                                background: 'var(--bg-elevated)',
+                                border: '1px solid var(--border-subtle)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 5
+                              }}
+                            >
+                              <div className="tabular" style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent-primary)' }}>
+                                أجزاء المحاضرة ({dur.donePartsCount}/{dur.partsCount}):
+                              </div>
+                              {lecParts.map((part, pIdx) => {
+                                const pMeta = getLecturePartDuration(part);
+                                const rawSubs = Array.isArray(part.subParts) ? part.subParts : [];
+                                const nonHwSubs = rawSubs.filter((s) => !isHomeworkPartItem(s));
+                                const embeddedHwSub = rawSubs.find((s) => isHomeworkPartItem(s));
+                                const showAutoHwUnderThisPart =
+                                  dur.hasHomework && (Boolean(embeddedHwSub) || (!hasEmbeddedHwInParts && pIdx === lecParts.length - 1));
+                                return (
+                                  <div key={part.id} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    <label
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 6,
+                                        cursor: onToggleLecturePart ? 'pointer' : 'default',
+                                        fontSize: 11.5,
+                                        color: part.isDone ? 'var(--text-faint)' : 'var(--text-main)',
+                                        textDecoration: part.isDone ? 'line-through' : 'none'
+                                      }}
+                                    >
+                                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                                        {onToggleLecturePart && (
+                                          <input
+                                            type="checkbox"
+                                            checked={Boolean(part.isDone)}
+                                            onChange={() => onToggleLecturePart(lec.id, part.id)}
+                                            style={{ width: 13, height: 13, accentColor: 'var(--accent-primary)', flexShrink: 0 }}
+                                          />
+                                        )}
+                                        <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          {part.title}
+                                        </span>
+                                      </span>
+                                      <span className="tabular" style={{ fontSize: 11, color: 'var(--accent-secondary)', fontWeight: 700, flexShrink: 0 }}>
+                                        {pMeta.totalMins} د
+                                      </span>
+                                    </label>
+
+                                    {(nonHwSubs.length > 0 || showAutoHwUnderThisPart) && (
+                                      <div
+                                        style={{
+                                          marginRight: 16,
+                                          paddingRight: 8,
+                                          borderRight: '2px solid rgba(56, 189, 248, 0.35)',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: 2
+                                        }}
+                                      >
+                                        {nonHwSubs.map((sub) => {
+                                          const subDone = Boolean(part.isDone || sub.isDone);
+                                          return (
+                                            <label
+                                              key={sub.id}
+                                              style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: 6,
+                                                cursor: onToggleLecturePart ? 'pointer' : 'default',
+                                                fontSize: 11,
+                                                color: subDone ? 'var(--text-faint)' : 'var(--text-muted)',
+                                                textDecoration: subDone ? 'line-through' : 'none'
+                                              }}
+                                            >
+                                              <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                                                {onToggleLecturePart && (
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={subDone}
+                                                    onChange={() => onToggleLecturePart(lec.id, part.id, sub.id)}
+                                                    style={{ width: 12, height: 12, accentColor: 'var(--accent-secondary)', flexShrink: 0 }}
+                                                  />
+                                                )}
+                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub.title}</span>
+                                              </span>
+                                              <span className="tabular" style={{ fontSize: 10.5, flexShrink: 0 }}>
+                                                {sub.durationMinutes} د
+                                              </span>
+                                            </label>
+                                          );
+                                        })}
+
+                                        {showAutoHwUnderThisPart && (
+                                          <label
+                                            style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'space-between',
+                                              gap: 6,
+                                              cursor: onToggleLectureHomework || onToggleLecturePart ? 'pointer' : 'default',
+                                              fontSize: 11,
+                                              color: hwDone ? 'var(--text-faint)' : 'var(--accent-secondary)',
+                                              textDecoration: hwDone ? 'line-through' : 'none',
+                                              fontWeight: 700
+                                            }}
+                                          >
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                                              {(onToggleLectureHomework || onToggleLecturePart) && (
+                                                <input
+                                                  type="checkbox"
+                                                  checked={hwDone}
+                                                  onChange={() => {
+                                                    if (onToggleLectureHomework) onToggleLectureHomework(lec.id);
+                                                    else if (embeddedHwSub && onToggleLecturePart) onToggleLecturePart(lec.id, part.id, embeddedHwSub.id);
+                                                  }}
+                                                  style={{ width: 12, height: 12, accentColor: 'var(--accent-secondary)', flexShrink: 0 }}
+                                                />
+                                              )}
+                                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                الواجب{hwAmountDetail}
+                                              </span>
+                                            </span>
+                                            <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>
+                                              بدون وقت
+                                            </span>
+                                          </label>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {dur.hasHomework && lecParts.length === 0 && (
+                            <div
+                              style={{
+                                marginTop: 4,
+                                padding: '6px 10px',
+                                borderRadius: 8,
+                                background: 'var(--bg-elevated)',
+                                border: '1px solid var(--border-subtle)',
+                                borderRight: '2.5px solid var(--accent-secondary)'
+                              }}
+                            >
+                              <label
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: 6,
+                                  cursor: onToggleLectureHomework ? 'pointer' : 'default',
+                                  fontSize: 11.5,
+                                  color: hwDone ? 'var(--text-faint)' : 'var(--text-main)',
+                                  textDecoration: hwDone ? 'line-through' : 'none',
+                                  fontWeight: 700
+                                }}
+                              >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                                  {onToggleLectureHomework && (
+                                    <input
+                                      type="checkbox"
+                                      checked={hwDone}
+                                      onChange={() => onToggleLectureHomework(lec.id)}
+                                      style={{ width: 13, height: 13, accentColor: 'var(--accent-secondary)', flexShrink: 0 }}
+                                    />
+                                  )}
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    جزء فرعي: الواجب{hwAmountDetail}
+                                  </span>
+                                </span>
+                                <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>
+                                  بدون وقت
+                                </span>
+                              </label>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                     {lec.packageName && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Package size={12} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />

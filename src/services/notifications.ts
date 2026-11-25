@@ -1,5 +1,14 @@
-import { ExamRecord, Session, SmartNotificationItem, Subject, WeeklyTask } from '../types';
-import { getArabicDayLabel, getCurrentArabicDayId, getNextArabicDayId } from '../utils/scheduleEngine';
+import { ExamRecord, OfficialExam, Session, SmartNotificationItem, Subject, WeeklyTask } from '../types';
+import {
+  addDaysYmd,
+  diffDaysYmd,
+  filterTasksForWeek,
+  getArabicDayLabel,
+  getCurrentArabicDayId,
+  getNextArabicDayId,
+  getWeekStartSaturdayKey,
+  toLocalYmd
+} from '../utils/scheduleEngine';
 
 export interface NotificationPrefs {
   enabled: boolean;
@@ -85,10 +94,12 @@ export function buildCheckInNotification(
 ): SmartNotificationItem {
   const todayId = getCurrentArabicDayId();
   const todayLabel = getArabicDayLabel(todayId);
+  const currentWeekKey = getWeekStartSaturdayKey();
   const hoursIdle = sessions ? getHoursSinceLastSession(sessions) : undefined;
   const { greeting, motivation } = getTimeGreeting(new Date(), hoursIdle);
 
-  const todayTasks = tasks.filter(t => t.dayId === todayId);
+  const currentWeekTasks = filterTasksForWeek(tasks, currentWeekKey, currentWeekKey);
+  const todayTasks = currentWeekTasks.filter(t => t.dayId === todayId);
   const pendingToday = todayTasks.filter(
     t => !completedTaskIds.has(t.id) && !completedTaskIds.has(String(t.id))
   );
@@ -170,57 +181,82 @@ export function buildInactivity12hNotification(
 }
 
 /**
- * Checks for upcoming or today's exams in weeklyTasks or exams schedule.
+ * Checks for today's or tomorrow's (night-before!) exams across OfficialExams, active-week tasks, and ExamRecords.
+ * Uses strictly local YYYY-MM-DD comparisons so future exams never fire early or shift.
  */
 export function buildPreExamNotification(
   tasks: WeeklyTask[],
   completedTaskIds: Set<string | number>,
   subjects: Subject[],
-  exams: ExamRecord[] = []
+  exams: ExamRecord[] = [],
+  officialExams: OfficialExam[] = []
 ): SmartNotificationItem | null {
+  const todayStr = toLocalYmd(new Date());
+  const tmrwStr = addDaysYmd(todayStr, 1);
   const todayId = getCurrentArabicDayId();
   const tomorrowId = getNextArabicDayId(todayId);
+  const currentWeekKey = getWeekStartSaturdayKey();
 
-  const upcomingExamTasks = tasks.filter(t => {
+  // 1. Official Timetable Exams (alert ONLY on today diff === 0 or night-before diff === 1)
+  const urgentOfficialExams = (officialExams || []).filter((oe) => {
+    if (!oe?.date || !/^\d{4}-\d{2}-\d{2}$/.test(oe.date)) return false;
+    const diff = diffDaysYmd(oe.date, todayStr);
+    return diff === 0 || diff === 1;
+  });
+
+  // 2. Active-week exam tasks matching today or tomorrow
+  const activeWeekTasks = filterTasksForWeek(tasks, currentWeekKey, currentWeekKey);
+  const upcomingExamTasks = activeWeekTasks.filter((t) => {
     const isDone = completedTaskIds.has(t.id) || completedTaskIds.has(String(t.id));
     if (isDone) return false;
     const isExam = t.category === 'exam' || t.priority === 'exam' || t.text.includes('امتحان') || t.text.includes('كويز');
-    return isExam && (t.dayId === todayId || t.dayId === tomorrowId);
+    if (!isExam) return false;
+    if (t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date)) {
+      const diff = diffDaysYmd(t.date, todayStr);
+      return diff === 0 || diff === 1;
+    }
+    return t.dayId === todayId || t.dayId === tomorrowId;
   });
 
-  // Also check ExamRecord if future date matches today or tomorrow
-  const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
-  const tmrw = new Date(now);
-  tmrw.setDate(tmrw.getDate() + 1);
-  const tmrwStr = tmrw.toISOString().split('T')[0];
+  // 3. ExamRecord only if dated strictly today or tomorrow
+  const datedUpcomingExams = exams.filter((e) => e.date === todayStr || e.date === tmrwStr);
 
-  const datedUpcomingExams = exams.filter(e => e.date === todayStr || e.date === tmrwStr);
-
-  if (upcomingExamTasks.length === 0 && datedUpcomingExams.length === 0) {
+  if (urgentOfficialExams.length === 0 && upcomingExamTasks.length === 0 && datedUpcomingExams.length === 0) {
     return null;
   }
 
   const lines: string[] = [];
-  upcomingExamTasks.forEach(t => {
-    const subj = subjects.find(s => s.id === t.subjId)?.name || t.subjId;
-    const when = t.dayId === todayId ? 'النهاردة' : `بكرة (${getArabicDayLabel(tomorrowId)})`;
+  urgentOfficialExams.forEach((oe) => {
+    const subj = subjects.find((s) => s.id === oe.subjId)?.name || oe.subjId;
+    const diff = diffDaysYmd(oe.date, todayStr);
+    const when = diff === 0 ? 'اليوم!!' : 'غداً (تنبيه ليلة الامتحان 🔔)';
+    const periodPart = oe.period ? ` · ${oe.period}` : '';
+    const syllabusPart = oe.syllabus ? ` — المقرر: ${oe.syllabus}` : '';
+    lines.push(`• [جدول رسمي · ${subj}] ${oe.title}${periodPart} (${when}${syllabusPart})`);
+  });
+  upcomingExamTasks.forEach((t) => {
+    const subj = subjects.find((s) => s.id === t.subjId)?.name || t.subjId;
+    const isToday = t.date ? t.date === todayStr : t.dayId === todayId;
+    const when = isToday ? 'النهاردة' : `بكرة (${getArabicDayLabel(tomorrowId)})`;
     lines.push(`• [${subj}] ${t.text} (${when})`);
   });
-  datedUpcomingExams.forEach(e => {
-    const subj = subjects.find(s => s.id === e.subjId)?.name || e.subjId;
+  datedUpcomingExams.forEach((e) => {
+    const subj = subjects.find((s) => s.id === e.subjId)?.name || e.subjId;
     const when = e.date === todayStr ? 'اليوم' : 'غداً';
     lines.push(`• [${subj}] ${e.topic} - ${e.teacher} (${when})`);
   });
 
+  const hasOfficialNightBefore = urgentOfficialExams.some((oe) => diffDaysYmd(oe.date, todayStr) === 1);
   return {
     id: `notif_exam_${Date.now()}`,
     type: 'exam_alert',
-    title: '🏆 امتحانك على الأبواب يا كريم! مفيش سماح تنزل عن 95%!',
+    title: hasOfficialNightBefore
+      ? '🔔 تنبيه ليلة الامتحان: امتحان رسمي بكرة يا كريم! الـ 95% خط أحمر!'
+      : '🏆 امتحانك على الأبواب يا كريم! مفيش سماح تنزل عن 95%!',
     body: `الامتحان ده بيختبر تعبك الحقيقي — راجع غلطاتك السابقة وحل بإيدك قبل ما تدخل القاعة عشان تقفله 100% وترفع راس أهلك:\n${lines.join('\n')}`,
     timestamp: Date.now(),
     read: false,
-    actionTab: 'weeklyView'
+    actionTab: urgentOfficialExams.length > 0 ? 'examsView' : 'weeklyView'
   };
 }
 

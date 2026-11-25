@@ -1,10 +1,18 @@
-import { Subject, Session, Exemption, WeeklyTask, Lecture, ExamRecord } from '../types';
+import { Subject, Session, Exemption, WeeklyTask, Lecture, ExamRecord, OfficialExam } from '../types';
+import {
+  computeBacklogHoursSummary,
+  diffDaysYmd,
+  getLectureTotalMinutes,
+  isPlatformLecture,
+  toLocalYmd
+} from '../utils/scheduleEngine';
 
 export interface LiveStudyInput {
   sessions?: Session[];
   subjects?: Subject[];
   exemptions?: Exemption[];
   exams?: ExamRecord[];
+  officialExams?: OfficialExam[];
   weeklyTasks?: WeeklyTask[];
   completedTaskIds?: Array<string | number>;
   lectures?: Lecture[];
@@ -41,6 +49,9 @@ export interface SubjectStudyAnalysis {
   doneLecturesCount: number;
   pendingPlatformLectures: Lecture[];
   pendingCenterLectures: Lecture[];
+  platformBacklogHours: number;
+  homeworkPages: number;
+  homeworkQuestions: number;
   pendingTasksCount: number;
 }
 
@@ -76,6 +87,10 @@ export interface LiveStudySnapshot {
   lecturesCompletionPct: number;
   undonePlatformLectures: Lecture[];
   undoneCenterLectures: Lecture[];
+  platformBacklogHours: number;
+  homeworkPagesTotal: number;
+  homeworkQuestionsTotal: number;
+  upcomingOfficialExams: OfficialExam[];
   examsCount: number;
   examsAvgPct: number;
   examsAbove95: number;
@@ -128,8 +143,7 @@ export function formatDurationSince(hours: number | null): string {
 }
 
 export function isLectureCenter(lec: Lecture): boolean {
-  const hay = `${lec.type || ''} ${lec.tag || ''} ${lec.details || ''} ${lec.title || ''}`.toLowerCase();
-  return hay.includes('سنتر') || hay.includes('حضور') || hay.includes('center');
+  return !isPlatformLecture(lec);
 }
 
 export function computeLiveStudySnapshot(input: LiveStudyInput): LiveStudySnapshot {
@@ -146,6 +160,7 @@ export function computeLiveStudySnapshot(input: LiveStudyInput): LiveStudySnapsh
       ];
   const exemptions = Array.isArray(input.exemptions) ? input.exemptions : [];
   const exams = Array.isArray(input.exams) ? input.exams : [];
+  const officialExams = Array.isArray(input.officialExams) ? input.officialExams : [];
   const weeklyTasks = Array.isArray(input.weeklyTasks) ? input.weeklyTasks : [];
   const completedSet = new Set((input.completedTaskIds || []).map((id) => String(id)));
   const lectures = Array.isArray(input.lectures) ? input.lectures : [];
@@ -224,11 +239,16 @@ export function computeLiveStudySnapshot(input: LiveStudyInput): LiveStudySnapsh
   const todayPendingTasks = todayTasks.filter((t) => !completedSet.has(String(t.id)));
   const urgentPendingTasks = allPendingTasks.filter((t) => t.priority === 'urgent' || t.priority === 'exam' || t.isUserAdded);
 
-  // 3. Lectures stats (platform vs center)
+  // 3. Lectures & homework backlog stats (strictly platform hours vs center zero-video)
   const doneLectures = lectures.filter((l) => l.isDone).length;
   const undoneLectures = lectures.filter((l) => !l.isDone);
   const undoneCenterLectures = undoneLectures.filter(isLectureCenter);
   const undonePlatformLectures = undoneLectures.filter((l) => !isLectureCenter(l));
+  const backlogSummary = computeBacklogHoursSummary(lectures, weeklyTasks, completedSet);
+  const todayYmd = toLocalYmd(now);
+  const upcomingOfficialExams = officialExams
+    .filter((oe) => oe?.date && diffDaysYmd(oe.date, todayYmd) >= 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   // 4. Subject study breakdown
   const subjectStudies: SubjectStudyAnalysis[] = subjects.map((s) => {
@@ -237,6 +257,17 @@ export function computeLiveStudySnapshot(input: LiveStudyInput): LiveStudySnapsh
     const subjLecs = lectures.filter((l) => l.subjId === s.id);
     const subjUndone = subjLecs.filter((l) => !l.isDone);
     const subjPendingTasks = allPendingTasks.filter((t) => t.subjId === s.id);
+    let subjPlatformMins = 0;
+    let homeworkPages = 0;
+    let homeworkQuestions = 0;
+    subjUndone.forEach((l) => {
+      const meta = getLectureTotalMinutes(l);
+      if (meta.isPlatform) subjPlatformMins += meta.lectureMins;
+      if (meta.hasHomework && !meta.homeworkDone && meta.homeworkAmount > 0) {
+        if (meta.homeworkUnit === 'questions') homeworkQuestions += meta.homeworkAmount;
+        else homeworkPages += meta.homeworkAmount;
+      }
+    });
 
     return {
       subjId: s.id,
@@ -251,6 +282,9 @@ export function computeLiveStudySnapshot(input: LiveStudyInput): LiveStudySnapsh
       doneLecturesCount: subjLecs.length - subjUndone.length,
       pendingPlatformLectures: subjUndone.filter((l) => !isLectureCenter(l)),
       pendingCenterLectures: subjUndone.filter(isLectureCenter),
+      platformBacklogHours: Number((subjPlatformMins / 60).toFixed(1)),
+      homeworkPages,
+      homeworkQuestions,
       pendingTasksCount: subjPendingTasks.length
     };
   });
@@ -380,6 +414,10 @@ export function computeLiveStudySnapshot(input: LiveStudyInput): LiveStudySnapsh
     lecturesCompletionPct: lectures.length > 0 ? Math.round((doneLectures / lectures.length) * 100) : 0,
     undonePlatformLectures,
     undoneCenterLectures,
+    platformBacklogHours: backlogSummary.lecturesTotalHours,
+    homeworkPagesTotal: backlogSummary.homeworkPagesTotal,
+    homeworkQuestionsTotal: backlogSummary.homeworkQuestionsTotal,
+    upcomingOfficialExams,
     examsCount: exams.length,
     examsAvgPct,
     examsAbove95,
@@ -464,6 +502,16 @@ export function buildComprehensiveReport(snap: LiveStudySnapshot): string {
     ? `اقفل أي مشتت في إيدك دلوقتي حالاً، افتح غرفة التركيز على **${snap.prioritySubjectName}** واكسر الصفر بـ 50 دقيقة نار، وممنوع تنام الليلة قبل ما تغلق ${snap.todayPendingTasks.length > 0 ? `مهمة «${snap.todayPendingTasks[0].text}»` : 'أول محاضرة متروكة'}!`
     : `توقف عن النظر للوقت الضائع (${snap.wastedHours}h) وابدأ فوراً جلسة 50 دقيقة في **${snap.prioritySubjectName}** لإنقاذ التوازن بين المواد وإغلاق ${snap.todayPendingTasks.length > 0 ? `«${snap.todayPendingTasks[0].text}»` : 'أقرب محاضرة معلقة'}.`;
 
+  const hwSummaryText = [
+    snap.homeworkPagesTotal > 0 ? `${snap.homeworkPagesTotal} صفحة` : '',
+    snap.homeworkQuestionsTotal > 0 ? `${snap.homeworkQuestionsTotal} سؤال` : ''
+  ].filter(Boolean).join(' + ') || 'لا يوجد واجب متراكم';
+
+  const officialExamsAlert = snap.upcomingOfficialExams
+    .filter((oe) => diffDaysYmd(oe.date, toLocalYmd()) <= 1)
+    .map((oe) => `${oe.title} (${oe.date} · ${oe.period})`)
+    .join(' | ');
+
   return `### 📋 التقرير الشامل للحالة الدراسية والتوازن الزمني (د. كريم عمر)
 🕒 **وقت الفحص:** ${snap.generatedAtLabel}
 
@@ -487,8 +535,8 @@ ${studyRows}
 
 #### 3️⃣ وضع الخطة الأسبوعية والمحاضرات والامتحانات:
 • **تنفيذ جدول الأسبوع:** ${snap.doneTasks} من ${snap.totalTasks} مهمة (${snap.tasksCompletionPct}%) — واليوم: ${todayTasksLine}.
-• **تغطية المحاضرات:** أنهيت ${snap.doneLectures} من ${snap.totalLectures} محاضرة (${snap.lecturesCompletionPct}%)، ولسه **${snap.undoneLecturesCount} محاضرة** مفتوحة بتستناك.
-• **المؤشر العام للامتحانات:** ${snap.examsCount > 0 ? `متوسط ${snap.examsAvgPct}% عبر ${snap.examsCount} امتحانات (${snap.examsAbove95} فوق الـ 95%، و ${snap.examsBelow95.length} تحت الحد الأدنى للأوائل)` : 'لم تُسجل امتحانات بعد'}.
+• **تغطية المحاضرات والواجب:** أنهيت ${snap.doneLectures} من ${snap.totalLectures} محاضرة (${snap.lecturesCompletionPct}%)، ومتبقي **${snap.platformBacklogHours} ساعة منصة** (${snap.undonePlatformLectures.length} محاضرة صلاح/عبد المعبود) + **${snap.undoneCenterLectures.length} حصة سنتر** | واجب متبقي: **${hwSummaryText}**.
+• **المؤشر العام للامتحانات:** ${snap.examsCount > 0 ? `متوسط ${snap.examsAvgPct}% عبر ${snap.examsCount} امتحانات (${snap.examsAbove95} فوق الـ 95%، و ${snap.examsBelow95.length} تحت الحد الأدنى للأوائل)` : 'لم تُسجل امتحانات بعد'}${officialExamsAlert ? `\n• **🔔 تنبيه امتحانات الجدول الرسمي:** ${officialExamsAlert}` : ''}.
 ${nextTodayTasks ? `\n**اللي مستنيك تنفذه النهاردة (${snap.todayDayName}) بدل التسويف:**\n${nextTodayTasks}` : ''}
 
 ---
@@ -539,13 +587,18 @@ export function buildBacklogInterrogationReport(snap: LiveStudySnapshot): string
   const topTargetName = topBacklogSubj?.subjName || snap.prioritySubjectName;
   const topFirstLec = topBacklogSubj?.pendingPlatformLectures[0]?.title || topBacklogSubj?.pendingCenterLectures[0]?.title;
 
+  const hwSummaryText = [
+    snap.homeworkPagesTotal > 0 ? `${snap.homeworkPagesTotal} صفحة` : '',
+    snap.homeworkQuestionsTotal > 0 ? `${snap.homeworkQuestionsTotal} سؤال` : ''
+  ].filter(Boolean).join(' + ') || 'صفر';
+
   return `### 🚨 محكمة الضمير وجلسة مساءلة المتراكمات (كلام يطلع من النافوخ)
 ${gapAlert}
 
 > **"يا كريم، القعدة والفرجة على التراكم مش هتذاكرلك محاضرة، والخوف اللي جواك ده سببه إنك سايب نفسك للتأجيل. التراكمات دي مش هتنزل عليك بوحي قبل الامتحان — يا تصفيها دلوقتي برجولة يا هتدفع تمنها من أعصابك ومجموعك!"**
 
 📊 **حجم الكارثة اللي سايبها وراك الآن:**
-**${snap.undoneLecturesCount} محاضرة مهجورة** (**${snap.undonePlatformLectures.length}** أونلاين على المنصة + **${snap.undoneCenterLectures.length}** حصة سنتر) • **${snap.pendingTasksCount} مهمة جدول** ما اتقفلتش • **${snap.examsBelow95.length} امتحان** نزل تحت خط الـ 95%.
+**${snap.platformBacklogHours} ساعة منصة متروكة** (${snap.undonePlatformLectures.length} محاضرة منصة صلاح/عبد المعبود) • **${snap.undoneCenterLectures.length} حصة سنتر** (تقوى/أيمن/أحمد سمير بدون وقت فيديو) • **واجب متراكم: ${hwSummaryText}** • **${snap.pendingTasksCount} مهمة جدول** ما اتقفلتش • **${snap.examsBelow95.length} امتحان** نزل تحت خط الـ 95%.
 
 ---
 
@@ -785,12 +838,17 @@ export function buildSupervisorChatAnswer(userMessage: string, snap: LiveStudySn
       ? `🔥 **اسمع الكلام اللي يطلع من النافوخ يا كريم:** عندك **${st?.pendingLecturesCount || 0} محاضرة متروكة** في ${introLabel} ${ex && ex.examsCount > 0 && ex.avgPct < 95 ? `ومتوسط درجاتك نازل عن الـ 95% (${ex.avgPct}%)` : ''}! المادة دي ما بتتفهمش بالنية الطيبة — يا تحبس نفسك تقفلها دلوقتي يا هتدفع التمن في الامتحان الجاي!`
       : `⚡ **شد حيلك يا دكتور:** ${introLabel} محتاجة منك شرسة ومواصلة بدون ما تسيب محاضرة واحدة تركن!`;
 
+    const hwSubjStr = [
+      st?.homeworkPages ? `${st.homeworkPages} صفحة` : '',
+      st?.homeworkQuestions ? `${st.homeworkQuestions} سؤال` : ''
+    ].filter(Boolean).join(' + ');
+
     return `### 🎯 مكاشفة صريحة في ${introLabel}:
 ${emotionalPunch}
 
 • **مذاكرتك المسجلة:** ${st?.totalHours || '0.0'}h إجمالي (${((st?.weekMinutes || 0) / 60).toFixed(1)}h هذا الأسبوع).
 • **موقف الامتحانات:** ${examSummary}.
-• **المتروك في ${introLabel}:** ${st?.pendingLecturesCount || 0} محاضرة (${st?.pendingPlatformLectures.length || 0} منصة + ${st?.pendingCenterLectures.length || 0} سنتر).
+• **المتروك في ${introLabel}:** ${st?.pendingLecturesCount || 0} محاضرة (${st?.pendingPlatformLectures.length || 0} منصة بـ ${st?.platformBacklogHours || 0}h + ${st?.pendingCenterLectures.length || 0} سنتر)${hwSubjStr ? ` | واجب متبقي: ${hwSubjStr}` : ''}.
 ${nextLecs.length > 0 ? `\n**اللي بيبصلك ومستني تفتحه دلوقتي:**\n${nextLecs.map((x) => `- ${x}`).join('\n')}` : '\n✅ مفيش محاضرات متأخرة في المادة دي — عاش!'}
 ${pendingTasks.length > 0 ? `\n**مهام في الجدول:**\n${pendingTasks.map((t) => `- ${t.text}`).join('\n')}` : ''}
 

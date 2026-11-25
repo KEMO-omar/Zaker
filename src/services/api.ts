@@ -1,4 +1,5 @@
-import { Subject, Session, Exemption, WeeklyTask, Lecture, ExamRecord } from '../types';
+import { Subject, Session, Exemption, WeeklyTask, Lecture, ExamRecord, OfficialExam, ChangelogEntry } from '../types';
+import { toLocalYmd } from '../utils/scheduleEngine';
 import {
   LiveStudyInput,
   computeLiveStudySnapshot,
@@ -87,6 +88,8 @@ function sanitizeFirebaseData(fb: any) {
     activeWeekStartKey: fb.activeWeekStartKey || '',
     lectures: toArray(fb.lectures),
     exams: toArray(fb.exams).sort((a: any, b: any) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()),
+    officialExams: toArray(fb.officialExams).sort((a: any, b: any) => String(a.date || '').localeCompare(String(b.date || ''))),
+    changelog: toArray(fb.changelog).sort((a: any, b: any) => Number(b.timestamp || 0) - Number(a.timestamp || 0)).slice(0, 400),
     subjects: subjectsWithNotebooks,
     customAiInstructions: fb.customAiInstructions || '',
     activeSession: fb.activeSession || null
@@ -163,6 +166,8 @@ export async function saveDbData(data: {
   activeWeekStartKey?: string;
   lectures?: Lecture[];
   exams?: ExamRecord[];
+  officialExams?: OfficialExam[];
+  changelog?: ChangelogEntry[];
   subjects?: Subject[];
   customAiInstructions?: string;
   displayTimeMode?: string;
@@ -209,6 +214,8 @@ export async function saveDbData(data: {
       fetch(`${FIREBASE_RTDB_URL}/subjects.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.subjects)) }),
       ...(data.archivedWeeks ? [fetch(`${FIREBASE_RTDB_URL}/archivedWeeks.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.archivedWeeks)) })] : []),
       ...(data.activeWeekStartKey ? [fetch(`${FIREBASE_RTDB_URL}/activeWeekStartKey.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data.activeWeekStartKey) })] : []),
+      ...(data.officialExams !== undefined ? [fetch(`${FIREBASE_RTDB_URL}/officialExams.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.officialExams)) })] : []),
+      ...(data.changelog !== undefined ? [fetch(`${FIREBASE_RTDB_URL}/changelog.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toArray(data.changelog).slice(0, 400)) })] : []),
       fetch(`${FIREBASE_RTDB_URL}/customAiInstructions.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data.customAiInstructions || '') }),
       fetch(`${FIREBASE_RTDB_URL}/lastUpdated.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now()) })
     ]);
@@ -216,6 +223,135 @@ export async function saveDbData(data: {
   } catch (err) {}
 
   return ok;
+}
+
+function formatLocalStamp(d: Date = new Date()): string {
+  const ymd = toLocalYmd(d);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${ymd}_${hh}-${mm}-${ss}`;
+}
+
+function downloadBlobFile(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    try {
+      document.body.removeChild(a);
+    } catch {}
+    URL.revokeObjectURL(url);
+  }, 1500);
+}
+
+/**
+ * Triggers real JSON download via GET /api/db/export (with complete DB fallback if offline).
+ */
+export async function triggerFullBackupExport(fallbackData: any): Promise<{
+  ok: boolean;
+  filename: string;
+  method: 'server' | 'client';
+}> {
+  const stamp = formatLocalStamp();
+  const defaultFilename = `kareem_full_backup_${stamp}.json`;
+
+  try {
+    // Save latest state to server DB first so export contains all recent client edits
+    if (fallbackData && typeof fallbackData === 'object') {
+      await fetch('/api/db/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: fallbackData, clientTimestamp: Date.now() })
+      }).catch(() => {});
+    }
+
+    const res = await fetch('/api/db/export');
+    if (res.ok) {
+      const disp = res.headers.get('content-disposition') || '';
+      const fnMatch = disp.match(/filename="?([^";]+)"?/i);
+      const filename = fnMatch ? fnMatch[1] : defaultFilename;
+      const blob = await res.blob();
+      downloadBlobFile(blob, filename);
+      return { ok: true, filename, method: 'server' };
+    }
+  } catch {}
+
+  try {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      exportedLocal: stamp,
+      app: 'شباب STUDY HUB - د. كريم عمر',
+      summary: {
+        sessionsCount: toArray(fallbackData?.sessions).length,
+        lecturesCount: toArray(fallbackData?.lectures).length,
+        examsCount: toArray(fallbackData?.exams).length,
+        officialExamsCount: toArray(fallbackData?.officialExams).length,
+        weeklyTasksCount: toArray(fallbackData?.weeklyTasks).length,
+        archivedWeeksCount: toArray(fallbackData?.archivedWeeks).length,
+        changelogCount: toArray(fallbackData?.changelog).length
+      },
+      data: fallbackData || {}
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    downloadBlobFile(blob, defaultFilename);
+    return { ok: true, filename: defaultFilename, method: 'client' };
+  } catch {
+    return { ok: false, filename: defaultFilename, method: 'client' };
+  }
+}
+
+/**
+ * Saves a dated snapshot directly into data/backups/ AND Firebase RTDB /backups/<stamp>.json.
+ */
+export async function saveCloudBackupSnapshot(snapshotData: any): Promise<{
+  ok: boolean;
+  backupKey?: string;
+  filename?: string;
+  cloudSaved?: boolean;
+}> {
+  try {
+    const res = await fetch('/api/db/backup-cloud', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: snapshotData })
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return {
+        ok: Boolean(json?.success),
+        backupKey: json.backupKey,
+        filename: json.filename,
+        cloudSaved: json.cloudSaved
+      };
+    }
+  } catch {}
+
+  try {
+    const stamp = formatLocalStamp();
+    const record = {
+      backupKey: stamp,
+      createdAt: new Date().toISOString(),
+      data: snapshotData
+    };
+    const fbRes = await fetch(`${FIREBASE_RTDB_URL}/backups/${stamp}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record)
+    });
+    return {
+      ok: fbRes.ok,
+      backupKey: stamp,
+      filename: `kareem_backup_${stamp}.json`,
+      cloudSaved: fbRes.ok
+    };
+  } catch {
+    return { ok: false };
+  }
 }
 
 // 3. Active Session Sync (Immediately saves running session to Firebase + LocalStorage)
@@ -398,6 +534,7 @@ export function generateRealSupervisorAnswer(userMessage: string, context: any):
     sessions,
     subjects: subjectsList,
     exams: Array.isArray(context?.exams) ? context.exams : [],
+    officialExams: Array.isArray(context?.officialExams) ? context.officialExams : [],
     weeklyTasks: Array.isArray(context?.pendingTasks) ? context.pendingTasks : (Array.isArray(context?.weeklyTasks) ? context.weeklyTasks : []),
     completedTaskIds: Array.isArray(context?.completedTaskIds) ? context.completedTaskIds : [],
     lectures: Array.isArray(context?.lectures) ? context.lectures : []

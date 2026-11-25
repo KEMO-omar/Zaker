@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Subject, ExamRecord } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Subject, ExamRecord, OfficialExam } from '../types';
+import { diffDaysYmd, formatYmdShort, toLocalYmd } from '../utils/scheduleEngine';
 import { CertificateViewerModal } from '../components/Modals';
 import {
   Award,
@@ -15,7 +16,8 @@ import {
   BookOpen,
   Image,
   ExternalLink,
-  Trophy
+  Trophy,
+  Bell
 } from 'lucide-react';
 
 interface ExamsViewProps {
@@ -27,6 +29,10 @@ interface ExamsViewProps {
   onTriggerAudit: () => void;
   isAuditing: boolean;
   auditDiagnostic: string | null;
+  officialExams?: OfficialExam[];
+  onOpenNewOfficialExam?: () => void;
+  onOpenEditOfficialExam?: (oe: OfficialExam) => void;
+  onDeleteOfficialExam?: (id: string) => void;
 }
 
 export const ExamsView: React.FC<ExamsViewProps> = ({
@@ -37,11 +43,21 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   onDeleteExam,
   onTriggerAudit,
   isAuditing,
-  auditDiagnostic
+  auditDiagnostic,
+  officialExams = [],
+  onOpenNewOfficialExam,
+  onOpenEditOfficialExam,
+  onDeleteOfficialExam
 }) => {
   const [selectedSubj, setSelectedSubj] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCertExam, setSelectedCertExam] = useState<ExamRecord | null>(null);
+
+  const todayYmd = toLocalYmd();
+  const sortedOfficialExams = useMemo(
+    () => [...officialExams].sort((a, b) => a.date.localeCompare(b.date)),
+    [officialExams]
+  );
 
   const certExams = exams.filter((e) => Boolean(e.certificateImage || e.certificateUrl || e.certificateTitle));
 
@@ -147,6 +163,150 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Official Timetable Exams Card (امتحانات الجدول الرسمي + تنبيه ليلة الامتحان) */}
+      <div
+        className="card"
+        style={{
+          marginBottom: 20,
+          padding: '16px 20px',
+          background: 'var(--bg-surface)',
+          border: '1px solid rgba(167, 139, 250, 0.35)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(167, 139, 250, 0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a78bfa' }}>
+              <Calendar size={19} />
+            </div>
+            <div>
+              <strong style={{ fontSize: 15.5, fontWeight: 800, color: 'var(--text-main)', display: 'block' }}>
+                جدول الامتحانات الرسمية القادمة ({sortedOfficialExams.length})
+              </strong>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                سجّل كل امتحان رسمي بتاريخه والحصة — يظهر التنبيه التلقائي فقط قبل الامتحان بليلة أو في يومه
+              </p>
+            </div>
+          </div>
+
+          {onOpenNewOfficialExam && (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={onOpenNewOfficialExam}
+              style={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+            >
+              <Plus size={14} />
+              <span>إضافة امتحان بالجدول الرسمي</span>
+            </button>
+          )}
+        </div>
+
+        {sortedOfficialExams.length === 0 ? (
+          <div style={{ padding: '14px 16px', borderRadius: 8, background: 'var(--bg-elevated)', fontSize: 12.5, color: 'var(--text-muted)' }}>
+            لم تضف أي امتحانات للجدول الرسمي بعد. اضغط «إضافة امتحان بالجدول الرسمي» لتحديد التاريخ والحصة وتفعيل تنبيه ليلة الامتحان تلقائياً.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 10 }}>
+            {sortedOfficialExams.map((oe) => {
+              const subj = subjects.find((s) => s.id === oe.subjId);
+              const diff = diffDaysYmd(oe.date, todayYmd);
+              const isAlertActive = diff === 0 || diff === 1;
+              const isPast = diff < 0;
+              const statusText =
+                diff === 0
+                  ? 'النهاردة! 🔥'
+                  : diff === 1
+                  ? 'غداً · تنبيه الليلة 🔔'
+                  : diff > 1
+                  ? `بعد ${diff} يوم`
+                  : `انتهى منذ ${Math.abs(diff)} يوم`;
+
+              return (
+                <div
+                  key={oe.id}
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: `1px solid ${isAlertActive ? '#f59e0b' : 'var(--border-subtle)'}`,
+                    borderRight: `3.5px solid ${subj?.color || '#a78bfa'}`,
+                    borderRadius: 10,
+                    padding: '12px 14px',
+                    opacity: isPast ? 0.68 : 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: 8
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: subj?.color || '#a78bfa' }}>
+                        {subj?.name || oe.subjId} · {oe.period}
+                      </span>
+                      <span
+                        className="tabular"
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: 800,
+                          color: diff === 0 ? 'var(--danger)' : diff === 1 ? '#f59e0b' : isPast ? 'var(--text-faint)' : 'var(--accent-primary)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                      >
+                        {isAlertActive && <Bell size={11} />}
+                        {statusText}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-main)' }}>
+                      {oe.title}
+                    </div>
+                    <div className="tabular" style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                      التاريخ: <strong style={{ color: 'var(--text-main)' }}>{oe.date}</strong> ({formatYmdShort(oe.date)})
+                    </div>
+                    {oe.syllabus && (
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>
+                        المقرر: {oe.syllabus}
+                      </div>
+                    )}
+                    {oe.notes && (
+                      <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 3 }}>
+                        ملاحظة: {oe.notes}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                    {onOpenEditOfficialExam && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => onOpenEditOfficialExam(oe)}
+                        style={{ padding: '4px 10px', fontSize: 11 }}
+                      >
+                        <Pencil size={11} />
+                        <span>تعديل</span>
+                      </button>
+                    )}
+                    {onDeleteOfficialExam && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => onDeleteOfficialExam(oe.id)}
+                        style={{ padding: '4px 8px', fontSize: 11, color: 'var(--danger)' }}
+                        title="حذف من الجدول الرسمي"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Upcoming Milestone Prize Exams (امتحانات قادمة ذات جوائز وتكريم) */}

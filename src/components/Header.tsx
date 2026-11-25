@@ -8,6 +8,7 @@ import {
   Bot,
   Palette,
   FileDown,
+  CloudUpload,
   Bell
 } from 'lucide-react';
 
@@ -29,6 +30,9 @@ interface HeaderProps {
   onInstallPwa: () => void;
   unreadNotificationsCount?: number;
   onOpenNotifications?: () => void;
+  onExportBackup?: () => Promise<void> | void;
+  onSaveCloudBackup?: () => Promise<void> | void;
+  isBackingUp?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -44,7 +48,10 @@ export const Header: React.FC<HeaderProps> = ({
   onTriggerManualSync,
   onInstallPwa,
   unreadNotificationsCount = 0,
-  onOpenNotifications
+  onOpenNotifications,
+  onExportBackup,
+  onSaveCloudBackup,
+  isBackingUp = false
 }) => {
   const allHours = Math.floor(allTimeMinutes / 60);
   const allMins = Math.round(allTimeMinutes % 60);
@@ -53,21 +60,29 @@ export const Header: React.FC<HeaderProps> = ({
   const countdownSecs = syncCountdown % 60;
   const countdownFormatted = `${countdownMins < 10 ? '0' : ''}${countdownMins}:${countdownSecs < 10 ? '0' : ''}${countdownSecs}`;
 
-  const handleExportBackup = () => {
+  const handleExportBackup = async () => {
+    if (onExportBackup) {
+      await onExportBackup();
+      return;
+    }
     try {
+      const now = new Date();
+      const localYmd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const rawSessions = localStorage.getItem('kareem_sessions');
       const backupData = {
-        exportedAt: new Date().toISOString(),
+        exportedAt: now.toISOString(),
         sessions: rawSessions ? JSON.parse(rawSessions) : [],
         allTimeMinutes
       };
-      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `kareem_study_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `kareem_study_backup_${localYmd}.json`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
     } catch (e) {}
   };
 
@@ -191,16 +206,31 @@ export const Header: React.FC<HeaderProps> = ({
           <span>تثبيت التطبيق</span>
         </button>
 
-        {/* Export Backup JSON Button */}
+        {/* Export Backup JSON Button (Full DB Download) */}
         <button
           className="btn btn-sm"
           onClick={handleExportBackup}
-          title="تحميل نسخة احتياطية كاملة من كافة جلساتك ومذاكرتك كملف JSON"
-          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-main)' }}
+          disabled={isBackingUp}
+          title="تحميل نسخة احتياطية كاملة (كل الجلسات والجدول والمحاضرات والامتحانات) كملف JSON"
+          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-main)', whiteSpace: 'nowrap' }}
         >
           <FileDown size={13} style={{ color: 'var(--accent-secondary)' }} />
           <span>تصدير نسخة (JSON)</span>
         </button>
+
+        {/* Dated Cloud Snapshot Button */}
+        {onSaveCloudBackup && (
+          <button
+            className="btn btn-sm"
+            onClick={onSaveCloudBackup}
+            disabled={isBackingUp}
+            title="حفظ نسخة احتياطية مؤرخة في السحابة وفي مجلد النسخ الاحتياطية"
+            style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: '#10b981', whiteSpace: 'nowrap' }}
+          >
+            <CloudUpload size={13} />
+            <span>{isBackingUp ? 'جارٍ الحفظ...' : 'حفظ سحابي بتاريخه'}</span>
+          </button>
+        )}
 
         {/* AI Supervisor Mood Quick Action */}
         <button

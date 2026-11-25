@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Session, Subject, ExamRecord, WeeklyTask, Lecture, ArchivedWeek } from '../types';
-import { LECTURE_TRACKS, getLectureTrack, getWeekStartSaturdayKey } from '../utils/scheduleEngine';
+import { LECTURE_TRACKS, computeBacklogHoursSummary, getLectureTrack, getWeekStartSaturdayKey } from '../utils/scheduleEngine';
 import {
   ChevronRight,
   ChevronLeft,
@@ -100,6 +100,8 @@ export const PastWeeksAnalytics: React.FC<PastWeeksAnalyticsProps> = ({
       ? Math.round(exams.reduce((a, b) => a + (b.pct || Math.round((b.score / b.total) * 100)), 0) / exams.length)
       : 0;
 
+    const backlogHoursSummary = computeBacklogHoursSummary(lectures, weeklyTasks, completedTaskIds);
+
     return {
       allTimeHours: allTimeHours.toFixed(1),
       allTimeHoursNum: allTimeHours,
@@ -115,7 +117,8 @@ export const PastWeeksAnalytics: React.FC<PastWeeksAnalyticsProps> = ({
       taskBacklogPct,
       overallBacklogPct,
       allTimeSubjMins,
-      avgExamPct
+      avgExamPct,
+      backlogHoursSummary
     };
   }, [sessions, lectures, weeklyTasks, completedTaskIds, subjects, exams]);
 
@@ -547,18 +550,18 @@ export const PastWeeksAnalytics: React.FC<PastWeeksAnalyticsProps> = ({
           </div>
         </div>
 
-        {/* KPI 2: Overall Backlog & Accumulation % */}
+        {/* KPI 2: Overall Backlog in Hours & Accumulation % */}
         <div className="card" style={{ padding: '16px 18px', background: 'var(--bg-surface)', borderRight: '3.5px solid var(--danger)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>المراكمة الكلية ونسبة المتراكم</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>متراكم المنصات بالساعات والنسبة</span>
             <AlertTriangle size={16} style={{ color: globalStats.overallBacklogPct > 50 ? 'var(--danger)' : 'var(--warning)' }} />
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span className="tabular" style={{ fontSize: 30, fontWeight: 900, color: globalStats.overallBacklogPct > 50 ? 'var(--danger)' : 'var(--warning)' }}>
-              {globalStats.overallBacklogPct}%
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <span className="tabular" style={{ fontSize: 28, fontWeight: 900, color: globalStats.overallBacklogPct > 50 ? 'var(--danger)' : 'var(--warning)' }}>
+              {globalStats.backlogHoursSummary.lecturesTotalHours} س
             </span>
-            <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
-              نسبة مراكمة ({globalStats.pendingLecs} محاضرة + {globalStats.pendingTasks} مهمة)
+            <span className="tabular" style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+              ({globalStats.overallBacklogPct}% · {globalStats.backlogHoursSummary.pendingPlatformLecturesCount} منصة + {globalStats.backlogHoursSummary.pendingCenterLecturesCount} سنتر)
             </span>
           </div>
           <div className="stat-progress-bar" style={{ marginTop: 10, height: 6 }}>
@@ -572,22 +575,22 @@ export const PastWeeksAnalytics: React.FC<PastWeeksAnalyticsProps> = ({
           </div>
         </div>
 
-        {/* KPI 3: Lectures Backlog Breakdown */}
+        {/* KPI 3: Lectures & Homework Backlog Breakdown (Platform Hours + Pages/Questions) */}
         <div className="card" style={{ padding: '16px 18px', background: 'var(--bg-surface)', borderRight: '3.5px solid var(--accent-secondary)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>إنجاز ومراكمة المحاضرات</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>تراكم المحاضرات والواجبات</span>
             <PieChart size={16} style={{ color: 'var(--accent-secondary)' }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span className="tabular" style={{ fontSize: 28, fontWeight: 900, color: 'var(--text-main)' }}>
               {globalStats.doneLecs}/{globalStats.totalLecs}
             </span>
-            <span style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 700 }}>
-              (مراكمة {globalStats.lecBacklogPct}%)
+            <span className="tabular" style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 700 }}>
+              ({globalStats.backlogHoursSummary.lecturesTotalHours} س منصة متبقية)
             </span>
           </div>
-          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>
-            متبقي <strong className="tabular">{globalStats.pendingLecs}</strong> محاضرة لم تُغلق بعد
+          <div className="tabular" style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>
+            واجب: {globalStats.backlogHoursSummary.homeworkPagesTotal} صفحة · {globalStats.backlogHoursSummary.homeworkQuestionsTotal} سؤال · {globalStats.pendingTasks} مهمة
           </div>
         </div>
 

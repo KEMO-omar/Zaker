@@ -1,14 +1,38 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Subject, Session, Exemption, WeeklyTask, Lecture, ExamRecord, ThemeType, ViewTab, ArchivedWeek, SmartNotificationItem } from './types';
+import {
+  Subject,
+  Session,
+  Exemption,
+  WeeklyTask,
+  Lecture,
+  ExamRecord,
+  OfficialExam,
+  ChangelogEntry,
+  ThemeType,
+  ViewTab,
+  ArchivedWeek,
+  SmartNotificationItem
+} from './types';
 import {
   buildRandomizedWeeklySchedule,
+  canAddTaskToDay,
+  formatLectureHomeworkLabel,
+  getArabicDayLabel,
   getLectureTrack,
+  getTaskWeekKey,
   getWeekStartSaturdayKey,
+  getYmdForWeekDay,
   injectLectureIntoSchedule,
+  isLectureHomeworkDone,
+  isPlatformLecture,
   normalizeDaySlots,
   reindexLectures,
   setLecturePositionInTrack,
-  sortLecturesByOrder
+  sortLecturesByOrder,
+  syncHomeworkPartOnLecture,
+  toggleLectureHomeworkDone,
+  toggleLecturePartDone,
+  toLocalYmd
 } from './utils/scheduleEngine';
 import {
   DEFAULT_NOTIFICATION_PREFS,
@@ -32,7 +56,9 @@ import {
   callAiExamAudit,
   callAiInterrogate,
   fetchQuotes,
-  calculateDynamicSupervisorMood
+  calculateDynamicSupervisorMood,
+  triggerFullBackupExport,
+  saveCloudBackupSnapshot
 } from './services/api';
 import {
   computeLiveStudySnapshot,
@@ -58,7 +84,8 @@ import {
   AiScheduleModal,
   InterrogationModal,
   ManualSessionModal,
-  PwaInstallModal
+  PwaInstallModal,
+  OfficialExamModal
 } from './components/Modals';
 
 import { DashboardView } from './views/DashboardView';
@@ -70,10 +97,17 @@ import { FocusView } from './views/FocusView';
 import { WastedView } from './views/WastedView';
 import { LogView } from './views/LogView';
 import { AllTimeMatrixView } from './views/AllTimeMatrixView';
+import { QuickStatsView } from './views/QuickStatsView';
 
 export const App: React.FC = () => {
-  // Navigation & Theme
-  const [currentTab, setCurrentTab] = useState<ViewTab>('dashView');
+  // Navigation & Theme (supports ?view=stats direct link for read-only stats screen)
+  const [currentTab, setCurrentTab] = useState<ViewTab>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('view') === 'stats') return 'quickStatsView';
+    } catch {}
+    return 'dashView';
+  });
   const [theme, setTheme] = useState<ThemeType>('default');
   const [vizMode, setVizMode] = useState<'spiral' | 'gauge' | 'bars'>('spiral');
 
@@ -103,9 +137,29 @@ export const App: React.FC = () => {
   const [dbLoaded, setDbLoaded] = useState<boolean>(false);
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [exams, setExams] = useState<ExamRecord[]>([]);
+  const [officialExams, setOfficialExams] = useState<OfficialExam[]>(() => {
+    try {
+      const saved = localStorage.getItem('kareem_official_exams');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [changelog, setChangelog] = useState<ChangelogEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('kareem_changelog');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const examsRef = useRef<ExamRecord[]>([]);
   examsRef.current = exams;
+  const officialExamsRef = useRef<OfficialExam[]>([]);
+  officialExamsRef.current = officialExams;
+  const changelogRef = useRef<ChangelogEntry[]>([]);
+  changelogRef.current = changelog;
   const weeklyTasksRef = useRef<WeeklyTask[]>([]);
   weeklyTasksRef.current = weeklyTasks;
   const completedTaskIdsRef = useRef<Set<string | number>>(completedTaskIds);
@@ -191,12 +245,17 @@ export const App: React.FC = () => {
   const [examToEdit, setExamToEdit] = useState<ExamRecord | null>(null);
 
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
+  const [newTaskInitialDate, setNewTaskInitialDate] = useState<string | undefined>(undefined);
   const [isEditTaskOpen, setIsEditTaskOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<WeeklyTask | null>(null);
 
   const [isNewLectureModalOpen, setIsNewLectureModalOpen] = useState(false);
   const [isEditLectureOpen, setIsEditLectureOpen] = useState(false);
   const [lectureToEdit, setLectureToEdit] = useState<Lecture | null>(null);
+
+  const [isOfficialExamModalOpen, setIsOfficialExamModalOpen] = useState(false);
+  const [officialExamToEdit, setOfficialExamToEdit] = useState<OfficialExam | null>(null);
+  const [isBackingUp, setIsBackingUp] = useState(false);
 
   const [isEditSubjectsOpen, setIsEditSubjectsOpen] = useState(false);
   const [isExemptionModalOpen, setIsExemptionModalOpen] = useState(false);
@@ -390,6 +449,34 @@ export const App: React.FC = () => {
           setActiveWeekStartKey(db.activeWeekStartKey);
           try { localStorage.setItem('kareem_active_week_key', db.activeWeekStartKey); } catch (e) {}
         }
+        if (Array.isArray(db.officialExams)) {
+          const oeMap = new Map<string, OfficialExam>();
+          officialExamsRef.current.forEach((oe) => {
+            if (oe && oe.id) oeMap.set(oe.id, oe);
+          });
+          db.officialExams.forEach((oe: OfficialExam) => {
+            if (oe && oe.id) oeMap.set(oe.id, oe);
+          });
+          const mergedOe = Array.from(oeMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+          officialExamsRef.current = mergedOe;
+          setOfficialExams(mergedOe);
+          try { localStorage.setItem('kareem_official_exams', JSON.stringify(mergedOe)); } catch (e) {}
+        }
+        if (Array.isArray(db.changelog)) {
+          const logMap = new Map<string, ChangelogEntry>();
+          db.changelog.forEach((c: ChangelogEntry) => {
+            if (c && c.id) logMap.set(c.id, c);
+          });
+          changelogRef.current.forEach((c) => {
+            if (c && c.id) logMap.set(c.id, c);
+          });
+          const mergedLogs = Array.from(logMap.values())
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+            .slice(0, 350);
+          changelogRef.current = mergedLogs;
+          setChangelog(mergedLogs);
+          try { localStorage.setItem('kareem_changelog', JSON.stringify(mergedLogs)); } catch (e) {}
+        }
         if (db.customAiInstructions) {
           setCustomAiInstructions(db.customAiInstructions);
         }
@@ -462,12 +549,13 @@ export const App: React.FC = () => {
     subjects,
     exemptions,
     exams,
+    officialExams,
     weeklyTasks,
     completedTaskIds: Array.from(completedTaskIds),
     lectures,
     nowMs: Date.now(),
     ...overrides
-  }), [sessions, subjects, exemptions, exams, weeklyTasks, completedTaskIds, lectures]);
+  }), [sessions, subjects, exemptions, exams, officialExams, weeklyTasks, completedTaskIds, lectures]);
 
   // Dynamically recompute Comprehensive Report and Exam Diagnostic Report whenever live data changes or view is opened
   useEffect(() => {
@@ -518,6 +606,22 @@ export const App: React.FC = () => {
     };
   }, [isRunning]);
 
+  // Simple Audit Changelog helper (returns updated array so callers can sync in one atomic request)
+  const appendChangelog = useCallback((entry: Omit<ChangelogEntry, 'id' | 'timestamp'>): ChangelogEntry[] => {
+    const newItem: ChangelogEntry = {
+      id: `chg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: Date.now(),
+      ...entry
+    };
+    const next = [newItem, ...changelogRef.current].slice(0, 350);
+    changelogRef.current = next;
+    setChangelog(next);
+    try {
+      localStorage.setItem('kareem_changelog', JSON.stringify(next));
+    } catch (e) {}
+    return next;
+  }, []);
+
   // Trigger Sync with Server (always reads latest refs so rapid updates never clobber each other!)
   const triggerAutoSync = useCallback(async (overrides?: any) => {
     setIsSyncing(true);
@@ -530,6 +634,8 @@ export const App: React.FC = () => {
       activeWeekStartKey: overrides?.activeWeekStartKey ?? activeWeekStartKeyRef.current,
       lectures: overrides?.lectures ?? lecturesRef.current,
       exams: overrides?.exams ?? examsRef.current,
+      officialExams: overrides?.officialExams ?? officialExamsRef.current,
+      changelog: overrides?.changelog ?? changelogRef.current,
       subjects: overrides?.subjects ?? subjects,
       customAiInstructions: overrides?.customAiInstructions ?? customAiInstructions
     };
@@ -552,6 +658,7 @@ export const App: React.FC = () => {
   }, []);
 
   // AUTO-ROLLOVER & AUTO-ARCHIVE ON SATURDAY (when Friday ends & new Saturday week begins!)
+  // Preserves future-dated tasks and backlog tasks safely.
   useEffect(() => {
     if (!dbLoaded) return;
 
@@ -567,18 +674,27 @@ export const App: React.FC = () => {
       }
 
       if (activeWeekStartKeyRef.current !== currentWeekKey) {
+        const prevWeekKey = activeWeekStartKeyRef.current;
         const currentTasks = weeklyTasksRef.current;
         const currentDoneSet = completedTaskIdsRef.current;
-        const total = currentTasks.length;
-        const done = currentTasks.filter(
+
+        const expiringTasks = currentTasks.filter(
+          t => t.dayId !== 'backlog' && getTaskWeekKey(t, prevWeekKey) < currentWeekKey
+        );
+        const preservedTasks = currentTasks.filter(
+          t => t.dayId === 'backlog' || getTaskWeekKey(t, prevWeekKey) >= currentWeekKey
+        );
+
+        const total = expiringTasks.length;
+        const done = expiringTasks.filter(
           t => currentDoneSet.has(t.id) || currentDoneSet.has(String(t.id))
         ).length;
         const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
         const newArchive: ArchivedWeek = {
-          id: `auto_archive_${activeWeekStartKeyRef.current}_${Date.now()}`,
-          weekTitle: `أسبوع ${activeWeekStartKeyRef.current}`,
-          weekKey: activeWeekStartKeyRef.current,
+          id: `auto_archive_${prevWeekKey}_${Date.now()}`,
+          weekTitle: `أسبوع ${prevWeekKey}`,
+          weekKey: prevWeekKey,
           archivedAt: new Date().toISOString(),
           totalCount: total,
           completedCount: done,
@@ -587,42 +703,61 @@ export const App: React.FC = () => {
         };
 
         const updatedArchives = total > 0 ? [newArchive, ...archivedWeeksRef.current] : archivedWeeksRef.current;
-        const freshWeekTasks = buildRandomizedWeeklySchedule({
-          lectures: lecturesRef.current,
-          preserveUserTasks: [],
-          respectLectureOrder: true
+        const hasFutureWeekAlready = preservedTasks.some(
+          t => t.dayId !== 'backlog' && getTaskWeekKey(t, currentWeekKey) === currentWeekKey
+        );
+
+        const generatedForCurrent = hasFutureWeekAlready
+          ? []
+          : buildRandomizedWeeklySchedule({
+              lectures: lecturesRef.current,
+              preserveUserTasks: [],
+              respectLectureOrder: true,
+              weekStartSatKey: currentWeekKey
+            });
+
+        const freshWeekTasks = normalizeDaySlots([...preservedTasks, ...generatedForCurrent], currentWeekKey);
+        const preservedIds = new Set(preservedTasks.map(t => String(t.id)));
+        const keptDone = Array.from(currentDoneSet).filter(id => preservedIds.has(String(id)));
+        const nextDoneSet = new Set<string | number>(keptDone);
+
+        const nextLog = appendChangelog({
+          action: 'archive',
+          entityType: 'schedule',
+          summary: `أرشفة تلقائية للأسبوع (${prevWeekKey}) وبدء أسبوع ${currentWeekKey}`,
+          details: `${done}/${total} مهمة منجزة (${pct}%)`
         });
-        const emptyDone = new Set<string | number>();
 
         archivedWeeksRef.current = updatedArchives;
         weeklyTasksRef.current = freshWeekTasks;
-        completedTaskIdsRef.current = emptyDone;
+        completedTaskIdsRef.current = nextDoneSet;
         activeWeekStartKeyRef.current = currentWeekKey;
 
         setArchivedWeeks(updatedArchives);
         setWeeklyTasks(freshWeekTasks);
-        setCompletedTaskIds(emptyDone);
+        setCompletedTaskIds(nextDoneSet);
         setActiveWeekStartKey(currentWeekKey);
 
         try {
           localStorage.setItem('kareem_archived_weeks', JSON.stringify(updatedArchives));
           localStorage.setItem('kareem_weekly_tasks', JSON.stringify(freshWeekTasks));
-          localStorage.setItem('kareem_completed_task_ids', JSON.stringify([]));
+          localStorage.setItem('kareem_completed_task_ids', JSON.stringify(keptDone));
           localStorage.setItem('kareem_active_week_key', currentWeekKey);
         } catch (e) {}
 
         triggerAutoSync({
           archivedWeeks: updatedArchives,
           weeklyTasks: freshWeekTasks,
-          completedTaskIds: [],
-          activeWeekStartKey: currentWeekKey
+          completedTaskIds: keptDone,
+          activeWeekStartKey: currentWeekKey,
+          changelog: nextLog
         });
 
         pushSmartNotification({
           id: `notif_week_${Date.now()}`,
           type: 'week_rollover',
           title: '🎉 أسبوع جديد بدأ (السبت)! تم الأرشفة والتجهيز تلقائياً',
-          body: `تمت أرشفة الأسبوع السابق (${done}/${total} مهمة) وبدأنا أسبوعك الجديد بجدول عشوائي طازج من محاضراتك والسناتر الحضورية، مع ترك الخانة الأخيرة أسفل كل يوم فارغة لإضافاتك!`,
+          body: `تمت أرشفة الأسبوع السابق (${done}/${total} مهمة) وبدأنا أسبوعك الجديد بجدول طازج مع الحفاظ على المهام المجدولة مستقبلاً!`,
           timestamp: Date.now(),
           read: false,
           actionTab: 'weeklyView'
@@ -633,9 +768,9 @@ export const App: React.FC = () => {
     checkWeekRollover();
     const interval = setInterval(checkWeekRollover, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [dbLoaded, activeWeekStartKey, weeklyTasks, completedTaskIds, archivedWeeks, lectures, triggerAutoSync, pushSmartNotification]);
+  }, [dbLoaded, activeWeekStartKey, weeklyTasks, completedTaskIds, archivedWeeks, lectures, triggerAutoSync, pushSmartNotification, appendChangelog]);
 
-  // SMART ALERTS & PERIODIC CHECK-INS ENGINE (12h Inactivity + Pre-Exam + Morning/Periodic Tasks Check-in)
+  // SMART ALERTS & PERIODIC CHECK-INS ENGINE (12h Inactivity + Night-Before Official Exam + Morning Check-in)
   const runSmartNotificationsCheck = useCallback((forceCheckIn = false, forceAlerts = false) => {
     const now = Date.now();
 
@@ -651,11 +786,11 @@ export const App: React.FC = () => {
       }
     }
 
-    // 2. Check upcoming exam alert (cooldown 4 hours unless forced)
+    // 2. Check upcoming exam alert (strictly Today or Night-Before official exams; cooldown 4 hours unless forced)
     if (notificationPrefs.preExamAlert) {
       const lastExamAlert = Number(localStorage.getItem('kareem_last_exam_alert') || 0);
       if (forceAlerts || now - lastExamAlert >= 4 * 60 * 60 * 1000) {
-        const examAlert = buildPreExamNotification(weeklyTasks, completedTaskIds, subjects, exams);
+        const examAlert = buildPreExamNotification(weeklyTasks, completedTaskIds, subjects, exams, officialExams);
         if (examAlert) {
           localStorage.setItem('kareem_last_exam_alert', String(now));
           pushSmartNotification(examAlert);
@@ -673,7 +808,7 @@ export const App: React.FC = () => {
         pushSmartNotification(checkIn);
       }
     }
-  }, [notificationPrefs, sessions, weeklyTasks, completedTaskIds, subjects, exams, pushSmartNotification]);
+  }, [notificationPrefs, sessions, weeklyTasks, completedTaskIds, subjects, exams, officialExams, pushSmartNotification]);
 
   useEffect(() => {
     if (!dbLoaded) return;
@@ -735,13 +870,14 @@ export const App: React.FC = () => {
     showToast('جاري تشغيل صوت المراقب...');
   };
 
-  // Task Toggle (immediately updates ref + localStorage + server/Firebase)
+  // Task Toggle (immediately updates ref + localStorage + server/Firebase + changelog)
   const handleToggleTask = (taskId: string | number) => {
     const next = new Set(completedTaskIdsRef.current);
     const strId = String(taskId);
     const numId = Number(taskId);
+    const wasDone = next.has(taskId) || next.has(strId) || (!isNaN(numId) && next.has(numId));
 
-    if (next.has(taskId) || next.has(strId) || (!isNaN(numId) && next.has(numId))) {
+    if (wasDone) {
       next.delete(taskId);
       next.delete(strId);
       if (!isNaN(numId)) next.delete(numId);
@@ -753,15 +889,23 @@ export const App: React.FC = () => {
     const arr = Array.from(next);
     completedTaskIdsRef.current = next;
     setCompletedTaskIds(next);
+    const taskObj = weeklyTasksRef.current.find((t) => String(t.id) === strId);
+    const nextLog = appendChangelog({
+      action: wasDone ? 'uncomplete' : 'complete',
+      entityType: 'task',
+      summary: `${wasDone ? 'إلغاء إنجاز' : 'إنجاز مهمة'}: ${taskObj?.text || strId}`,
+      details: taskObj ? getArabicDayLabel(taskObj.dayId) : undefined
+    });
     try {
       localStorage.setItem('kareem_completed_task_ids', JSON.stringify(arr));
     } catch (e) {}
-    triggerAutoSync({ completedTaskIds: arr });
+    triggerAutoSync({ completedTaskIds: arr, changelog: nextLog });
   };
 
-  // Add Task (preserving category, teacher, time, safe non-colliding slot placement, and user priority)
+  // Add Task (supports YYYY-MM-DD date, enforces 15-slot cap without pushing to backlog, logs to changelog)
   const handleSaveNewTask = (taskData: {
     dayId: string;
+    date?: string;
     subjId: string;
     text: string;
     priority: WeeklyTask['priority'];
@@ -771,9 +915,22 @@ export const App: React.FC = () => {
     slotIndex?: number;
     isUserAdded?: boolean;
   }) => {
+    const baseWeekKey = activeWeekStartKeyRef.current || getWeekStartSaturdayKey();
+    const resolvedDate =
+      taskData.dayId === 'backlog'
+        ? undefined
+        : taskData.date || getYmdForWeekDay(baseWeekKey, taskData.dayId);
+
+    const capCheck = canAddTaskToDay(weeklyTasksRef.current, taskData.dayId, resolvedDate, baseWeekKey);
+    if (!capCheck.allowed) {
+      showToast(`⚠️ ${capCheck.reason}`);
+      return;
+    }
+
     const newTask: WeeklyTask = {
       id: `task_user_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
       dayId: taskData.dayId,
+      date: resolvedDate,
       subjId: taskData.subjId,
       text: taskData.text,
       priority: taskData.priority,
@@ -783,38 +940,75 @@ export const App: React.FC = () => {
       slotIndex: taskData.slotIndex,
       isUserAdded: taskData.isUserAdded ?? true
     };
-    const updated = normalizeDaySlots([...weeklyTasksRef.current, newTask]);
+    const updated = normalizeDaySlots([...weeklyTasksRef.current, newTask], baseWeekKey);
     weeklyTasksRef.current = updated;
     setWeeklyTasks(updated);
+    const nextLog = appendChangelog({
+      action: 'add',
+      entityType: 'task',
+      summary: `إضافة مهمة: ${newTask.text}`,
+      details: resolvedDate ? `${getArabicDayLabel(newTask.dayId)} (${resolvedDate})` : getArabicDayLabel(newTask.dayId)
+    });
     try {
       localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
     } catch (e) {}
-    showToast('تمت إضافة المهمة بتصنيفها وحفظها في الجدول حتى نهاية الأسبوع ✓');
-    triggerAutoSync({ weeklyTasks: updated });
+    showToast('تمت إضافة المهمة بتاريخها وتصنيفها وحفظها في الجدول ✓');
+    triggerAutoSync({ weeklyTasks: updated, changelog: nextLog });
   };
 
-  // Edit Task
+  // Edit Task (enforces 15-slot cap on target date/day)
   const handleOpenEditTask = (task: WeeklyTask) => {
     setTaskToEdit(task);
     setIsEditTaskOpen(true);
   };
 
   const handleUpdateTask = (updatedTask: WeeklyTask) => {
+    const baseWeekKey = activeWeekStartKeyRef.current || getWeekStartSaturdayKey();
+    const resolvedDate =
+      updatedTask.dayId === 'backlog'
+        ? undefined
+        : updatedTask.date || getYmdForWeekDay(baseWeekKey, updatedTask.dayId);
+
+    const capCheck = canAddTaskToDay(
+      weeklyTasksRef.current,
+      updatedTask.dayId,
+      resolvedDate,
+      baseWeekKey,
+      updatedTask.id
+    );
+    if (!capCheck.allowed) {
+      showToast(`⚠️ ${capCheck.reason}`);
+      return;
+    }
+
+    const cleanTask: WeeklyTask = { ...updatedTask, date: resolvedDate };
     const updated = normalizeDaySlots(
-      weeklyTasksRef.current.map((t) => (String(t.id) === String(updatedTask.id) ? updatedTask : t))
+      weeklyTasksRef.current.map((t) => (String(t.id) === String(cleanTask.id) ? cleanTask : t)),
+      baseWeekKey
     );
     weeklyTasksRef.current = updated;
     setWeeklyTasks(updated);
+    const nextLog = appendChangelog({
+      action: 'edit',
+      entityType: 'task',
+      summary: `تعديل مهمة: ${cleanTask.text}`,
+      details: resolvedDate ? `${getArabicDayLabel(cleanTask.dayId)} (${resolvedDate})` : getArabicDayLabel(cleanTask.dayId)
+    });
     try {
       localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
     } catch (e) {}
-    showToast('تم حفظ تعديلات المهمة وتثبيتها في الجدول ✓');
-    triggerAutoSync({ weeklyTasks: updated });
+    showToast('تم حفظ تعديلات المهمة وتاريخها في الجدول ✓');
+    triggerAutoSync({ weeklyTasks: updated, changelog: nextLog });
   };
 
   // Delete Task
   const handleDeleteTask = (taskId: string | number) => {
-    const updated = normalizeDaySlots(weeklyTasksRef.current.filter((t) => String(t.id) !== String(taskId)));
+    const baseWeekKey = activeWeekStartKeyRef.current || getWeekStartSaturdayKey();
+    const targetObj = weeklyTasksRef.current.find((t) => String(t.id) === String(taskId));
+    const updated = normalizeDaySlots(
+      weeklyTasksRef.current.filter((t) => String(t.id) !== String(taskId)),
+      baseWeekKey
+    );
     const nextDone = new Set(completedTaskIdsRef.current);
     nextDone.delete(taskId);
     nextDone.delete(String(taskId));
@@ -824,17 +1018,24 @@ export const App: React.FC = () => {
     completedTaskIdsRef.current = nextDone;
     setWeeklyTasks(updated);
     setCompletedTaskIds(nextDone);
+    const nextLog = appendChangelog({
+      action: 'delete',
+      entityType: 'task',
+      summary: `حذف مهمة: ${targetObj?.text || String(taskId)}`,
+      details: targetObj ? getArabicDayLabel(targetObj.dayId) : undefined
+    });
     try {
       localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updated));
       localStorage.setItem('kareem_completed_task_ids', JSON.stringify(arrDone));
     } catch (e) {}
     showToast('تم حذف المهمة وحفظ الجدول');
-    triggerAutoSync({ weeklyTasks: updated, completedTaskIds: arrDone });
+    triggerAutoSync({ weeklyTasks: updated, completedTaskIds: arrDone, changelog: nextLog });
   };
 
   // Bulk update all tasks (preserves completedTaskIds for all remaining tasks and syncs immediately)
   const handleUpdateAllTasks = (updated: WeeklyTask[]) => {
-    const normalized = normalizeDaySlots(updated);
+    const baseWeekKey = activeWeekStartKeyRef.current || getWeekStartSaturdayKey();
+    const normalized = normalizeDaySlots(updated, baseWeekKey);
     const validIds = new Set(normalized.map((t) => String(t.id)));
     const filteredDone = Array.from(completedTaskIdsRef.current).filter((id) => validIds.has(String(id)));
     const nextDoneSet = new Set<string | number>(filteredDone);
@@ -850,47 +1051,127 @@ export const App: React.FC = () => {
     triggerAutoSync({ weeklyTasks: normalized, completedTaskIds: filteredDone });
   };
 
-  // Archive Current Week
+  // Archive Current Week (preserves any future-dated tasks and backlog tasks)
   const handleArchiveWeek = (archive: ArchivedWeek, cleanTasks: WeeklyTask[]) => {
     const currentWeekKey = getWeekStartSaturdayKey();
+    const prevKey = activeWeekStartKeyRef.current || currentWeekKey;
+    const preservedFutureAndBacklog = weeklyTasksRef.current.filter(
+      (t) => t.dayId === 'backlog' || getTaskWeekKey(t, prevKey) > currentWeekKey
+    );
     const updatedArchives = [archive, ...archivedWeeksRef.current];
-    const normalizedClean = normalizeDaySlots(cleanTasks);
-    const emptyDone = new Set<string | number>();
+    const normalizedClean = normalizeDaySlots([...cleanTasks, ...preservedFutureAndBacklog], currentWeekKey);
+    const preservedIds = new Set(preservedFutureAndBacklog.map((t) => String(t.id)));
+    const keptDone = Array.from(completedTaskIdsRef.current).filter((id) => preservedIds.has(String(id)));
+    const nextDoneSet = new Set<string | number>(keptDone);
+
+    const nextLog = appendChangelog({
+      action: 'archive',
+      entityType: 'schedule',
+      summary: `أرشفة: ${archive.weekTitle}`,
+      details: `${archive.completedCount}/${archive.totalCount} مهمة (${archive.completionPct}%)`
+    });
 
     archivedWeeksRef.current = updatedArchives;
     weeklyTasksRef.current = normalizedClean;
-    completedTaskIdsRef.current = emptyDone;
+    completedTaskIdsRef.current = nextDoneSet;
     activeWeekStartKeyRef.current = currentWeekKey;
 
     setArchivedWeeks(updatedArchives);
     setWeeklyTasks(normalizedClean);
-    setCompletedTaskIds(emptyDone);
+    setCompletedTaskIds(nextDoneSet);
     setActiveWeekStartKey(currentWeekKey);
     try {
       localStorage.setItem('kareem_archived_weeks', JSON.stringify(updatedArchives));
       localStorage.setItem('kareem_weekly_tasks', JSON.stringify(normalizedClean));
-      localStorage.setItem('kareem_completed_task_ids', JSON.stringify([]));
+      localStorage.setItem('kareem_completed_task_ids', JSON.stringify(keptDone));
       localStorage.setItem('kareem_active_week_key', currentWeekKey);
     } catch (e) {}
     showToast('تمت أرشفة الأسبوع بنجاح وبدء أسبوع جديد نظيف!');
     triggerAutoSync({
       archivedWeeks: updatedArchives,
       weeklyTasks: normalizedClean,
-      completedTaskIds: [],
-      activeWeekStartKey: currentWeekKey
+      completedTaskIds: keptDone,
+      activeWeekStartKey: currentWeekKey,
+      changelog: nextLog
     });
   };
 
   // Lecture Toggle
   const handleToggleLecture = (lecId: string) => {
-    const updated = lecturesRef.current.map((l) => (l.id === lecId ? { ...l, isDone: !l.isDone } : l));
+    const lecObj = lecturesRef.current.find((l) => l.id === lecId);
+    const updated = lecturesRef.current.map((l) => {
+      if (l.id !== lecId) return l;
+      const nextDone = !l.isDone;
+      const syncedParts = Array.isArray(l.parts)
+        ? l.parts.map((p) => ({
+            ...p,
+            isDone: nextDone,
+            subParts: Array.isArray(p.subParts) ? p.subParts.map((s) => ({ ...s, isDone: nextDone })) : p.subParts
+          }))
+        : l.parts;
+      return {
+        ...l,
+        isDone: nextDone,
+        ...(l.hasHomework ? { homeworkDone: nextDone } : {}),
+        ...(syncedParts ? { parts: syncedParts } : {})
+      };
+    });
     lecturesRef.current = updated;
     setLectures(updated);
+    const nextLog = appendChangelog({
+      action: lecObj?.isDone ? 'uncomplete' : 'complete',
+      entityType: 'lecture',
+      summary: `${lecObj?.isDone ? 'إعادة فتح محاضرة' : 'إتمام محاضرة'}: ${lecObj?.title || lecId}`,
+      details: lecObj?.code
+    });
     try {
       localStorage.setItem('kareem_lectures', JSON.stringify(updated));
     } catch (e) {}
     showToast('تم تحديث حالة المحاضرة وحفظها في القاعدة');
-    triggerAutoSync({ lectures: updated });
+    triggerAutoSync({ lectures: updated, changelog: nextLog });
+  };
+
+  // Toggle Lecture Part or SubPart completion
+  const handleToggleLecturePart = (lecId: string, partId: string, subPartId?: string) => {
+    const updated = lecturesRef.current.map((l) =>
+      l.id === lecId ? toggleLecturePartDone(l, partId, subPartId) : l
+    );
+    const updatedLec = updated.find((l) => l.id === lecId);
+    lecturesRef.current = updated;
+    setLectures(updated);
+    const nextLog = appendChangelog({
+      action: 'edit',
+      entityType: 'lecture',
+      summary: `تحديث أجزاء محاضرة: ${updatedLec?.title || lecId}`,
+      details: updatedLec?.isDone ? 'اكتملت كل الأجزاء ✓' : undefined
+    });
+    try {
+      localStorage.setItem('kareem_lectures', JSON.stringify(updated));
+    } catch (e) {}
+    showToast(updatedLec?.isDone ? '🎉 اكتملت المحاضرة بكل أجزائها وواجبها!' : 'تم تحديث حالة الجزء ✓');
+    triggerAutoSync({ lectures: updated, changelog: nextLog });
+  };
+
+  // Toggle Homework sub-item ('الواجب') independently
+  const handleToggleLectureHomework = (lecId: string) => {
+    const updated = lecturesRef.current.map((l) =>
+      l.id === lecId ? toggleLectureHomeworkDone(l) : l
+    );
+    const updatedLec = updated.find((l) => l.id === lecId);
+    const hwNowDone = updatedLec ? isLectureHomeworkDone(updatedLec) : false;
+    lecturesRef.current = updated;
+    setLectures(updated);
+    const nextLog = appendChangelog({
+      action: hwNowDone ? 'complete' : 'uncomplete',
+      entityType: 'lecture',
+      summary: `${hwNowDone ? 'إتمام واجب محاضرة' : 'إعادة فتح واجب محاضرة'}: ${updatedLec?.title || lecId}`,
+      details: updatedLec ? formatLectureHomeworkLabel(updatedLec) : undefined
+    });
+    try {
+      localStorage.setItem('kareem_lectures', JSON.stringify(updated));
+    } catch (e) {}
+    showToast(hwNowDone ? '✅ تم تعليم الواجب كمنجز وخصمه من المتراكم!' : 'تم إعادة فتح الواجب');
+    triggerAutoSync({ lectures: updated, changelog: nextLog });
   };
 
   // Reorder Lectures (saves orderIndex permanently so Weekly Schedule injects them strictly in this order)
@@ -898,11 +1179,16 @@ export const App: React.FC = () => {
     const indexed = reindexLectures(reordered);
     lecturesRef.current = indexed;
     setLectures(indexed);
+    const nextLog = appendChangelog({
+      action: 'edit',
+      entityType: 'lecture',
+      summary: 'إعادة ترتيب مسار المحاضرات'
+    });
     try {
       localStorage.setItem('kareem_lectures', JSON.stringify(indexed));
     } catch (e) {}
     showToast('تم حفظ ترتيب المحاضرات الجديد — سينزل الجدول بهذا الترتيب ✓');
-    triggerAutoSync({ lectures: indexed });
+    triggerAutoSync({ lectures: indexed, changelog: nextLog });
   };
 
   // Add Lecture (auto-injecting newly added lecture into weekly schedule)
@@ -917,22 +1203,29 @@ export const App: React.FC = () => {
       isDone: false,
       orderIndex: maxOrder + 1
     };
-    const newLec: Lecture = {
+    const newLec = syncHomeworkPartOnLecture({
       ...baseLec,
       trackKey: lecData.trackKey || getLectureTrack(baseLec).id
-    };
+    });
     const updatedLectures = reindexLectures([...lecturesRef.current, newLec]);
-    const updatedTasks = injectLectureIntoSchedule(weeklyTasksRef.current, newLec);
+    const baseWeekKey = activeWeekStartKeyRef.current || getWeekStartSaturdayKey();
+    const updatedTasks = injectLectureIntoSchedule(weeklyTasksRef.current, newLec, baseWeekKey);
     lecturesRef.current = updatedLectures;
     weeklyTasksRef.current = updatedTasks;
     setLectures(updatedLectures);
     setWeeklyTasks(updatedTasks);
+    const nextLog = appendChangelog({
+      action: 'add',
+      entityType: 'lecture',
+      summary: `إضافة محاضرة: ${newLec.title}`,
+      details: `${isPlatformLecture(newLec) ? `${newLec.durationMinutes || 90} د شرح` : 'سنتر (بدون وقت فيديو)'} · ${formatLectureHomeworkLabel(newLec)}`
+    });
     try {
       localStorage.setItem('kareem_lectures', JSON.stringify(updatedLectures));
       localStorage.setItem('kareem_weekly_tasks', JSON.stringify(updatedTasks));
     } catch (e) {}
     showToast('تمت إضافة المحاضرة وإدراجها تلقائياً في الجدول الأسبوعي! ⚡');
-    triggerAutoSync({ lectures: updatedLectures, weeklyTasks: updatedTasks });
+    triggerAutoSync({ lectures: updatedLectures, weeklyTasks: updatedTasks, changelog: nextLog });
   };
 
   // Edit Lecture
@@ -942,30 +1235,43 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateLecture = (updatedLecture: Lecture, desiredTrackOrder?: number) => {
+    const syncedUpdated = syncHomeworkPartOnLecture(updatedLecture);
     const updated =
       typeof desiredTrackOrder === 'number' && !isNaN(desiredTrackOrder) && desiredTrackOrder >= 1
-        ? setLecturePositionInTrack(lecturesRef.current, updatedLecture, desiredTrackOrder)
+        ? setLecturePositionInTrack(lecturesRef.current, syncedUpdated, desiredTrackOrder)
         : reindexLectures(
-            lecturesRef.current.map((l) => (l.id === updatedLecture.id ? updatedLecture : l))
+            lecturesRef.current.map((l) => (l.id === syncedUpdated.id ? syncedUpdated : l))
           );
     lecturesRef.current = updated;
     setLectures(updated);
+    const nextLog = appendChangelog({
+      action: 'edit',
+      entityType: 'lecture',
+      summary: `تعديل محاضرة: ${updatedLecture.title}`,
+      details: `${isPlatformLecture(updatedLecture) ? `${updatedLecture.durationMinutes || 90} د شرح` : 'سنتر (بدون وقت فيديو)'} · ${formatLectureHomeworkLabel(updatedLecture)}`
+    });
     try {
       localStorage.setItem('kareem_lectures', JSON.stringify(updated));
     } catch (e) {}
     showToast('تم حفظ تعديلات المحاضرة وترتيبها في القاعدة بنجاح! ✓');
-    triggerAutoSync({ lectures: updated });
+    triggerAutoSync({ lectures: updated, changelog: nextLog });
   };
 
   const handleDeleteLecture = (id: string) => {
+    const lecObj = lecturesRef.current.find((l) => l.id === id);
     const updated = reindexLectures(lecturesRef.current.filter((l) => l.id !== id));
     lecturesRef.current = updated;
     setLectures(updated);
+    const nextLog = appendChangelog({
+      action: 'delete',
+      entityType: 'lecture',
+      summary: `حذف محاضرة: ${lecObj?.title || id}`
+    });
     try {
       localStorage.setItem('kareem_lectures', JSON.stringify(updated));
     } catch (e) {}
     showToast('تم حذف المحاضرة من القاعدة');
-    triggerAutoSync({ lectures: updated });
+    triggerAutoSync({ lectures: updated, changelog: nextLog });
   };
 
   // Add Exam
@@ -982,9 +1288,15 @@ export const App: React.FC = () => {
     examsRef.current = updated;
     setExams(updated);
     safeSaveExamsLocalStorage(updated);
+    const nextLog = appendChangelog({
+      action: 'add',
+      entityType: 'exam',
+      summary: `تسجيل امتحان: ${newExam.topic}`,
+      details: `${newExam.score}/${newExam.total} (${pct}%)`
+    });
 
     // Sync IMMEDIATELY to server & Firebase BEFORE running AI reaction
-    const syncOk = await triggerAutoSync({ exams: updated });
+    const syncOk = await triggerAutoSync({ exams: updated, changelog: nextLog });
     if (syncOk) {
       showToast('✅ تم تسجيل وحفظ نتيجة الامتحان في قاعدة البيانات بنجاح!');
     } else {
@@ -1013,18 +1325,142 @@ export const App: React.FC = () => {
     examsRef.current = updated;
     setExams(updated);
     safeSaveExamsLocalStorage(updated);
-    const syncOk = await triggerAutoSync({ exams: updated });
+    const nextLog = appendChangelog({
+      action: 'edit',
+      entityType: 'exam',
+      summary: `تعديل امتحان: ${updatedExam.topic}`,
+      details: `${updatedExam.score}/${updatedExam.total}`
+    });
+    const syncOk = await triggerAutoSync({ exams: updated, changelog: nextLog });
     showToast(syncOk ? '✅ تم حفظ تعديلات الامتحان والشهادة في القاعدة!' : '⚠️ تم التعديل محلياً — اضغط مزامنة');
   };
 
   // Delete Exam
   const handleDeleteExam = async (id: string) => {
+    const targetEx = examsRef.current.find((e) => e.id === id);
     const updated = examsRef.current.filter((e) => e.id !== id);
     examsRef.current = updated;
     setExams(updated);
     safeSaveExamsLocalStorage(updated);
-    const syncOk = await triggerAutoSync({ exams: updated });
+    const nextLog = appendChangelog({
+      action: 'delete',
+      entityType: 'exam',
+      summary: `حذف امتحان: ${targetEx?.topic || id}`
+    });
+    const syncOk = await triggerAutoSync({ exams: updated, changelog: nextLog });
     showToast(syncOk ? 'تم حذف سجل الامتحان من القاعدة' : 'تم الحذف محلياً');
+  };
+
+  // Official Timetable Exams Handlers
+  const handleSaveOfficialExam = async (payload: Omit<OfficialExam, 'id'> & { id?: string }) => {
+    const isEdit = Boolean(payload.id);
+    const record: OfficialExam = {
+      id: payload.id || `oex_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      subjId: payload.subjId,
+      title: payload.title,
+      date: payload.date,
+      period: payload.period,
+      syllabus: payload.syllabus,
+      notes: payload.notes
+    };
+
+    const updated = isEdit
+      ? officialExamsRef.current.map((o) => (o.id === record.id ? record : o))
+      : [...officialExamsRef.current, record];
+    updated.sort((a, b) => a.date.localeCompare(b.date));
+
+    officialExamsRef.current = updated;
+    setOfficialExams(updated);
+    try { localStorage.setItem('kareem_official_exams', JSON.stringify(updated)); } catch (e) {}
+
+    const nextLog = appendChangelog({
+      action: isEdit ? 'edit' : 'add',
+      entityType: 'official_exam',
+      summary: `${isEdit ? 'تعديل امتحان رسمي' : 'إضافة امتحان رسمي'}: ${record.title}`,
+      details: `${record.date} · ${record.period}`
+    });
+    const syncOk = await triggerAutoSync({ officialExams: updated, changelog: nextLog });
+    showToast(syncOk ? '✅ تم حفظ امتحان الجدول الرسمي وتفعيل تنبيه الليلة السابقة ✓' : 'تم الحفظ محلياً ✓');
+  };
+
+  const handleDeleteOfficialExam = async (id: string) => {
+    const target = officialExamsRef.current.find((o) => o.id === id);
+    const updated = officialExamsRef.current.filter((o) => o.id !== id);
+    officialExamsRef.current = updated;
+    setOfficialExams(updated);
+    try { localStorage.setItem('kareem_official_exams', JSON.stringify(updated)); } catch (e) {}
+    const nextLog = appendChangelog({
+      action: 'delete',
+      entityType: 'official_exam',
+      summary: `حذف امتحان رسمي: ${target?.title || id}`
+    });
+    await triggerAutoSync({ officialExams: updated, changelog: nextLog });
+    showToast('تم حذف الامتحان من الجدول الرسمي');
+  };
+
+  // Full JSON Download & Dated Cloud Backup Handlers
+  const handleExportFullBackup = async () => {
+    setIsBackingUp(true);
+    const payload = {
+      sessions: sessionsRef.current,
+      subjects,
+      exemptions: exemptionsRef.current,
+      exams: examsRef.current,
+      officialExams: officialExamsRef.current,
+      weeklyTasks: weeklyTasksRef.current,
+      completedTaskIds: Array.from(completedTaskIdsRef.current),
+      archivedWeeks: archivedWeeksRef.current,
+      activeWeekStartKey: activeWeekStartKeyRef.current,
+      lectures: lecturesRef.current,
+      changelog: changelogRef.current,
+      customAiInstructions,
+      theme,
+      vizMode
+    };
+    const res = await triggerFullBackupExport(payload);
+    const nextLog = appendChangelog({
+      action: 'backup',
+      entityType: 'backup',
+      summary: 'تحميل نسخة احتياطية كاملة (JSON)',
+      details: res.filename
+    });
+    triggerAutoSync({ changelog: nextLog });
+    setIsBackingUp(false);
+    showToast(`💾 تم تنزيل ملف النسخة الاحتياطية: ${res.filename}`);
+  };
+
+  const handleSaveCloudBackup = async () => {
+    setIsBackingUp(true);
+    const payload = {
+      sessions: sessionsRef.current,
+      subjects,
+      exemptions: exemptionsRef.current,
+      exams: examsRef.current,
+      officialExams: officialExamsRef.current,
+      weeklyTasks: weeklyTasksRef.current,
+      completedTaskIds: Array.from(completedTaskIdsRef.current),
+      archivedWeeks: archivedWeeksRef.current,
+      activeWeekStartKey: activeWeekStartKeyRef.current,
+      lectures: lecturesRef.current,
+      changelog: changelogRef.current,
+      customAiInstructions,
+      theme,
+      vizMode
+    };
+    const res = await saveCloudBackupSnapshot(payload);
+    if (res.ok) {
+      const nextLog = appendChangelog({
+        action: 'backup',
+        entityType: 'backup',
+        summary: `حفظ نسخة احتياطية مؤرخة: ${res.filename || res.backupKey}`,
+        details: res.cloudSaved ? 'محلي + Firebase Cloud' : 'محلي'
+      });
+      await triggerAutoSync({ changelog: nextLog });
+      showToast(`☁️ تم حفظ نسخة احتياطية بتاريخها (${res.filename || res.backupKey}) بنجاح!`);
+    } else {
+      showToast('⚠️ تعذر حفظ النسخة الاحتياطية في السيرفر — جرب «تصدير نسخة (JSON)»');
+    }
+    setIsBackingUp(false);
   };
 
   // Save Subjects Targets
@@ -1059,26 +1495,18 @@ export const App: React.FC = () => {
     const updatedSessions = sessions.filter(
       (s) => s.id !== id && s.fbKey !== id && (s.tsStart ? `ts_${s.tsStart}` !== id : true)
     );
+    sessionsRef.current = updatedSessions;
     setSessions(updatedSessions);
     try {
       localStorage.setItem('kareem_sessions', JSON.stringify(updatedSessions));
     } catch (e) {}
     showToast('تم حذف الجلسة من السجل');
-    saveDbData({
-      sessions: updatedSessions,
-      exemptions,
-      weeklyTasks,
-      completedTaskIds: Array.from(completedTaskIds),
-      lectures,
-      exams,
-      subjects,
-      customAiInstructions
-    });
+    triggerAutoSync({ sessions: updatedSessions });
   };
 
   // Add Manual Session
   const handleSaveManualSession = (sessionData: { subjId: string; minutes: number; task: string; date?: string }) => {
-    const sessionDate = sessionData.date || new Date().toISOString().split('T')[0];
+    const sessionDate = sessionData.date || toLocalYmd();
     const sessionTs = new Date(sessionDate).getTime() || Date.now();
     const newSession: Session = {
       id: `s_${Date.now()}`,
@@ -1095,23 +1523,14 @@ export const App: React.FC = () => {
     };
 
     const updatedSessions = [newSession, ...sessions];
+    sessionsRef.current = updatedSessions;
     setSessions(updatedSessions);
     try {
       localStorage.setItem('kareem_sessions', JSON.stringify(updatedSessions));
     } catch (e) {}
 
     showToast(`تم تسجيل وحفظ الجلسة (${sessionData.minutes} دقيقة) بنجاح ⚡`);
-
-    saveDbData({
-      sessions: updatedSessions,
-      exemptions,
-      weeklyTasks,
-      completedTaskIds: Array.from(completedTaskIds),
-      lectures,
-      exams,
-      subjects,
-      customAiInstructions
-    });
+    triggerAutoSync({ sessions: updatedSessions });
   };
 
   // Save Directives
@@ -1178,6 +1597,7 @@ export const App: React.FC = () => {
     };
 
     const updatedSessions = [newSession, ...sessions];
+    sessionsRef.current = updatedSessions;
     setSessions(updatedSessions);
     try {
       localStorage.setItem('kareem_sessions', JSON.stringify(updatedSessions));
@@ -1190,16 +1610,7 @@ export const App: React.FC = () => {
     saveActiveSession(null);
     showToast(`تم إنهاء وحفظ الجلسة (${mins} دقيقة) بنجاح ⚡`);
 
-    saveDbData({
-      sessions: updatedSessions,
-      exemptions,
-      weeklyTasks,
-      completedTaskIds: Array.from(completedTaskIds),
-      lectures,
-      exams,
-      subjects,
-      customAiInstructions
-    });
+    triggerAutoSync({ sessions: updatedSessions });
   };
 
   const handleCancelSession = () => {
@@ -1295,6 +1706,9 @@ export const App: React.FC = () => {
         onInstallPwa={handleInstallPwa}
         unreadNotificationsCount={notifications.filter(n => !n.read).length}
         onOpenNotifications={() => setIsNotificationCenterOpen(true)}
+        onExportBackup={handleExportFullBackup}
+        onSaveCloudBackup={handleSaveCloudBackup}
+        isBackingUp={isBackingUp}
       />
 
       <main className="container">
@@ -1407,6 +1821,7 @@ export const App: React.FC = () => {
             sessions={sessions}
             subjects={subjects}
             exams={exams}
+            officialExams={officialExams}
             weeklyTasks={weeklyTasks}
             completedTaskIds={completedTaskIds}
             lectures={lectures}
@@ -1429,13 +1844,20 @@ export const App: React.FC = () => {
             subjects={subjects}
             completedTaskIds={completedTaskIds}
             onToggleTask={handleToggleTask}
-            onOpenNewTaskModal={() => setIsNewTaskModalOpen(true)}
+            onOpenNewTaskModal={(initialDate) => {
+              setNewTaskInitialDate(initialDate);
+              setIsNewTaskModalOpen(true);
+            }}
             onOpenEditTask={handleOpenEditTask}
             onDeleteTask={handleDeleteTask}
             onUpdateAllTasks={handleUpdateAllTasks}
             archivedWeeks={archivedWeeks}
             onArchiveWeek={handleArchiveWeek}
             onOpenNotificationsCenter={() => setIsNotificationCenterOpen(true)}
+            activeWeekStartKey={activeWeekStartKey}
+            changelog={changelog}
+            officialExams={officialExams}
+            onLogEvent={appendChangelog}
             sessions={sessions}
             exams={exams}
             lectures={lectures}
@@ -1453,6 +1875,8 @@ export const App: React.FC = () => {
             lectures={lectures}
             subjects={subjects}
             onToggleLecture={handleToggleLecture}
+            onToggleLecturePart={handleToggleLecturePart}
+            onToggleLectureHomework={handleToggleLectureHomework}
             onOpenNewLectureModal={() => setIsNewLectureModalOpen(true)}
             onOpenEditLecture={handleOpenEditLecture}
             onDeleteLecture={handleDeleteLecture}
@@ -1465,7 +1889,7 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* VIEW 5: EXAMS & 95% RULE */}
+        {/* VIEW 5: EXAMS & 95% RULE + OFFICIAL TIMETABLE */}
         {currentTab === 'examsView' && (
           <ExamsView
             exams={exams}
@@ -1476,6 +1900,16 @@ export const App: React.FC = () => {
             onTriggerAudit={handleTriggerExamAudit}
             isAuditing={isAuditingExams}
             auditDiagnostic={examAuditReport}
+            officialExams={officialExams}
+            onOpenNewOfficialExam={() => {
+              setOfficialExamToEdit(null);
+              setIsOfficialExamModalOpen(true);
+            }}
+            onOpenEditOfficialExam={(oe) => {
+              setOfficialExamToEdit(oe);
+              setIsOfficialExamModalOpen(true);
+            }}
+            onDeleteOfficialExam={handleDeleteOfficialExam}
           />
         )}
 
@@ -1538,6 +1972,18 @@ export const App: React.FC = () => {
             }}
           />
         )}
+        {/* VIEW 10: READ-ONLY QUICK STATS SCREEN (?view=stats) */}
+        {currentTab === 'quickStatsView' && (
+          <QuickStatsView
+            sessions={sessions}
+            subjects={subjects}
+            lectures={lectures}
+            weeklyTasks={weeklyTasks}
+            completedTaskIds={completedTaskIds}
+            officialExams={officialExams}
+            onNavigateFullApp={() => setCurrentTab('dashView')}
+          />
+        )}
       </main>
 
       {/* Modals */}
@@ -1576,8 +2022,13 @@ export const App: React.FC = () => {
 
       <NewTaskModal
         isOpen={isNewTaskModalOpen}
-        onClose={() => setIsNewTaskModalOpen(false)}
+        onClose={() => {
+          setIsNewTaskModalOpen(false);
+          setNewTaskInitialDate(undefined);
+        }}
         subjects={subjects}
+        defaultWeekStartKey={activeWeekStartKey}
+        initialDate={newTaskInitialDate}
         onSave={handleSaveNewTask}
       />
 
@@ -1595,6 +2046,18 @@ export const App: React.FC = () => {
         onClose={() => setIsNewLectureModalOpen(false)}
         subjects={subjects}
         onSave={handleSaveNewLecture}
+      />
+
+      <OfficialExamModal
+        isOpen={isOfficialExamModalOpen}
+        onClose={() => {
+          setIsOfficialExamModalOpen(false);
+          setOfficialExamToEdit(null);
+        }}
+        subjects={subjects}
+        officialExam={officialExamToEdit}
+        onSave={handleSaveOfficialExam}
+        onDelete={handleDeleteOfficialExam}
       />
 
       <EditLectureModal
